@@ -13,7 +13,7 @@ import datetime
 def main():
     given_time = datetime.datetime(2017, 1, 13, 16, 27, 00, 100000)
 
-    t_delta = datetime.timedelta(hours=-9)
+    t_delta = datetime.timedelta(hours=-8)
 
     actual_time = given_time + t_delta
 
