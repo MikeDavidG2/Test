@@ -19,7 +19,7 @@ def main():
 
 def Set_Time_Fields(table):
 
-    with arcpy.da.SearchCursor(table, ['CreationDate_String']) as cursor:
+    with arcpy.da.UpdateCursor(table, ['CreationDate_String', 'SampleDate', 'SampleTime']) as cursor:
 
         for row in cursor:
 
@@ -34,10 +34,15 @@ def Set_Time_Fields(table):
 
             sample_date = [PCT_dt_obj.strftime('%m/%d/%Y')]
 
-            survey_time = [PCT_dt_obj.strftime('%H:%M')]
+            sample_time = [PCT_dt_obj.strftime('%H:%M')]
 
             print 'Sample Date: ' + sample_date[0]
-            print 'Survey Time: ' + survey_time[0]
+            row[1] = sample_date[0]
+            print 'Survey Time: ' + sample_time[0]
+            row[2] = sample_time[0]
+
+            # Update the cursor with the updated list
+            cursor.updateRow(row)
 
 #TODO: Make an update cursor to write the values to the rows
 
