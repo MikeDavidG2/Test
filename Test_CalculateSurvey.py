@@ -44,9 +44,6 @@ def Set_Time_Fields(table):
             # Update the cursor with the updated list
             cursor.updateRow(row)
 
-#TODO: Make an update cursor to write the values to the rows
-
-
 if __name__ == '__main__':
     main()
 
