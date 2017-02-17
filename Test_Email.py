@@ -24,12 +24,13 @@ def main():
     errorSTATUS = 0
     cfgFile = r"U:\grue\Scripts\GitHub\DPW-Sci-Monitoring\Master\accounts.txt"
     dpw_email_list = ['michael.grue@sdcounty.ca.gov', 'mikedavidg2@gmail.com']
-    lueg_admin_email = ['michael.grue@stcounty.ca.gov']
+    lueg_admin_email = ['michael.grue@sdcounty.ca.gov']
     prod_FGDB = r'U:\grue\Scripts\GitHub\DPW-Sci-Monitoring\Data'
     attach_folder = r'U:\grue\Scripts\GitHub\DPW-Sci-Monitoring\Data\Sci_Monitoring_pics'
     SmpEvntIDs_dl = ['feature1', 'feature2', 'feature3']
-    SmpEvntIDs_dl = []
+    ##SmpEvntIDs_dl = []
     New_Loc_Descs = ['List of descriptions', '  new suggestion...', '  new suggestion...']
+    new_locs      = ['List of locations that were moved', 'first moved location', 'second moved location']
     fileLog = 'C:\\fileLog_address_here'
     start_time = datetime.datetime.now()
 
@@ -37,12 +38,12 @@ def main():
     dt_last_ret_data = datetime.datetime.now()
 
     # Send info to function
-    Email_Results(errorSTATUS, cfgFile, dpw_email_list, lueg_admin_email, fileLog, start_time, dt_last_ret_data, prod_FGDB, attach_folder, SmpEvntIDs_dl, New_Loc_Descs)
+    Email_Results(errorSTATUS, cfgFile, dpw_email_list, lueg_admin_email, fileLog, start_time, dt_last_ret_data, prod_FGDB, attach_folder, SmpEvntIDs_dl, New_Loc_Descs, new_locs)
 
 #-------------------------------------------------------------------------------
 #-------------------------------------------------------------------------------
 #                           FUNCTION:  Email Results
-def Email_Results(errorSTATUS, cfgFile, dpw_email_list, lueg_admin_email, log_file, start_time_obj, dt_last_ret_data, prod_FGDB, attach_folder, dl_features_ls, new_loc_descs):
+def Email_Results(errorSTATUS, cfgFile, dpw_email_list, lueg_admin_email, log_file, start_time_obj, dt_last_ret_data, prod_FGDB, attach_folder, dl_features_ls, new_loc_descs, new_locs):
     print 'Emailing Results...'
 
     #---------------------------------------------------------------------------
@@ -60,6 +61,10 @@ def Email_Results(errorSTATUS, cfgFile, dpw_email_list, lueg_admin_email, log_fi
 
     # Get the number of downloaded features
     num_dl_features = len(dl_features_ls)
+
+    # Get a formatted string of the new_loc_descs and new_locs
+    str_new_loc_descs = ' <br> &nbsp;'.join(new_loc_descs) # join each item in the list with a line break and a tab
+    str_new_locs      = ' <br> &nbsp;'.join(new_locs)
 
     #---------------------------------------------------------------------------
     #                         Write the "Success" email
@@ -79,21 +84,38 @@ def Email_Results(errorSTATUS, cfgFile, dpw_email_list, lueg_admin_email, log_fi
         <html>
           <head></head>
           <body>
-            <h3>Times:</h3>
-            <p>The script started at:             <i>{st}</i><br>
-               The script finished at:            <i>{ft}</i><br>
+            <h3>New Locations and New Location Descriptions</h3>
+            <p>
+               {nld}
+            <br>
+            <br>
+               {nl}
             </p>
             <br>
+
+            <h3>Times:</h3>
+            <p>
+               The script started at:             <i>{st}</i><br>
+               The script finished at:            <i>{ft}</i><br>
+               The data retrieved was between:    <i>{dlr}</i>
+               and the start time of the script.
+            </p>
+            <br>
+
             <h3>Info and Locations:</h3>
-            <p>There were <b>{num}</b> features downloaded this run.<br>
+            <p>
+               There were <b>{num}</b> features downloaded this run.<br>
                You can find the updated FGDB at:  <i>{fgdb}</i><br>
                All Images are located at:         <i>{af}</i><br>
                The Log file is located at:        <i>{lf}</i><br>
+
             </p>
           </body>
         </html>
-        """.format(st = start_time[0], ft = finish_time[0], num = num_dl_features,
-                   fgdb = prod_FGDB, af = attach_folder, lf = log_file))
+        """.format(nld = str_new_loc_descs, nl = str_new_locs, st = start_time[0],
+                   ft = finish_time[0], dlr = data_last_retrieved[0],
+                   num = num_dl_features, fgdb = prod_FGDB, af = attach_folder,
+                   lf = log_file))
 
     #---------------------------------------------------------------------------
     #                     Write the "No Data Downloaded' email
@@ -106,7 +128,7 @@ def Email_Results(errorSTATUS, cfgFile, dpw_email_list, lueg_admin_email, log_fi
         email_list = lueg_admin_email
 
         # Format the Subject for the 'No Data Downloaded' email
-        subj = 'No Data Downloaded for DPW_Science_and_Monitoring.py script'
+        subj = 'No Data Downloaded for DPW_Science_and_Monitoring.py Script'
 
         # Format the Body in html
         body  = ("""\
@@ -120,12 +142,14 @@ def Email_Results(errorSTATUS, cfgFile, dpw_email_list, lueg_admin_email, log_fi
             <br>
             <h3>Info and Locations:</h3>
             <p>There were <b>{num}</b> features downloaded this run.<br>
-               This is NOT an error IF there was no data collected between the date the data was last retrieved... <i>{dlr}</i> ... and now.
+               This is NOT an error IF there was no data collected between the
+               date the data was last retrieved... <i>{dlr}</i> ... and now.<br>
                The Log file is located at:        <i>{lf}</i><br>
             </p>
           </body>
         </html>
-        """.format(st = start_time, ft = finish_time, num = num_dl_features, dlr = data_last_retrieved, lf = log_file))
+        """.format(st = start_time[0], ft = finish_time[0], num = num_dl_features,
+                   dlr = data_last_retrieved[0], lf = log_file))
 
     #---------------------------------------------------------------------------
     #                        Write the "Errors" email
@@ -148,16 +172,21 @@ def Email_Results(errorSTATUS, cfgFile, dpw_email_list, lueg_admin_email, log_fi
         <html>
           <head></head>
           <body>
-            <p>There were ERRORS with the DPW_Science_and_Monitoring.py script.<br>
-               The script started at:             <i>{st}</i><br>
+            <h2>ERROR</h2>
+            <h3>Times:</h3>
+            <p>The script started at:             <i>{st}</i><br>
                The error happened at:             <i>{ft}</i><br>
+            </p>
+            <br>
+            <h3>Info and Locations:</h3>
+            <p>There were ERRORS with the DPW_Science_and_Monitoring.py script.<br>
                The Log file is located at:        <i>{lf}</i><br>
                The script is located at:          <i>{cwd}</i><br>
             </p>
           <body>
         </html>
 
-        """.format(st = start_time, ft = finish_time, lf = log_file, cwd = cwd))
+        """.format(st = start_time[0], ft = finish_time[0], lf = log_file, cwd = cwd))
 
     #---------------------------------------------------------------------------
     #---------------------------------------------------------------------------

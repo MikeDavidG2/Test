@@ -12,11 +12,13 @@ from email.mime.multipart import MIMEMultipart
 from email import encoders
 from email.message import Message
 from email.mime.text import MIMEText
-import arcpy as gpRMA 
+import arcpy as gpRMA
 
 old_outputRMA = sys.stdout
 timestart = str(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()))
 stimes = time.time()
+
+print 'TEST initial test'
 
 ### Set some variables
 todaystr    = str(time.strftime("%Y%m%d", time.localtime()))
@@ -46,14 +48,15 @@ logFileNameRMA = str(wkgFolder) + "\\..\\log\\reportRMAs_" + str(time.strftime("
 logFileRMA = open(logFileNameRMA,"w")
 sys.stdout = logFileRMA
 
+
 #######################################################################################
 #######################################################################################
 ###  Set any changeable variables between here ---------------------------------->  ###
 roadbuffer  = 40    ###  <-- Change the road buffer distance (number of FEET) here!
 distcutoff  = 5280  ###  <-- Change the cutoff distance (number of FEET) here!
 cfgFile     = "M:\\scripts\\configFiles\\accounts.txt"
-stmwtrPeeps = ["gary.ross@sdcounty.ca.gov",]#["alex.romo@sdcounty.ca.gov","randy.yakos@sdcounty.ca.gov","gary.ross@sdcounty.ca.gov"]
-scriptAdmin = ["gary.ross@sdcounty.ca.gov",]#["randy.yakos@sdcounty.ca.gov","gary.ross@sdcounty.ca.gov"]
+stmwtrPeeps = ['michael.grue@sdcounty.ca.gov']#["gary.ross@sdcounty.ca.gov",]#["alex.romo@sdcounty.ca.gov","randy.yakos@sdcounty.ca.gov","gary.ross@sdcounty.ca.gov"]
+scriptAdmin = ['michael.grue@sdcounty.ca.gov']#["gary.ross@sdcounty.ca.gov",]#["randy.yakos@sdcounty.ca.gov","gary.ross@sdcounty.ca.gov"]
 fromEmail   = "dplugis@gmail.com"
 ###  <-------------------------------------------------------------------  and here ###
 #######################################################################################
@@ -97,7 +100,7 @@ try:
 except:
     errorSTATUS = 1
     print "********* ERROR during preliminary setup... *********"
-    
+
 ### Get AGOL token
 try:
     if errorSTATUS == 0:
@@ -134,7 +137,7 @@ try:
         print str(fsURL)
         fs = gpRMA.FeatureSet()
         print "10"
-        fs.load('Track_line')#fs.load(fsURL)
+        fs.load(fsURL)#fs.load('Track_line')
         print "20"
         gpRMA.CreateFileGDB_management(wkgFolder,wkgGDB)
         print "30"
@@ -178,13 +181,13 @@ try:
                 gpRMA.management.MakeFeatureLayer(cmroads,"cmrLyr","\"ASSET_STATUS\" = 'ACTIVE' AND \"JURISDICTION\" = 'CMR - COUNTY-MAINTAINED ROAD'")
                 gpRMA.SelectLayerByLocation_management("bufferTrackLyr","INTERSECT","cmrLyr")
                 gpRMA.CopyFeatures_management("bufferTrackLyr","cmrbuffer")
-                gpRMA.MakeFeatureLayer_management("tempTESTtrackSPLITrefine","trackTEMPLyr") 
+                gpRMA.MakeFeatureLayer_management("tempTESTtrackSPLITrefine","trackTEMPLyr")
                 gpRMA.SelectLayerByLocation_management("trackTEMPLyr","INTERSECT","cmrbuffer")
                 gpRMA.CopyFeatures_management("trackTEMPLyr","cmrTrackTEMP")
                 gpRMA.Dissolve_management("cmrTrackTEMP","cmrTrack","","","MULTI_PART","UNSPLIT_LINES")
                 # Compare to parcels
                 print "Identifying parcels..."
-                gpRMA.MakeFeatureLayer_management(parcels,"parcelsLyr") 
+                gpRMA.MakeFeatureLayer_management(parcels,"parcelsLyr")
                 gpRMA.SelectLayerByLocation_management("parcelsLyr","INTERSECT","bufferTrack")
                 gpRMA.CopyFeatures_management("parcelsLyr","parcelsTEMP")
                 # Dissolve parcels by parcel ID (to only count "stacked" (e.g., condo) parcels once)
@@ -269,7 +272,7 @@ try:
             ctype = "application/octet-stream"
         maintype, subtype = ctype.split("/", 1)
         with open (rptPath) as fpRMA:
-            attachmentRMA = MIMEText(fpRMA.read(), _subtype=subtype)        
+            attachmentRMA = MIMEText(fpRMA.read(), _subtype=subtype)
         attachmentRMA.add_header("Content-Disposition","attachment",filename=rptPath)
         msgRMA.attach(attachmentRMA)
         # Send the email
@@ -331,8 +334,8 @@ try:
 except:
     errorSTATUS = 1
     print "********* ERROR while emailing... *********"
-    
-    
+
+
 ##### END processing - do clerical messaging
 timeend = str(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()))
 etimee = time.time()
