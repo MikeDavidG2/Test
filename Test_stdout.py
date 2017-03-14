@@ -12,6 +12,7 @@ import sys
 
 def main():
     old_stdout = sys.stdout
+    print old_stdout
 
     log_file = r'U:\grue\Scripts\GitHub\DPW-Sci-Monitoring\Data\Logs\test.log'
 
