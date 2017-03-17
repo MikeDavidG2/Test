@@ -18,9 +18,10 @@ from datetime import datetime
 def main():
 
     # Set Variables
-    xml_file = r"U:\grue\Projects\GaryProjects\DEH_HMD_FIRST_RESPONDER_INDEX_sample ORIG.xml"
-    xml_file = r"U:\grue\Projects\GaryProjects\DEH_HMD_FIRST_RESPONDER_INDEX.xml"
-    xml_file = r"U:\grue\Projects\GaryProjects\DEH_HMD_FIRST_RESPONDER_INDEX.xml"
+    working_folder = r'U:\grue\Projects\GaryProjects'
+
+    xml_file = working_folder + r"\DEH_HMD_FIRST_RESPONDER_INDEX_sample ORIG.xml"
+    ##xml_file = working_folder + r"\DEH_HMD_FIRST_RESPONDER_INDEX.xml"
     ##xml_file = r"U:\grue\Projects\GaryProjects\DEH_HMD_FIRST_RESPONDER_INDEX First 5000 records.xml"
     ##xml_file = r"U:\grue\Projects\GaryProjects\DEH_HMD_FIRST_RESPONDER_INDEX 5001 to 10000.xml"
     ##xml_file = r"U:\grue\Projects\GaryProjects\DEH_HMD_FIRST_RESPONDER_INDEX last 4015.xml"
@@ -29,12 +30,14 @@ def main():
     num_records_to_process = 10
 
     # Folder CSV file will be saved to
-    csv_folder = r'U:\grue\Projects\GaryProjects\csv_files'
+    csv_folder = working_folder + '\csv_files'
     csv_file_name = 'xml_to_csv'
 
     # FGDB the CSV will be imported to
-    fgdb_path = r'U:\grue\Projects\GaryProjects\test.gdb'
+    fgdb_path = working_folder + r'\test.gdb'
     table_name = 'csv_to_table'
+
+
 
     #---------------------------------------------------------------------------
     #---------------------------------------------------------------------------
@@ -42,6 +45,7 @@ def main():
     csv_path_file, dt = xml_to_csv(xml_file, csv_folder, csv_file_name, fgdb_path, table_name, num_records_to_process)
 
     csv_to_feature_class(csv_path_file, fgdb_path, table_name, dt)
+
 
 #-------------------------------------------------------------------------------
 #+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -149,7 +153,7 @@ def csv_to_feature_class(csv_path_file, fgdb_path, table_name, dt):
     #---------------------------------------------------------------------------
     #                   Turn table into a Feature Class
 
-# TODO: fill this out
+    # TODO: fill this out
 
 
 
