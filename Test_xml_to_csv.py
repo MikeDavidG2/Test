@@ -20,7 +20,7 @@ def main():
     # Set Variables
     xml_file = r"U:\grue\Projects\GaryProjects\DEH_HMD_FIRST_RESPONDER_INDEX_sample ORIG.xml"
     xml_file = r"U:\grue\Projects\GaryProjects\DEH_HMD_FIRST_RESPONDER_INDEX.xml"
-    xml_file = r"U:\grue\Projects\GaryProjects\DEH_HMD_FIRST_RESPONDER_INDEX copy.xml"
+    xml_file = r"U:\grue\Projects\GaryProjects\DEH_HMD_FIRST_RESPONDER_INDEX.xml"
     ##xml_file = r"U:\grue\Projects\GaryProjects\DEH_HMD_FIRST_RESPONDER_INDEX First 5000 records.xml"
     ##xml_file = r"U:\grue\Projects\GaryProjects\DEH_HMD_FIRST_RESPONDER_INDEX 5001 to 10000.xml"
     ##xml_file = r"U:\grue\Projects\GaryProjects\DEH_HMD_FIRST_RESPONDER_INDEX last 4015.xml"
@@ -38,14 +38,17 @@ def main():
 
     #---------------------------------------------------------------------------
     #---------------------------------------------------------------------------
-    # Call function
-    xml_to_table(xml_file, csv_folder, csv_file_name, fgdb_path, table_name, num_records_to_process)
+    # Call functions
+    csv_path_file, dt = xml_to_csv(xml_file, csv_folder, csv_file_name, fgdb_path, table_name, num_records_to_process)
+
+    csv_to_feature_class(csv_path_file, fgdb_path, table_name, dt)
 
 #-------------------------------------------------------------------------------
+#+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 #-------------------------------------------------------------------------------
 #                          FUNCTION: xml_to_table()
 
-def xml_to_table(xml_file, csv_folder, csv_file_name, fgdb_path, table_name, num_records_to_process):
+def xml_to_csv(xml_file, csv_folder, csv_file_name, fgdb_path, table_name, num_records_to_process):
 
     #---------------------------------------------------------------------------
     #                    Create CSV file with headers
@@ -94,9 +97,14 @@ def xml_to_table(xml_file, csv_folder, csv_file_name, fgdb_path, table_name, num
                 writer = csv.writer(csv_file)
                 writer.writerow(row_info)
 
-    #---------------------------------------------------------------------------
+    print 'Done with xml_to_csv()'
+    return csv_path_file, dt
+
+#-------------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
     #                    Import csv to FGDB table
 
+def csv_to_feature_class(csv_path_file, fgdb_path, table_name, dt):
     #TODO: put this part into a separate function to see if that resolves the existing connection being closed error
     in_rows  = csv_path_file
     out_path = fgdb_path
