@@ -27,7 +27,7 @@ def main():
     # XML file to read
     xml_folder      = working_folder + r'\xml_files'
     xml_file_name   = r'\DEH_HMD_FIRST_RESPONDER_INDEX_sample ORIG.xml'
-    ##xml_file_name   = r"\DEH_HMD_FIRST_RESPONDER_INDEX.xml"
+    xml_file_name   = r"\DEH_HMD_FIRST_RESPONDER_INDEX.xml"
     xml_path_file   = xml_folder + '\\' + xml_file_name
 
     # CSV file to be saved
@@ -84,7 +84,7 @@ def main():
         csv_to_table(csv_path_file, fgdb_path, table_name)
 
     # Turn table into a Feature Class
-    if table_to_fc:
+    if run_table_to_fc:
         table_to_fc()
 
 
@@ -200,6 +200,7 @@ def csv_to_table(csv_path_file, fgdb_path, table_name):
 
 #-------------------------------------------------------------------------------
 def table_to_fc():
+    pass
 
 #-------------------------------------------------------------------------------
 #****************************     RUN MAIN    **********************************
