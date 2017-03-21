@@ -30,6 +30,7 @@ def main():
     # Folder CSV file will be saved to
     csv_folder = working_folder + '\csv_files'
     csv_file_name = 'temp_csv.csv'
+    csv_path_file = csv_folder + '\\' + csv_file_name
 
     # FGDB the CSV will be imported to
     fgdb_path = working_folder + r'\test.gdb'
@@ -38,7 +39,7 @@ def main():
     #---------------------------------------------------------------------------
     #             Set variables that shouldn't have to be changed
 
-    csv_path_file = csv_folder + '\\' + csv_file_name
+
 
 
     #---------------------------------------------------------------------------
