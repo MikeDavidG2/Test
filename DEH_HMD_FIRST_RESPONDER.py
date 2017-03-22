@@ -27,7 +27,7 @@ def main():
     # XML file to read
     xml_folder      = working_folder + r'\xml_files'
     xml_file_name   = r'\DEH_HMD_FIRST_RESPONDER_INDEX_sample ORIG.xml'
-    xml_file_name   = r"\DEH_HMD_FIRST_RESPONDER_INDEX.xml"
+    xml_file_name   = r"\DEH_HMD_FIRST_RESPONDER_INDEX.xml" # The FULL dataset
     xml_path_file   = xml_folder + '\\' + xml_file_name
 
     # CSV file to be saved
@@ -38,6 +38,7 @@ def main():
     # FGDB the CSV will be imported to
     fgdb_path  = working_folder + r'\test.gdb'
     table_name = 'csv_to_table'
+    fc_name    = 'DEH_HMD_FIRST_RESPONDER'
 
     #---------------------------------------------------------------------------
     # Below are variables used with the batch file to control which functions are called
@@ -85,13 +86,15 @@ def main():
 
     # Turn table into a Feature Class
     if run_table_to_fc:
-        table_to_fc()
+        table_to_fc(fgdb_path, table_name, fc_name)
 
 
     print 'FINISHED with DEH_HMD_FIRST_RESPONDER.py!'
 
 #-------------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 #********************    START DEFINING FUNCTIONS    ***************************
+#-------------------------------------------------------------------------------
 #-------------------------------------------------------------------------------
 
 #                        FUNCTION: create_csv()
@@ -160,7 +163,6 @@ def csv_to_table(csv_path_file, fgdb_path, table_name):
     out_name = table_name
 
     print '  Importing csv to FGDB: "{}\{}"...'.format(out_path, out_name)
-
     arcpy.TableToTable_conversion(in_rows, out_path, out_name)
 
     print '  Imported\n'
@@ -177,7 +179,6 @@ def csv_to_table(csv_path_file, fgdb_path, table_name):
     field_length = 25
 
     print '  Adding field: "{}"'.format(field_name)
-
     arcpy.AddField_management (in_table, field_name, field_type, field_length)
 
     # Calculate new field to equal the RECORD_ID_temp
@@ -185,22 +186,46 @@ def csv_to_table(csv_path_file, fgdb_path, table_name):
     expression_typ = 'PYTHON_9.3'
 
     print '  Calculating field: "{}" so that it equals: "{}"'.format(field_name, expression)
-
     arcpy.CalculateField_management (in_table, field_name, expression, expression_typ)
 
     # Delete RECORD_ID_temp
     drop_field = 'RECORD_ID_temp'
 
-    print '  Deleting field: "{}"'.format(drop_field)
+    print '  Deleting field: "{}"\n'.format(drop_field)
     arcpy.DeleteField_management(in_table, drop_field)
 
-    print '\nDone with csv_to_table()\n'
+    print 'Done with csv_to_table()\n'
 
     return
 
 #-------------------------------------------------------------------------------
-def table_to_fc():
-    pass
+def table_to_fc(fgdb_path, table_name, fc_name):
+    """Turn the Table into a Feature Class"""
+
+    print 'Turning the Table into a Feature Class...'
+
+    # Make an XY Event Layer from the Table
+    table = fgdb_path + '\\' + table_name
+    in_x_field = 'LONGITUDE_WGS84_GEOINFO'
+    in_y_field = 'LATITUDE_WGS84_GEOINFO'
+    out_layer  = fc_name + '_lyr'
+    spatial_reference = arcpy.SpatialReference(4269)
+
+    print '  Making XY Event Layer\n    From: "{}"\n    Named: "{}"\n'.format(table, out_layer)
+    arcpy.MakeXYEventLayer_management (table, in_x_field, in_y_field, out_layer,
+                                       spatial_reference)
+
+    # Save the XY Event Layer to a Feature Class
+    in_features = out_layer
+    out_path    = fgdb_path
+    out_name    = fc_name
+
+    print '  Saving XY Event Layer "{}"\n    To: "{}"\n    Named: "{}"\n'.format(in_features, out_path, out_name)
+    arcpy.FeatureClassToFeatureClass_conversion(in_features, out_path, out_name)
+
+    print 'Done with table_to_fc()\n'
+
+    return
 
 #-------------------------------------------------------------------------------
 #****************************     RUN MAIN    **********************************
