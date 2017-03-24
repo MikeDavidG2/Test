@@ -27,7 +27,8 @@ def main():
     # XML file to read
     xml_folder      = working_folder + r'\xml_files'
     xml_file_name   = r'\DEH_HMD_FIRST_RESPONDER_INDEX_sample ORIG.xml'
-    xml_file_name   = r"\DEH_HMD_FIRST_RESPONDER_INDEX.xml" # The FULL dataset
+    xml_file_name   = r'\DEH_HMD_FIRST_RESPONDER_INDEX_OneELEMENT.xml'
+    ##xml_file_name   = r"\DEH_HMD_FIRST_RESPONDER_INDEX.xml" # The FULL dataset
     xml_path_file   = xml_folder + '\\' + xml_file_name
 
     # CSV file to be saved
@@ -51,7 +52,7 @@ def main():
     run_table_to_fc  = False
 
     # Use parameter from batch file calling this script to drive which functions are called
-    xml_to_csv_OR_csv_to_fc = arcpy.GetParameterAsText(0)
+    xml_to_csv_OR_csv_to_fc = arcpy.GetParameterAsText(0) or 'xml_to_csv' #TODO: remove this 'or' when done testing
 
     if xml_to_csv_OR_csv_to_fc == 'xml_to_csv':
         run_create_csv   = True
@@ -74,11 +75,11 @@ def main():
 
     # Create the CSV
     if run_create_csv:
-        create_csv(csv_path_file)
+        details_list, keys = create_csv(xml_path_file, csv_path_file)
 
     # Read xml and parse to csv file
     if run_xml_to_csv:
-        xml_to_csv(xml_path_file, csv_path_file)
+        xml_to_csv(xml_path_file, csv_path_file, details_list, keys)
 
     # Import csv file, process table
     if run_csv_to_table:
@@ -98,13 +99,25 @@ def main():
 #-------------------------------------------------------------------------------
 
 #                        FUNCTION: create_csv()
-def create_csv(csv_path_file):
+def create_csv(xml_path_file, csv_path_file):
     """Create CSV file with headers"""
 
     print 'Creating CSV file at: {}...'.format(csv_path_file)
 
+
+    # Get connection to the xml file
+    xml_doc = minidom.parse(xml_path_file)
+    details_list = xml_doc.getElementsByTagName('Details')
+
+    # Get a list of headers from first elements attribute keys as a template
+    detail = details_list[0]
+    keys = detail.attributes.keys()
+    keys.sort()
+    print keys
+    print len(keys)
+
     #Set the headers for the file
-    headers = ['RECORD_ID_temp', 'LATITUDE_WGS84_GEOINFO', 'LONGITUDE_WGS84_GEOINFO']
+    headers = keys
 
     #Create the CSV with headers
     with open(csv_path_file, 'wb') as csv_file:
@@ -113,37 +126,46 @@ def create_csv(csv_path_file):
 
     print 'Done with create_csv()\n'
 
-    return
+    return details_list, keys
 
 #-------------------------------------------------------------------------------
 
 #                          FUNCTION: xml_to_csv()
-def xml_to_csv(xml_path_file, csv_path_file):
+def xml_to_csv(xml_path_file, csv_path_file, details_list, keys):
     """xml to csv"""
 
     print 'Parsing xml to csv...'
     # Get connection to the xml file
-    xml_doc = minidom.parse(xml_path_file)
-    item_list = xml_doc.getElementsByTagName('Details')
+##    xml_doc = minidom.parse(xml_path_file)
+##    item_list = xml_doc.getElementsByTagName('Details')
 
-    print '  There are {} records in "{}" to write to the csv\n'.format(str(len(item_list)), xml_path_file)
+    print '  There are {} records in "{}" to write to the csv\n'.format(str(len(details_list)), xml_path_file)
 
+    row_info = []
     # Go through each item in 'Details' and get defined values
-    for count, item in enumerate(item_list):
-
-        # Get value for each 'Details' row
-        record_id  = item.attributes['RECORD_ID'].value
-        lat_wgs84  = item.attributes['LATITUDE_WGS84_GEOINFO'].value
-        long_wgs84 = item.attributes['LONGITUDE_WGS84_GEOINFO'].value
+    for count, detail in enumerate(details_list):
+        print 'count: ' + str(count)
+        row_info = []
+        for key in keys:
+            print 'key: ' + key
+            print 'value: ' + detail.attributes[key].value
+            value = detail.attributes[key].value
+            row_info.append(value)
+##        # Get value for each 'Details' row
+##        record_id  = detail.attributes['RECORD_ID'].value
+##        lat_wgs84  = detail.attributes['LATITUDE_WGS84_GEOINFO'].value
+##        long_wgs84 = detail.attributes['LONGITUDE_WGS84_GEOINFO'].value
 
         # Set values into one list
-        row_info = [record_id, lat_wgs84, long_wgs84]
+##        row_info = [record_id, lat_wgs84, long_wgs84]
+
 
         # Set list into csv file
         with open(csv_path_file, 'ab') as csv_file:
-            print 'Writing to csv:\n  Record ID:  {}\n  Latitude:   {}\n  Longitude: {}\n'.format(record_id, lat_wgs84, long_wgs84)
+            ##print 'Writing to csv:\n  Record ID:  {}\n  Latitude:   {}\n  Longitude: {}\n'.format(record_id, lat_wgs84, long_wgs84)
             writer = csv.writer(csv_file)
             writer.writerow(row_info)
+            del row_info
 
     print 'Done with xml_to_csv()\n'
 
