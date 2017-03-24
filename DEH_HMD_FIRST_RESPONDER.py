@@ -27,8 +27,8 @@ def main():
     # XML file to read
     xml_folder      = working_folder + r'\xml_files'
     xml_file_name   = r'\DEH_HMD_FIRST_RESPONDER_INDEX_sample ORIG.xml'
-    xml_file_name   = r'\DEH_HMD_FIRST_RESPONDER_INDEX_OneELEMENT.xml'
-    ##xml_file_name   = r"\DEH_HMD_FIRST_RESPONDER_INDEX.xml" # The FULL dataset
+    ##xml_file_name   = r'\DEH_HMD_FIRST_RESPONDER_INDEX_OneELEMENT.xml'
+    xml_file_name   = r"\DEH_HMD_FIRST_RESPONDER_INDEX.xml" # The FULL dataset
     xml_path_file   = xml_folder + '\\' + xml_file_name
 
     # CSV file to be saved
@@ -75,11 +75,11 @@ def main():
 
     # Create the CSV
     if run_create_csv:
-        details_list, keys = create_csv(xml_path_file, csv_path_file)
+        details_list, full_key_list = create_csv(xml_path_file, csv_path_file)
 
     # Read xml and parse to csv file
     if run_xml_to_csv:
-        xml_to_csv(xml_path_file, csv_path_file, details_list, keys)
+        xml_to_csv(xml_path_file, csv_path_file, details_list, full_key_list)
 
     # Import csv file, process table
     if run_csv_to_table:
@@ -109,15 +109,23 @@ def create_csv(xml_path_file, csv_path_file):
     xml_doc = minidom.parse(xml_path_file)
     details_list = xml_doc.getElementsByTagName('Details')
 
-    # Get a list of headers from first elements attribute keys as a template
-    detail = details_list[0]
-    keys = detail.attributes.keys()
-    keys.sort()
-    print keys
-    print len(keys)
+    # Each detauls element may have different keys so cycle through the elements
+    # to get a list of headers from the elements
+    full_key_list = []
+    for count in range (len(details_list)):
+        detail = details_list[count]
+        keys = detail.attributes.keys()
+
+        for key in keys:
+            if key not in full_key_list:
+                full_key_list.append(key)
+
+    full_key_list.sort()
+    print full_key_list
+    print len(full_key_list)
 
     #Set the headers for the file
-    headers = keys
+    headers = full_key_list
 
     #Create the CSV with headers
     with open(csv_path_file, 'wb') as csv_file:
@@ -126,12 +134,12 @@ def create_csv(xml_path_file, csv_path_file):
 
     print 'Done with create_csv()\n'
 
-    return details_list, keys
+    return details_list, full_key_list
 
 #-------------------------------------------------------------------------------
 
 #                          FUNCTION: xml_to_csv()
-def xml_to_csv(xml_path_file, csv_path_file, details_list, keys):
+def xml_to_csv(xml_path_file, csv_path_file, details_list, full_key_list):
     """xml to csv"""
 
     print 'Parsing xml to csv...'
@@ -144,13 +152,23 @@ def xml_to_csv(xml_path_file, csv_path_file, details_list, keys):
     row_info = []
     # Go through each item in 'Details' and get defined values
     for count, detail in enumerate(details_list):
-        print 'count: ' + str(count)
+        print '\n\ncount: {}\n\n'.format(str(count))
         row_info = []
-        for key in keys:
+        for key in full_key_list:
             print 'key: ' + key
-            print 'value: ' + detail.attributes[key].value
-            value = detail.attributes[key].value
+            try:
+                value = detail.attributes[key].value
+            except:
+                value = 'Value not in xml element'
+
+            try:
+                print 'value: {}\n'.format(value)
+            except:
+                print 'Couldn\'t print value'
+                value = 'Value couldn\'t be written.  XML Value contains a non-ascii character. Most likely an enye'
+
             row_info.append(value)
+
 ##        # Get value for each 'Details' row
 ##        record_id  = detail.attributes['RECORD_ID'].value
 ##        lat_wgs84  = detail.attributes['LATITUDE_WGS84_GEOINFO'].value
