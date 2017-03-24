@@ -1,7 +1,7 @@
 #-------------------------------------------------------------------------------
 # Name:        module1
 # Purpose:
-#
+# TODO:        Document this script
 # Author:      mgrue
 #
 # Created:     17/03/2017
@@ -22,13 +22,14 @@ def main():
     #                           User, Set Variables:
 
     # main working folder
+    # TODO: make a way so that both this script and the batch file will get the cwd and can use the folder structure I've built to allow the script to be able to be run from a different user account.
     working_folder = r'U:\grue\Projects\GaryProjects'
 
     # XML file to read
     xml_folder      = working_folder + r'\xml_files'
     xml_file_name   = r'\DEH_HMD_FIRST_RESPONDER_INDEX_sample ORIG.xml'
     ##xml_file_name   = r'\DEH_HMD_FIRST_RESPONDER_INDEX_OneELEMENT.xml'
-    xml_file_name   = r"\DEH_HMD_FIRST_RESPONDER_INDEX.xml" # The FULL dataset
+    ##xml_file_name   = r"\DEH_HMD_FIRST_RESPONDER_INDEX.xml" # The FULL dataset
     xml_path_file   = xml_folder + '\\' + xml_file_name
 
     # CSV file to be saved
@@ -81,7 +82,7 @@ def main():
     if run_xml_to_csv:
         xml_to_csv(xml_path_file, csv_path_file, details_list, full_key_list)
 
-    # Import csv file, process table
+    # Import csv file
     if run_csv_to_table:
         csv_to_table(csv_path_file, fgdb_path, table_name)
 
@@ -143,47 +144,45 @@ def xml_to_csv(xml_path_file, csv_path_file, details_list, full_key_list):
     """xml to csv"""
 
     print 'Parsing xml to csv...'
-    # Get connection to the xml file
-##    xml_doc = minidom.parse(xml_path_file)
-##    item_list = xml_doc.getElementsByTagName('Details')
 
     print '  There are {} records in "{}" to write to the csv\n'.format(str(len(details_list)), xml_path_file)
 
+    # Go through each 'Details' element
     row_info = []
-    # Go through each item in 'Details' and get defined values
     for count, detail in enumerate(details_list):
-        print '\n\ncount: {}\n\n'.format(str(count))
+        ##print '\n\ncount: {}\n\n'.format(str(count))
         row_info = []
+
+        # Go through each key and get attribute values for the specific element
         for key in full_key_list:
-            print 'key: ' + key
+            ##print '  Key: ' + key
+
+            # Use try / except to catch the exception
+            # if the element does not have a specific key.
             try:
                 value = detail.attributes[key].value
             except:
-                value = 'Value not in xml element'
+                value = 'Attribute Key not in this xml element'
 
+            # Use try / except to catch if there is a non ascii character in the
+            # xml.  Causes script fail.  Usually this is a spanish enye (n + ~).
+            # TODO: it would be nice to not have to use a print statement here to catch a non ascii character.  Find out how to test for the writer.writerow(row_info) fail w/o a print statement.
             try:
-                print 'value: {}\n'.format(value)
+                print '  Value: {}\n'.format(value)
+                row_info.append(value)
             except:
-                print 'Couldn\'t print value'
-                value = 'Value couldn\'t be written.  XML Value contains a non-ascii character. Most likely an enye'
-
-            row_info.append(value)
-
-##        # Get value for each 'Details' row
-##        record_id  = detail.attributes['RECORD_ID'].value
-##        lat_wgs84  = detail.attributes['LATITUDE_WGS84_GEOINFO'].value
-##        long_wgs84 = detail.attributes['LONGITUDE_WGS84_GEOINFO'].value
-
-        # Set values into one list
-##        row_info = [record_id, lat_wgs84, long_wgs84]
+                print '  Value couldn\'t be written.  XML Value contains a non-ascii character. Most likely an enye'
+                value = 'Value couldn\'t be written.  XML Value contains a non-ascii character. Most likely an enye\n'
+                row_info.append(value)
 
 
-        # Set list into csv file
+        # Set list of values into csv file for the specific element
         with open(csv_path_file, 'ab') as csv_file:
-            ##print 'Writing to csv:\n  Record ID:  {}\n  Latitude:   {}\n  Longitude: {}\n'.format(record_id, lat_wgs84, long_wgs84)
             writer = csv.writer(csv_file)
             writer.writerow(row_info)
             del row_info
+
+            # Loop back to get the next detail element in the details_list
 
     print 'Done with xml_to_csv()\n'
 
@@ -207,32 +206,35 @@ def csv_to_table(csv_path_file, fgdb_path, table_name):
 
     print '  Imported\n'
 
-    #---------------------------------------------------------------------------
-    # This import leaves any string field with 8000 characters in length!
-    # Need to add a field, calculate the values to this new field and delete
-    # the field that has the length of 8000
-
-    # Add field
-    in_table = fgdb_path + '\\' + table_name
-    field_name = 'RECORD_ID'
-    field_type = 'TEXT'
-    field_length = 25
-
-    print '  Adding field: "{}"'.format(field_name)
-    arcpy.AddField_management (in_table, field_name, field_type, field_length)
-
-    # Calculate new field to equal the RECORD_ID_temp
-    expression = '!RECORD_ID_temp!'
-    expression_typ = 'PYTHON_9.3'
-
-    print '  Calculating field: "{}" so that it equals: "{}"'.format(field_name, expression)
-    arcpy.CalculateField_management (in_table, field_name, expression, expression_typ)
-
-    # Delete RECORD_ID_temp
-    drop_field = 'RECORD_ID_temp'
-
-    print '  Deleting field: "{}"\n'.format(drop_field)
-    arcpy.DeleteField_management(in_table, drop_field)
+    # Below was a solution to get rid of the 8000 character long field in the
+    # FGDB table, but it is complicated to do with many dozens of text fields
+    # and it may not be needed anyways.
+##    #---------------------------------------------------------------------------
+##    # This import leaves any string field with 8000 characters in length!
+##    # Need to add a field, calculate the values to this new field and delete
+##    # the field that has the length of 8000
+##
+##    # Add field
+##    in_table = fgdb_path + '\\' + table_name
+##    field_name = 'RECORD_ID'
+##    field_type = 'TEXT'
+##    field_length = 25
+##
+##    print '  Adding field: "{}"'.format(field_name)
+##    arcpy.AddField_management (in_table, field_name, field_type, field_length)
+##
+##    # Calculate new field to equal the RECORD_ID_temp
+##    expression = '!RECORD_ID_temp!'
+##    expression_typ = 'PYTHON_9.3'
+##
+##    print '  Calculating field: "{}" so that it equals: "{}"'.format(field_name, expression)
+##    arcpy.CalculateField_management (in_table, field_name, expression, expression_typ)
+##
+##    # Delete RECORD_ID_temp
+##    drop_field = 'RECORD_ID_temp'
+##
+##    print '  Deleting field: "{}"\n'.format(drop_field)
+##    arcpy.DeleteField_management(in_table, drop_field)
 
     print 'Done with csv_to_table()\n'
 
