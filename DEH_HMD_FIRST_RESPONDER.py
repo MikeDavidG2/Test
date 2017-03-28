@@ -2,6 +2,8 @@
 # Name:        module1
 # Purpose:
 # TODO:        Document this script
+# TODO:        Make print statements into a log file
+# TODO:        Error handling
 # Author:      mgrue
 #
 # Created:     17/03/2017
@@ -150,7 +152,7 @@ def xml_to_csv(xml_path_file, csv_path_file, details_list, full_key_list):
     # Go through each 'Details' element
     row_info = []
     for count, detail in enumerate(details_list):
-        ##print '\n\ncount: {}\n\n'.format(str(count))
+        print '\n\ncount: {}\n\n'.format(str(count))
         row_info = []
 
         # Go through each key and get attribute values for the specific element
@@ -167,13 +169,24 @@ def xml_to_csv(xml_path_file, csv_path_file, details_list, full_key_list):
             # Use try / except to catch if there is a non ascii character in the
             # xml.  Causes script fail.  Usually this is a spanish enye (n + ~).
             # TODO: it would be nice to not have to use a print statement here to catch a non ascii character.  Find out how to test for the writer.writerow(row_info) fail w/o a print statement.
-            try:
-                print '  Value: {}\n'.format(value)
-                row_info.append(value)
-            except:
-                print '  Value couldn\'t be written.  XML Value contains a non-ascii character. Most likely an enye'
-                value = 'Value couldn\'t be written.  XML Value contains a non-ascii character. Most likely an enye\n'
-                row_info.append(value)
+##            try:
+##                print value
+##                value.encode('ascii', errors='ignore')
+##            except UnicodeDecodeError:
+##                print 'Unicode Decode Error'
+##                value = 'Unicode Decode Error'
+            # TODO: ATTEMPT to test for non ascii characters.  Need to replace them
+            value.encode('ascii', errors='ignore')
+            row_info.append(value)
+
+
+##            try:
+##                print '  Value: {}'.format(value)
+##                row_info.append(value)
+##            except:
+##                print '  Value couldn\'t be written.  XML Value contains a non-ascii character. Most likely an enye'
+##                value = 'Value couldn\'t be written.  XML Value contains a non-ascii character. Most likely an enye\n'
+##                row_info.append(value)
 
 
         # Set list of values into csv file for the specific element
