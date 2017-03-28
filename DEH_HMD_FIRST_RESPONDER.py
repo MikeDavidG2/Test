@@ -1,6 +1,28 @@
 #-------------------------------------------------------------------------------
 # Name:        module1
 # Purpose:
+"""This script takes an xml file from the DEH_HMD_FIRST_RESPONDER process and
+1)  Creates a csv with all of the xml keys as column headers.
+2)  Parses the xml attributes to their respective columns.
+3)  Imports the csv to a FGDB table.
+4)  Turns the table into a FC using the X and Y fields in the table.
+
+Folder structure this script expects:
+    ...\working_folder\
+           \csv_files\
+           \log_files\
+           \scripts\     (including the .bat file)
+           \FGDB\
+           \xml_files\
+
+This script should be called from a .bat file that passes a parameter to the
+variable "xml_to_csv_OR_csv_to_fc" which is used to control which functions are
+called.  This was needed because Python fails if it is asked to read the xml
+file and import the csv into a FGDB during the same compiled run.  The .bat
+file can call this script and pass the string 'xml_to_csv' for the first run
+and then call this script again and pass the string 'csv_to_fc' to finish the
+process.
+"""
 # TODO:        Document this script
 # TODO:        Make print statements into a log file
 # TODO:        Error handling
@@ -11,7 +33,7 @@
 # Licence:     <your licence>
 #-------------------------------------------------------------------------------
 #-------------------------------------------------------------------------------
-import csv, arcpy, time, math
+import csv, arcpy, time, math, os
 from xml.dom import minidom
 from datetime import datetime
 
@@ -24,14 +46,12 @@ def main():
     #                           User, Set Variables:
 
     # main working folder
-    # TODO: make a way so that both this script and the batch file will get the cwd and can use the folder structure I've built to allow the script to be able to be run from a different user account.
     working_folder = r'U:\grue\Projects\GaryProjects'
 
     # XML file to read
     xml_folder      = working_folder + r'\xml_files'
-    xml_file_name   = r'\DEH_HMD_FIRST_RESPONDER_INDEX_sample ORIG.xml'
-    ##xml_file_name   = r'\DEH_HMD_FIRST_RESPONDER_INDEX_OneELEMENT.xml'
-    ##xml_file_name   = r"\DEH_HMD_FIRST_RESPONDER_INDEX.xml" # The FULL dataset
+    ##xml_file_name   = r'\DEH_HMD_FIRST_RESPONDER_INDEX_sample ORIG.xml' # For testing
+    xml_file_name   = r"\DEH_HMD_FIRST_RESPONDER_INDEX.xml" # The FULL dataset
     xml_path_file   = xml_folder + '\\' + xml_file_name
 
     # CSV file to be saved
@@ -55,7 +75,7 @@ def main():
     run_table_to_fc  = False
 
     # Use parameter from batch file calling this script to drive which functions are called
-    xml_to_csv_OR_csv_to_fc = arcpy.GetParameterAsText(0) or 'xml_to_csv' #TODO: remove this 'or' when done testing
+    xml_to_csv_OR_csv_to_fc = arcpy.GetParameterAsText(0) ##or 'csv_to_fc' uncomment to test specific functions
 
     if xml_to_csv_OR_csv_to_fc == 'xml_to_csv':
         run_create_csv   = True
@@ -123,9 +143,11 @@ def create_csv(xml_path_file, csv_path_file):
             if key not in full_key_list:
                 full_key_list.append(key)
 
+    # Alphabetize list
     full_key_list.sort()
+
+    print '  Num of keys from xml: {}\n  List of keys from xml below'.format(str(len(full_key_list)))
     print full_key_list
-    print len(full_key_list)
 
     #Set the headers for the file
     headers = full_key_list
@@ -147,55 +169,52 @@ def xml_to_csv(xml_path_file, csv_path_file, details_list, full_key_list):
 
     print 'Parsing xml to csv...'
 
-    print '  There are {} records in "{}" to write to the csv\n'.format(str(len(details_list)), xml_path_file)
+    print '  There are {} records in: {}\n  to write to the csv at: {}'.format(str(len(details_list)), xml_path_file, csv_path_file)
 
-    # Go through each 'Details' element
-    row_info = []
+    #---------------------------------------------------------------------------
+    # Go through each 'Details' element get and write the value for each key
     for count, detail in enumerate(details_list):
-        print '\n\ncount: {}\n\n'.format(str(count))
         row_info = []
 
+        # Print status for every 1000 elements written
+        if (count % 1000 == 0):
+            print '  Writing: {} of {}'.format(str(count), str(len(details_list)))
+
+        #-----------------------------------------------------------------------
         # Go through each key and get attribute values for the specific element
         for key in full_key_list:
-            ##print '  Key: ' + key
 
             # Use try / except to catch the exception
             # if the element does not have a specific key.
             try:
                 value = detail.attributes[key].value
             except:
-                value = 'Attribute Key not in this xml element'
+                value = 'Null'
+
+            ##print '  Key: ' + key
+            ##print '  Value: ' + str(value)
 
             # Use try / except to catch if there is a non ascii character in the
-            # xml.  Causes script fail.  Usually this is a spanish enye (n + ~).
-            # TODO: it would be nice to not have to use a print statement here to catch a non ascii character.  Find out how to test for the writer.writerow(row_info) fail w/o a print statement.
-##            try:
-##                print value
-##                value.encode('ascii', errors='ignore')
-##            except UnicodeDecodeError:
-##                print 'Unicode Decode Error'
-##                value = 'Unicode Decode Error'
-            # TODO: ATTEMPT to test for non ascii characters.  Need to replace them
-            value.encode('ascii', errors='ignore')
+            # xml.  Remove non-ascii characters and replace with a '?' so that the
+            # value can be written to the csv without failure.
+            try:
+                value.encode('ascii')
+
+            except UnicodeEncodeError:
+                print '  \nUnicode Decode Error at record: {} for: {}\n    Removing non-ascii characters'.format(str(count + 1), value.encode('ascii', errors='ignore'))
+                value = ''.join([c if ord(c) < 128 else '?' for c in value])
+                print '    New value = {}\n'.format(value)
+
             row_info.append(value)
 
-
-##            try:
-##                print '  Value: {}'.format(value)
-##                row_info.append(value)
-##            except:
-##                print '  Value couldn\'t be written.  XML Value contains a non-ascii character. Most likely an enye'
-##                value = 'Value couldn\'t be written.  XML Value contains a non-ascii character. Most likely an enye\n'
-##                row_info.append(value)
-
-
-        # Set list of values into csv file for the specific element
+        #-----------------------------------------------------------------------
+        # Set list of values from row_info into csv file for the specific element
         with open(csv_path_file, 'ab') as csv_file:
             writer = csv.writer(csv_file)
             writer.writerow(row_info)
             del row_info
 
-            # Loop back to get the next detail element in the details_list
+    # Loop back to get the next detail element in the details_list
 
     print 'Done with xml_to_csv()\n'
 
@@ -208,6 +227,14 @@ def csv_to_table(csv_path_file, fgdb_path, table_name):
 
     print 'Starting csv_to_table()'
 
+    #---------------------------------------------------------------------------
+    # Create the FGDB if it does not exist
+    if not os.path.exists(fgdb_path):
+
+        # split full path into folder and FGDB name
+        out_folder_path, out_name = os.path.split(fgdb_path)
+
+        arcpy.CreateFileGDB_management(out_folder_path, out_name)
     #---------------------------------------------------------------------------
     # Import csv to table
     in_rows  = csv_path_file
@@ -259,6 +286,7 @@ def table_to_fc(fgdb_path, table_name, fc_name):
 
     print 'Turning the Table into a Feature Class...'
 
+    #---------------------------------------------------------------------------
     # Make an XY Event Layer from the Table
     table = fgdb_path + '\\' + table_name
     in_x_field = 'LONGITUDE_WGS84_GEOINFO'
@@ -270,6 +298,7 @@ def table_to_fc(fgdb_path, table_name, fc_name):
     arcpy.MakeXYEventLayer_management (table, in_x_field, in_y_field, out_layer,
                                        spatial_reference)
 
+    #---------------------------------------------------------------------------
     # Save the XY Event Layer to a Feature Class
     in_features = out_layer
     out_path    = fgdb_path
