@@ -31,21 +31,73 @@ Workflow:
 #-------------------------------------------------------------------------------
 
 # Imports
+import arcpy, os, xlrd
 
+arcpy.env.overwriteOutput = True
 
 def main():
     #---------------------------------------------------------------------------
     #                             Set variables
+    working_folder = 'U:\grue\Scripts\GitHub\Test\Test_Geolocator'
 
+    # Excel file
+    excel_file     = 'Addresses.xlsx'
+    excel_path    = os.path.join(working_folder, excel_file)
+
+    # fgdb file
+    fgdb_file     = 'Addresses.gdb'
+    out_fgdb_path = os.path.join(working_folder, fgdb_file)
 
     #---------------------------------------------------------------------------
     #                       Start calling functions
 
+    # Import excel file to fgdb
+    Import_Excel(excel_path, out_fgdb_path)
 
+    #
+#-------------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
+#                           DEFINE FUNCTIONS
+#-------------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
+def Import_Excel(excel_path, out_fgdb_path):
+    """
+    Documentation here
+    """
 
-    #---------------------------------------------------------------------------
-    #                           DEFINE FUNCTIONS
-    #---------------------------------------------------------------------------
+    print 'Starting Import_Excel()'
+
+    # Get list of sheets in excel file
+    workbook = xlrd.open_workbook(excel_path)
+    sheets = [sheet.name for sheet in workbook.sheets()]
+
+    # For each sheet, import to the out_fgdb_path
+    print ('  {} sheets found: {}'.format(len(sheets), ', '.join(sheets)))
+    for sheet in sheets:
+
+        # The out_table is based on the input excel file name then an
+        # underscore (_) separator followed by the sheet name
+        out_table = os.path.join(
+            out_fgdb_path,
+            arcpy.ValidateFieldName(
+                "{}_{}".format(os.path.basename(excel_path), sheet),
+                out_fgdb_path))
+
+        print ('  Converting {} to {}'.format(sheet, out_table))
+
+        # Perform conversion
+        arcpy.ExcelToTable_conversion(excel_path, out_table, sheet)
+
+        # Test to see if table has data, delete table if not
+        result = arcpy.GetCount_management(out_table)
+        count = int(result.getOutput(0))
+
+        if count == 0:
+            print '    There were no records in this table.  Deleting...'
+            arcpy.Delete_management(out_table)
+            print '    Deleted'
+
+    print 'Completed Import_Excel() successfully.'
 
 
 
