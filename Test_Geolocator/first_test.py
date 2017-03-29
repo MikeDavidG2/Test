@@ -52,7 +52,9 @@ def main():
     #                       Start calling functions
 
     # Import excel file to fgdb
-    Import_Excel(excel_path, out_fgdb_path)
+    sheets_w_data = Import_Excel(excel_path, out_fgdb_path)
+
+
 
     #
 #-------------------------------------------------------------------------------
@@ -60,6 +62,7 @@ def main():
 #                           DEFINE FUNCTIONS
 #-------------------------------------------------------------------------------
 #-------------------------------------------------------------------------------
+#                       FUNCTION: Import_Excel()
 def Import_Excel(excel_path, out_fgdb_path):
     """
     Documentation here
@@ -70,6 +73,7 @@ def Import_Excel(excel_path, out_fgdb_path):
     # Get list of sheets in excel file
     workbook = xlrd.open_workbook(excel_path)
     sheets = [sheet.name for sheet in workbook.sheets()]
+    sheets_w_data = []
 
     # For each sheet, import to the out_fgdb_path
     print ('  {} sheets found: {}'.format(len(sheets), ', '.join(sheets)))
@@ -97,10 +101,32 @@ def Import_Excel(excel_path, out_fgdb_path):
             arcpy.Delete_management(out_table)
             print '    Deleted'
 
+        else:
+            sheets_w_data.append(out_table)
+
     print 'Completed Import_Excel() successfully.'
 
+    return sheets_w_data
+#-------------------------------------------------------------------------------
+#                             FUNCTION:
+def Get_Query():
+    """
+    Gets the query
+    """
 
-
+    query = """
+{
+    "records": [
+        {
+            "attributes": {
+                "OBJECTID": {ob},
+                "Address": "{addy}",
+                "Zipcode": "{zip}"
+            }
+        }
+    ]
+}
+""".format()
 
 
 #-------------------------------------------------------------------------------
