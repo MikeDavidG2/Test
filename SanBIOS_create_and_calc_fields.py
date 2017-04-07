@@ -16,6 +16,11 @@
 # Copyright:   (c) mgrue 2017
 # Licence:     <your licence>
 #-------------------------------------------------------------------------------
+
+# TODO: document this script
+# TODO: get the polygons working on this script too
+# TODO: put this script in the SanBIOS folder
+
 import arcpy, os
 arcpy.env.overwriteOutput = True
 
@@ -159,42 +164,48 @@ def Join_Calc_Fields(master_table, sanbios_fgdb):
     # Calculate fields
     field      = "SANBIOS_PTS_CN.DEPTNAME"
     expression = '!Departments.DeptName!'
-    print 'Calculating field: {} in table: {} equal to {}'.format(field, in_table, expression)
+    print 'Calculating field: "{}" in table: "{}" equal to: "{}"'.format(field, in_table, expression)
     arcpy.CalculateField_management(in_table, field, expression, expression_type, code_block)
 
     field      = "SANBIOS_PTS_CN.LIFEFORM"
     expression = '!LifeForm.LifeForm!'
-    print 'Calculating field: {} in table: {} equal to {}'.format(field, in_table, expression)
+    print 'Calculating field: "{}" in table: "{}" equal to: "{}"'.format(field, in_table, expression)
     arcpy.CalculateField_management(in_table, field, expression, expression_type, code_block)
 
     field      = "SANBIOS_PTS_CN.ORIGINDESC"
     expression = '!Origin.OriginDesc!'
-    print 'Calculating field: {} in table: {} equal to {}'.format(field, in_table, expression)
+    print 'Calculating field: "{}" in table: "{}" equal to: "{}"'.format(field, in_table, expression)
     arcpy.CalculateField_management(in_table, field, expression, expression_type, code_block)
 
     field      = "SANBIOS_PTS_CN.PNAME"
     expression = '!Precision.PName!'
-    print 'Calculating field: {} in table: {} equal to {}'.format(field, in_table, expression)
+    print 'Calculating field: "{}" in table: "{}" equal to: "{}"'.format(field, in_table, expression)
     arcpy.CalculateField_management(in_table, field, expression, expression_type, code_block)
 
     field      = "SANBIOS_PTS_CN.SITEQUALDE"
     expression = '!SiteQuality.SiteQualDe!'
-    print 'Calculating field: {} in table: {} equal to {}'.format(field, in_table, expression)
+    print 'Calculating field: "{}" in table: "{}" equal to: "{}"'.format(field, in_table, expression)
     arcpy.CalculateField_management(in_table, field, expression, expression_type, code_block)
 
     field      = "SANBIOS_PTS_CN.SOURCE_NAM"
     expression = '!Source.source_nam!'
-    print 'Calculating field: {} in table: {} equal to {}'.format(field, in_table, expression)
+    print 'Calculating field: "{}" in table: "{}" equal to: "{}"'.format(field, in_table, expression)
     arcpy.CalculateField_management(in_table, field, expression, expression_type, code_block)
 
     field      = "SANBIOS_PTS_CN.MASTER_LAT"
     expression = '!Species.master_lat!'
-    print 'Calculating field: {} in table: {} equal to {}'.format(field, in_table, expression)
+    print 'Calculating field: "{}" in table: "{}" equal to: "{}"'.format(field, in_table, expression)
     arcpy.CalculateField_management(in_table, field, expression, expression_type, code_block)
 
     field      = "SANBIOS_PTS_CN.MASTER_COM"
     expression = '!Species.master_com!'
-    print 'Calculating field: {} in table: {} equal to {}'.format(field, in_table, expression)
+    print 'Calculating field: "{}" in table: "{}" equal to: "{}"'.format(field, in_table, expression)
+    arcpy.CalculateField_management(in_table, field, expression, expression_type, code_block)
+
+    # TODO: check to make sure this last calculation is performing as expected
+    field      = "SANBIOS_PTS_CN.STATUS"
+    expression = '!Species.Status!'
+    print 'Calculating field: "{}" in table: "{}" equal to: "{}"'.format(field, in_table, expression)
     arcpy.CalculateField_management(in_table, field, expression, expression_type, code_block)
 
 #-------------------------------------------------------------------------------
