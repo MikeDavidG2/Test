@@ -85,3 +85,25 @@ def Excel_To_Table(input_excel_file, out_table, sheet):
     print 'Finished Excel_To_Table()\n'
 #-------------------------------------------------------------------------------
 #-------------------------------------------------------------------------------
+#                        FUNCTION Get_Count_Selected()
+def Get_Count_Selected(lyr):
+
+    print 'Starting Get_Count()...'
+
+    # See if there are any selected records
+    desc = arcpy.Describe(lyr)
+    if desc.fidSet: # True if there are selected records
+        result = arcpy.GetCount_management(lyr)
+        count_selected = int(result.getOutput(0))
+
+    # If there weren't any selected records
+    else:
+        count_selected = 0
+
+    print '  Count of Selected: {}'.format(str(count_selected))
+
+    print 'Finished Get_Count()\n'
+
+    return count_selected
+#-------------------------------------------------------------------------------
+#-------------------------------------------------------------------------------

@@ -44,20 +44,72 @@ def main():
     out_feature_class = path_name_FGDB + '\\' + os.path.basename(fc_to_copy)
     myFunc.Copy_FC(fc_to_copy, out_feature_class)
 
-    # 3) Copy Budged Table
+    # 3) Copy Budget Table
     # out_table is the FGDB and the name of the Table in table_to_copy
-    out_table = path_name_FGDB + '\\' + os.path.basename(table_to_copy)
-    myFunc.Copy_Rows(table_to_copy, out_table)
+    out_budget_table = path_name_FGDB + '\\' + os.path.basename(table_to_copy)
+    myFunc.Copy_Rows(table_to_copy, out_budget_table)
 
-    # 4) Import Excel table
-    out_table = path_name_FGDB + '\\' + sheet_to_import
-    myFunc.Excel_To_Table(excel_to_import, out_table, sheet_to_import)
+    # 4) Import Excel CIP table
+    wkg_CIP_table = path_name_FGDB + '\\' + sheet_to_import + '_wkg'
+    myFunc.Excel_To_Table(excel_to_import, wkg_CIP_table, sheet_to_import)
+
+    # 5) Process new FGDB CIP table so it is ready for joining to the FC
+    continue_script = Process_CIP_Table(wkg_CIP_table, out_feature_class)
 
 #-------------------------------------------------------------------------------
 #-------------------------------------------------------------------------------
 #                          Start defining FUNCTIONS
 
+def Process_CIP_Table(wkg_CIP_table, out_feature_class):
+    """Documentation here
+    """
 
+    print 'Starting Process_CIP_Table...'
+
+    #                     Create views and layers to do processing
+    # Create a table view for CIP table
+    CIP_view = 'CIP_view'
+    arcpy.MakeTableView_management(wkg_CIP_table, CIP_view)
+
+    # Create a layer for the FC
+    FC_view = 'FC_view'
+    arcpy.MakeFeatureLayer_management(out_feature_class, FC_view)
+
+    #---------------------------------------------------------------------------
+    #                       Validate CIP table and FC
+    # Find if there are any Projects that GIS hasn't added a PROJECT_ID, stop script if so
+    # TODO: Change where clause so that it searches for any
+    where_clause = "PROJECT_ID = 'New, GIS to add'"
+    arcpy.SelectLayerByAttribute_management(CIP_view, 'NEW_SELECTION', where_clause)
+
+    # Get the count of selected records, if any selected stop script
+    count_selected = myFunc.Get_Count_Selected(CIP_view)
+
+    if count_selected != 0:
+        print '  WARNING!  There are projects in CIP table that need GIS to enter a PROJECT_ID.'
+        print '  Script halted.  GIS needs to:\n    1) Unprotect sheet with password: "GIS"\n    2) Add a unique PROJECT_ID for all projects\n    3) Reprotect the sheet with the same password.\n    4) Rerun this script'
+
+        continue_script = False
+        return continue_script
+
+    # Find if there are any projects that will not be able to join in CIP table and FC, stop script if so
+
+
+
+    #---------------------------------------------------------------------------
+    # CIP table and FC validated, continue processing CIP table
+
+
+
+
+    # Select rows if PROJECT_ID = '' and NAME = ''
+
+
+    # Delete selected rows
+
+
+
+    print 'Finished Process_CIP_Table.\n'
 
 #-------------------------------------------------------------------------------
 #-------------------------------------------------------------------------------
