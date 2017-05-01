@@ -24,6 +24,28 @@ def main():
 
 def Duplicate_Handler(target_table):
     """
+    This function does X sub tasks:
+      1) Get a list of all the SampleEventIDs that occur more than once in the
+           target_table (considered 'Duplicates').
+           Function stopped if there are no duplicates.
+      2) Sort the duplicates into one duplicate category:
+            A. Type 1 or Type 2
+            B. Type 3
+      3) Handle the Type 1 or Type 2 duplicates by deleting all of the
+           duplicates except for the youngest duplicate (per duplication).
+           This means that only the youngest duplicate remains in the dataset.
+           Google 'Last one to sync wins'.  This is a common method for
+           handling conflicting data.
+      4) Handle the Type 3 duplicates by renaming the SampleEventID for all
+           Type 3 duplicates so that it is obvious that there was a duplicate.
+
+    Types of duplicates:
+      Type 1:
+
+      Type 2:
+
+
+      Type 3:
     """
     print '--------------------------------------------------------------------'
     print 'Starting Duplicate_Handler()'
@@ -94,13 +116,18 @@ def Duplicate_Handler(target_table):
     # Handle the Type 1 and 2 duplicates by changing the SampleEventID to
     # 'Duplicate_Delete_Me' for all duplicates except for the youngest duplicate
     # We want to keep the youngest Type 1 or 2 duplicate.
-    print '  \nThere are: {} Type 1 and 2 duplicates:'.format(str(len(dup_typ_1_2)))
+    print '\n  There are "{}" Type 1 and 2 duplicates:'.format(str(len(dup_typ_1_2)))
+
+    if len(dup_typ_1_2) == 0:
+        print '    Nothing to change'
+
+    # If there are Type 1 / 2 duplicates...
     if len(dup_typ_1_2) > 0:
-        ##print '    Changing SampleEventID of all (but the youngest duplicate) to: {}'.format(dup_type_1_2_flag)
         for dup in dup_typ_1_2:
-            ##print '    {}'.format(dup)
+
             where_clause = "SampleEventID = {}".format(dup)
             sql_clause   = (None, 'ORDER BY OBJECTID DESC') # This will order the cursor to grab the youngest duplicate first
+
             with arcpy.da.UpdateCursor(target_table, ['SampleEventID', 'OBJECTID'], where_clause, '', '', sql_clause) as cursor:
                 i = 0
                 for row in cursor:
@@ -114,44 +141,47 @@ def Duplicate_Handler(target_table):
 
                     i += 1
 
-    # Select the older Type 1 and Type 2 duplicates that were flagged for deletion
-    arcpy.MakeTableView_management(target_table, 'target_table_view')
+        # Select the older Type 1 and Type 2 duplicates that were flagged for deletion
+        arcpy.MakeTableView_management(target_table, 'target_table_view')
 
-    where_clause = "SampleEventID = {}".format(str(dup_type_1_2_flag)) # TODO: add single quotes around the bracket: '{}' if SampleEventID is made into a string
-    arcpy.SelectLayerByAttribute_management('target_table_view', 'NEW_SELECTION', where_clause)
+        where_clause = "SampleEventID = {}".format(str(dup_type_1_2_flag)) # TODO: add single quotes around the bracket: '{}' if SampleEventID is made into a string
+        arcpy.SelectLayerByAttribute_management('target_table_view', 'NEW_SELECTION', where_clause)
 
-    # Test to see how many records were selected
-    result = arcpy.GetCount_management('target_table_view')
-    count_selected = int(result.getOutput(0))
+        # Test to see how many records were selected
+        result = arcpy.GetCount_management('target_table_view')
+        count_selected = int(result.getOutput(0))
 
-    if count_selected > 0:  # Only perform deletion if there are selected rows
-        print '\n  Deleting {} Type 1 and Type 2 duplicates'.format(count_selected)
-        # Delete the older Type 1 and Type 2 duplicates that were flagged for deletion
-        arcpy.DeleteRows_management('target_table_view')
+        if count_selected > 0:  # Only perform deletion if there are selected rows
 
+            print '\n  Deleting {} Type 1 and Type 2 duplicates'.format(count_selected)
 
-##    print '  Type 3 duplicates:'
-##    for dup in dup_typ_3:
-##        print '    {}'.format(dup)
-##                ##print '  SampleEventID: {} and Creator: {}'.format(str(row[0]), row[1])
-    # If SampleEventIDs match and Creators match:
-        # Then Type 1 or 2 duplicate and delete the older (as defined by the ObjectID) duplicate
+            # Delete the older Type 1 and Type 2 duplicates that were flagged for deletion
+            arcpy.DeleteRows_management('target_table_view')
 
-    # If SampleEventIDs match and the Creators DON'T match:
-        # Then Type 3 duplicate and append '_1' or '_2' to the end of the SampleEventIDs
+    #---------------------------------------------------------------------------
+    #                          Handle Type 3 Duplicates
+    print '\n  There is/are "{}" Type 3 duplicate(s):'.format(str(len(dup_typ_3)))
 
-        # Send an email to DPW and GIS letting them know that we had a Type 3 duplicate
+    if len(dup_typ_3) == 0:
+        print '    Nothing to change'
 
+    # If there are Type 3 duplicates...
+    if len(dup_typ_3) > 0:
 
+        for dup in dup_typ_3:
 
+            num_to_append = 1
+            where_clause = "SampleEventID = {}".format(dup)  # Update all of the Type 3 duplicates
 
-
+            with arcpy.da.UpdateCursor(target_table, ['SampleEventID'], where_clause) as cursor:
+                for row in cursor:
+                    new_sampID = float(str(row[0]) + str(num_to_append)) # TODO: Change this to a string friendly format if SampleEventID becomes a string
+                    print '    Changing SampleEventID: {} to {}'.format(str(row[0]), str(new_sampID))
+                    row[0] = new_sampID
+                    cursor.updateRow(row)
+                    num_to_append += 1
 
     print '\n\nFinished Duplicate_Handler()'
-
-
-
-
 
 if __name__ == '__main__':
     main()
