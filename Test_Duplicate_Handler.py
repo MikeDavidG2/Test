@@ -24,11 +24,11 @@ def main():
 
 def Duplicate_Handler(target_table):
     """
-    This function does X sub tasks:
+    This function does 4 sub tasks:
       1) Get a list of all the SampleEventIDs that occur more than once in the
            target_table (considered 'Duplicates').
            Function stopped if there are no duplicates.
-      2) Sort the duplicates into one duplicate category:
+      2) Sort the duplicates into one of two duplicate categories:
             A. Type 1 or Type 2
             B. Type 3
       3) Handle the Type 1 or Type 2 duplicates by deleting all of the
@@ -39,19 +39,49 @@ def Duplicate_Handler(target_table):
       4) Handle the Type 3 duplicates by renaming the SampleEventID for all
            Type 3 duplicates so that it is obvious that there was a duplicate.
 
-    Types of duplicates:
-      Type 1:
-
-      Type 2:
 
 
-      Type 3:
+    TYPES OF DUPLICATES:
+      Type 1:  Can occur if a survey is sent late enough in the day that the
+          survey arrives to the online database the next day (UTC time).  This
+          means the data is retrieved by script the next morning when it is run,
+          AND is grabbed again the following day because the script is looking
+          for all data that arrived to the database the previous day.  These
+          duplicates are IDENTICAL.
+
+          Can be FIXED by deleting either duplication.
+
+
+      Type 2:  Occurs when a user goes into 'Sent' folder on their device and
+          opens up an already sent survey and resends the survey.  It may be an
+          accident, or on purpose.  The survey may be DIFFERENT or IDENTICAL to
+          the original, and there may be more than 2 of this type of duplicate.
+
+          Can be FIXED by deleting all of these duplicates, except for the last
+          submitted survey.  This is the 'youngest' survey and will act as the
+          only true version.  This will allow the users to make corrections in
+          the field.
+
+
+
+      Type 3:  Occurs when two users start a survey within 1/10th of a second
+          from each other on the same day.  Very rare (about once per decade if
+          there are 3 monitors submitting 30 records M-F over 6 hours each day).
+          These surveys will be completely DIFFERENT with the exception of the
+          Sample Event ID.
+
+          Can be FIXED by giving these duplicates a new SampleEventID that can
+          still be easily converted back to the original SampleEventID.
+          For example, appending a '_1' or '0.0000001' so that '20170502.123456'
+          becomes '20170502.123456_1' or '20170502.1234561'
     """
     print '--------------------------------------------------------------------'
     print 'Starting Duplicate_Handler()'
 
-    dup_type_1_2_flag = -99 # TODO: change this to 'Duplicate_Delete_Me' if [SampleEventID] is a text field
-
+    # This is what the script below will chaange SampleEventIDs of all
+    # Type 1 and 2 duplicates to in order to 'flag' them for deletion later in
+    # the script
+    dup_type_1_2_flag = -99
 
     #---------------------------------------------------------------------------
     #                 Get list of all duplicate SampleEventIDs
@@ -63,10 +93,12 @@ def Duplicate_Handler(target_table):
 
             # Only add duplicate if it is the first instance of a duplication
             if row[0] in unique_list and row[0] not in dup_list:
-                dup_list.append(row[0])
+                print row[0]
+                dup_list.append(Decimal(row[0]))
 
-            else:
-                # This SampleEventID is unique
+            # Add the SampleEventID to the unique list if it is not in there already
+            if row[0] not in unique_list:
+                print row[0]
                 unique_list.append(row[0])
 
     #---------------------------------------------------------------------------
@@ -79,13 +111,21 @@ def Duplicate_Handler(target_table):
 
     #---------------------------------------------------------------------------
     #                        There were duplicates,
-    #         sort the duplicates into (Type 1, 2)  and (Type 3)
+    #         categorize the duplicates into (Type 1, 2)  and (Type 3)
 
-    dup_typ_1_2 = []
-    dup_typ_3   = []
+    dup_typ_1_2 = []  # List to hold the Type 1 and 2 duplicates
+    dup_typ_3   = []  # List to hold the Type 3 duplicates
 
     dup_list.sort()
 
+    # TODO: figure out the decimal, float, precision problem.  And how I can keep SampleEventID a nubmer and still have it work in this script...
+    print '#######################'
+    print dup_list[0]
+
+    for dup in dup_list:
+        print '{}'.format(dup)
+
+    print '########################'
     print '  There is/are: {} duplicate(s) to categorize:'.format(str(len(dup_list)))
 
     for dup in dup_list:
@@ -108,9 +148,6 @@ def Duplicate_Handler(target_table):
                 print '    SampleEventID: {} = Type 3 dup'.format(row[0])
                 dup_typ_3.append(row[0])
 
-            else:
-                print '***ERROR, there should be at least one Creator***'
-
     #---------------------------------------------------------------------------
     #                   Handle Type 1 and Type 2 duplicates
     # Handle the Type 1 and 2 duplicates by changing the SampleEventID to
@@ -123,6 +160,9 @@ def Duplicate_Handler(target_table):
 
     # If there are Type 1 / 2 duplicates...
     if len(dup_typ_1_2) > 0:
+
+        # For each duplicated SampleEventID, go through each duplicate and leave
+        # the youngest of them alone, but change all of the older ones to dup_typ_1_2_flag
         for dup in dup_typ_1_2:
 
             where_clause = "SampleEventID = {}".format(dup)
@@ -144,14 +184,15 @@ def Duplicate_Handler(target_table):
         # Select the older Type 1 and Type 2 duplicates that were flagged for deletion
         arcpy.MakeTableView_management(target_table, 'target_table_view')
 
-        where_clause = "SampleEventID = {}".format(str(dup_type_1_2_flag)) # TODO: add single quotes around the bracket: '{}' if SampleEventID is made into a string
+        where_clause = "SampleEventID = {}".format(str(dup_type_1_2_flag))
         arcpy.SelectLayerByAttribute_management('target_table_view', 'NEW_SELECTION', where_clause)
 
         # Test to see how many records were selected
         result = arcpy.GetCount_management('target_table_view')
         count_selected = int(result.getOutput(0))
 
-        if count_selected > 0:  # Only perform deletion if there are selected rows
+        # Only perform deletion if there are selected rows
+        if count_selected > 0:
 
             print '\n  Deleting {} Type 1 and Type 2 duplicates'.format(count_selected)
 
@@ -168,18 +209,22 @@ def Duplicate_Handler(target_table):
     # If there are Type 3 duplicates...
     if len(dup_typ_3) > 0:
 
+        # For each duplicated SampleEventID, append a 7th number to the SampleEventIDs to make them unique
         for dup in dup_typ_3:
 
-            num_to_append = 1
-            where_clause = "SampleEventID = {}".format(dup)  # Update all of the Type 3 duplicates
+            num_to_append = 0.0000001
+            where_clause = "SampleEventID = {}".format(dup)
 
             with arcpy.da.UpdateCursor(target_table, ['SampleEventID'], where_clause) as cursor:
                 for row in cursor:
-                    new_sampID = float(str(row[0]) + str(num_to_append)) # TODO: Change this to a string friendly format if SampleEventID becomes a string
+                    ##new_sampID = float(str(row[0]) + str(num_to_append))
+                    ##print '    Changing SampleEventID: {} to {}'.format(str(row[0]), str(new_sampID))
+
+                    new_sampID = row[0] + num_to_append
                     print '    Changing SampleEventID: {} to {}'.format(str(row[0]), str(new_sampID))
                     row[0] = new_sampID
                     cursor.updateRow(row)
-                    num_to_append += 1
+                    num_to_append += 0.0000001
 
     print '\n\nFinished Duplicate_Handler()'
 
