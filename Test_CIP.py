@@ -19,8 +19,8 @@ def main():
     #                              Set variables
 
     # FGDB to create variables
-    FGDB_name = 'Testing_FGDB.gdb'
     FGDB_path = r'P:\CIP\20170403_CIP_to_App\Working\Test'
+    FGDB_name = 'Testing_FGDB.gdb'
     path_name_FGDB = os.path.join(FGDB_path, FGDB_name)
 
     # FC to copy path
