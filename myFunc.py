@@ -1,4 +1,4 @@
-import os, arcpy
+import os, arcpy, datetime
 ##arcpy.env.overwriteOutput = True
 
 #-------------------------------------------------------------------------------
@@ -105,5 +105,61 @@ def Get_Count_Selected(lyr):
     print 'Finished Get_Count()\n'
 
     return count_selected
+
+#-------------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
+#                          FUNCTION Get dt_to_append
+
+def Get_DT_To_Append():
+    """
+    """
+    print 'Starting Get_DT_To_Append()...'
+
+    start_time = datetime.datetime.now()
+
+    date = '%s_%s_%s' % (start_time.year, start_time.month, start_time.day)
+    time = '%s_%s_%s' % (start_time.hour, start_time.minute, start_time.second)
+
+    dt_to_append = '%s__%s' % (date, time)
+
+    print '  DateTime to append: {}'.format(dt_to_append)
+
+    print 'Finished Get_DT_To_Append()\n'
+    return dt_to_append
+
+#-------------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
+#                          FUNCTION Join 2 Objects
+
+def Join_2_Objects(target_obj, target_join_field, to_join_obj, to_join_field):
+    """
+    """
+
+    print 'Starting Join_2_Objects()...'
+
+    # Create the layers or views using try/except
+    try:
+        arcpy.MakeFeatureLayer_management(target_obj, 'target_obj')
+        print '  Made FEATURE LAYER for {}'.format(target_obj)
+    except:
+        arcpy.MakeTableView_management(target_obj, 'target_obj')
+        print '  Made TABLE VIEW for {}'.format(target_obj)
+
+    try:
+        arcpy.MakeFeatureLayer_management(to_join_obj, 'to_join_obj')
+        print '  Made FEATURE LAYER for {}'.format(to_join_obj)
+    except:
+        arcpy.MakeTableView_management(to_join_obj, 'to_join_obj')
+        print '  Made TABLE VIEW for {}'.format(to_join_obj)
+
+    # Join the layers
+    print '  Joining layers'
+    arcpy.AddJoin_management('target_obj', target_join_field, 'to_join_obj', to_join_field)
+
+    print 'Finished Join_2_Objects()...\n'
+
+    # Return the layer/view of the joined object so it can be processed
+    return 'target_obj'
+
 #-------------------------------------------------------------------------------
 #-------------------------------------------------------------------------------
