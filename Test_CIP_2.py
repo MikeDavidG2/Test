@@ -38,6 +38,22 @@ def main():
                       'PROJECT_MANAGER', 'PM_EMAIL', 'PM_PHONE', 'ORACLE_NUMBER',
                       'DESCRIPTION']
 
+    # Dictionary of [TYPE] domains
+    type_dict = {
+    'Road Reconstruction':'1',
+    'Community Development Block Grant':'2',
+    'Bike Lanes/Pathways':'3',
+    'Traffic Signals':'4',
+    'Intersection Improvements':'5',
+    'Sidewalks':'6',
+    'Drainage Improvements':'7',
+    'Bridge':'8',
+    'Wastewater':'9.1',
+    'Airports':'9.2',
+    'Utility Undergrounding Districts':'9.3',
+    'Watersheds':'9.4'
+    }
+
 
     #---------------------------------------------------------------------------
     #                       Start calling FUNCTIONS
@@ -52,23 +68,24 @@ def main():
     # Validate the imported table data (make sure it has the correct fields
     valid_table = Validate_Table(sdw_field_ls, imported_table, sdw_cip_fc_path)
 
-    # Process table
-    ##Process_Table()
+    # If import table was valid, Process table
+    if valid_table:
+        Process_Table(imported_table, type_dict)
 
     # Join processed table to SDW CIP Feature Class
-    ##joined_fc = myFunc.Join_2_Objects(sdw_cip_fc_path, join_field, imported_table, join_field)
+    joined_fc = myFunc.Join_2_Objects(sdw_cip_fc_path, join_field, imported_table, join_field)
 
     # Update fields from imported table to SDW Feature Class
-    ##Update_Fields(joined_fc, sdw_cip_fc_name, imported_table, sdw_field_ls)
+    Update_Fields(joined_fc, sdw_cip_fc_name, imported_table, sdw_field_ls)
 
     # Let user know that they need to review the data and update the LUEG_UPDATES table
     # in order for Blue SDE can be updated
     # TODO: Uncomment the below print statements / raw_input
-##    print 'Updated the data in BLUE SDW, but you are NOT DONE YET! To update BLUE SDE please:'
-##    print '  1) Review the updated Feature Class at: "{}"'.format(sdw_cip_fc_path)
-##    print '  2) Then, update the date for: "{}", in: "{}"'.format( sdw_cip_fc_name, sdw_lueg_updates_path)
-##    print '  3) In a few days, check to confirm that the changes from BLUE SDE have replicated to County SDEP'
-##
+    print '***Updated the data in BLUE SDW, but you are NOT DONE YET! To update BLUE SDE please:***'
+    print '  1) Review the updated Feature Class at: "{}"'.format(sdw_cip_fc_path)
+    print '  2) Then, update the date for: "{}", in: "{}"'.format( sdw_cip_fc_name, sdw_lueg_updates_path)
+    print '  3) In a few days, check to confirm that the changes from BLUE SDE have replicated to County SDEP'
+
 ##    raw_input('Press ENTER to finish.')
 
 
@@ -231,23 +248,59 @@ def Validate_Table(sdw_field_ls, imported_table, sdw_cip_fc_path):
 
     print '  Done validating PROJECT_IDs in import table'
 
-
-
-
     print 'Finished Validating Table\n'
+
     return valid_table
 
 #-------------------------------------------------------------------------------
 #-------------------------------------------------------------------------------
 #                         FUNCTION: Process_Table()
 
-def Process_Table():
+def Process_Table(imported_table, type_dict):
     """
+    PARAMETERS:
+      imported_table: The path of the imported_table generated from Excel_To_Table().
+        we will perform calculations on this table before joining to SDW FC.
+
+      type_dict: The dictionary defined in main() that has the string and code
+        values of all the types in the domain CIP_TYPE.
+
+    RETURNS:
+      none
+
+    FUNCTION:
+      To process any data in the imported_table before joining to the SDW FC.
+      This function:
+        1) Makes sure that all values in [NAME] are all uppercase.
+        2) Changes the string values in the Excel sheet in [TYPE] to the
+           corresponding numeric values that are used in the actual SDW FC.
     """
 
     print 'Processing Table...'
 
+    #---------------------------------------------------------------------------
+    # 1)  Calculate field [NAME] to have all upper case letters for consistency
+    field_to_calc = 'NAME'
+    expression    = '!NAME!.upper()'
 
+    print '  Calculating field: "{}" to equal: "{}"'.format(field_to_calc, expression)
+    arcpy.CalculateField_management(imported_table, field_to_calc, expression, 'PYTHON_9.3')
+
+    #---------------------------------------------------------------------------
+    # 2) Calculate the values in [TYPE] to equal the values in the domain CIP_TYPE
+    # not the string values found in the Excel table
+    print '\n  Calculating [TYPE] based off of CIP_TYPE domain'
+    for typ in type_dict:
+
+        where_clause = "TYPE = '{}'".format(typ)
+        lyr = myFunc.Select_Object(imported_table, 'NEW_SELECTION', where_clause)
+
+        count_selected = myFunc.Get_Count_Selected(lyr)
+
+        if count_selected != 0:
+            domain_value = type_dict['{}'.format(typ)]
+            print '  Calculating field: "TYPE" to equal: {}\n\n'.format(domain_value)
+            arcpy.CalculateField_management(lyr, 'TYPE', domain_value)
 
     print 'Finished Processing Table\n'
 
