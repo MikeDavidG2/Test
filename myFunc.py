@@ -156,6 +156,12 @@ def Join_2_Objects(target_obj, target_join_field, to_join_obj, to_join_field):
     print '  Joining layers'
     arcpy.AddJoin_management('target_obj', target_join_field, 'to_join_obj', to_join_field)
 
+    # Print the fields
+    fields = arcpy.ListFields('target_obj')
+    print '  Fields in joined layer:'
+    for field in fields:
+        print '    ' + field.name
+
     print 'Finished Join_2_Objects()...\n'
 
     # Return the layer/view of the joined object so it can be processed
