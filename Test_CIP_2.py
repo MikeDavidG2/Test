@@ -99,6 +99,26 @@ def Process_Table():
 
 def Update_Fields(joined_fc, sdw_cip_fc_name, imported_table, sdw_field_ls):
     """
+    PARAMETERS:
+        joined_fc: The in-memory object from Join_2_Objects() that contains the
+          SDW layer joined to the imported table.
+
+        sdw_cip_fc_name: The name of the FC in SDW that we have joined to.
+          Used in 'field_to_calc'.
+
+        imported_table: Used to get the basename of the imported table.  Used in
+          'expression'.
+
+        sdw_field_ls: List of the fields that are in SDW (and imported table)
+          that will be updated.  Used in a loop to run through all the fields
+          to calculate.
+
+    RETURNS:
+        none
+
+    FUNCTION:
+        To calculate the fields in 'sdw_field_ls' list from the imported
+        table to the SDW feature class.
     """
 
     print 'Updating Fields in Joined Feature Class...'
@@ -114,8 +134,6 @@ def Update_Fields(joined_fc, sdw_cip_fc_name, imported_table, sdw_field_ls):
 
         print '  In joined_fc, calculating field: "{}", to equal: "{}"'.format(field_to_calc, expression)
         arcpy.CalculateField_management(joined_fc, field_to_calc, expression, 'PYTHON_9.3')
-
-
 
     print 'Finished Updating Fields\n'
 
