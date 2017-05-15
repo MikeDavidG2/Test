@@ -24,10 +24,11 @@ def main():
     sheet_to_import = 'CIP_5YEAR_POLY'
     join_field      = 'PROJECT_ID'
 
-    # SDW connection
-    sdw_connection  = r'P:\CIP\20170403_CIP_to_App\Data\Fake_SDW.gdb'
-    sdw_cip_fc_name = 'CIP_5YEAR_POLY'
-    sdw_cip_fc_path      = os.path.join(sdw_connection, sdw_cip_fc_name)
+    # SDW connection info
+    sdw_connection        = r'P:\CIP\20170403_CIP_to_App\Data\Fake_SDW.gdb'
+    sdw_cip_fc_name       = 'CIP_5YEAR_POLY'
+    sdw_cip_fc_path       = os.path.join(sdw_connection, sdw_cip_fc_name)
+    sdw_lueg_updates_path = os.path.join(sdw_connection, 'SDW.PDS.LUEG_UPDATES')
 
     # List of Fields to update in SDW/SDE Feature Class
     sdw_field_ls =   ['PROJECT_ID', 'NAME', 'TYPE', 'PROJECT_STATUS',
@@ -60,7 +61,14 @@ def main():
     # Update fields from imported table to SDW Feature Class
     Update_Fields(joined_fc, sdw_cip_fc_name, imported_table, sdw_field_ls)
 
+    # Let user know that they need to review the data and update the LUEG_UPDATES table
+    # in order for Blue SDE can be updated
+    print 'Updated the data in BLUE SDW, but you are NOT DONE YET! To update BLUE SDE please:'
+    print '  1) Review the updated Feature Class at: "{}"'.format(sdw_cip_fc_path)
+    print '  2) Then, update the date for: "{}", in: "{}"'.format( sdw_cip_fc_name, sdw_lueg_updates_path)
+    print '  3) In a few days, check to confirm that the changes from BLUE SDE have replicated to County SDEP'
 
+    raw_input('Press ENTER to finish.')
 #-------------------------------------------------------------------------------
 #*******************************************************************************
 #-------------------------------------------------------------------------------
