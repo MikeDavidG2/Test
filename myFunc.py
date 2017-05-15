@@ -77,12 +77,32 @@ def Excel_To_Table(input_excel_file, out_table, sheet):
 
     print 'Starting Excel_To_Table()...'
 
-    print '  Importing Excel file: "{}\{}" to: {}'.format(input_excel_file, sheet, out_table)
+    print '  Importing Excel file: {}\{}\n  To: {}'.format(input_excel_file, sheet, out_table)
 
     # Perform conversion
     arcpy.ExcelToTable_conversion(input_excel_file, out_table, sheet)
 
     print 'Finished Excel_To_Table()\n'
+#-------------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
+#                       FUNCTION Select_Object()
+def Select_Object(path_to_obj, selection_type, where_clause):
+    """
+    """
+
+    print 'Starting Select_Object()...'
+
+    try:
+        arcpy.MakeFeatureLayer_management(path_to_obj, 'lyr')
+    except:
+        arcpy.MakeTableView_management(path_to_obj, 'lyr')
+
+    print '  Selecting "lyr" with a selection type: {}, where: "{}"'.format(selection_type, where_clause)
+    arcpy.SelectLayerByAttribute_management('lyr', selection_type, where_clause)
+
+    print 'Finished Select_Object()\n'
+    return 'lyr'
+
 #-------------------------------------------------------------------------------
 #-------------------------------------------------------------------------------
 #                        FUNCTION Get_Count_Selected()
