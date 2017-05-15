@@ -83,6 +83,33 @@ def main():
 #                          FUNCTION: Validate_Table()
 def Validate_Table(sdw_field_ls, imported_table, sdw_cip_fc_path):
     """
+    PARAMETERS:
+        sdw_field_ls: The list of fields that we defined in main() that are in
+          SDW FC that we want to update with the imported table.
+
+        imported_table: The path of the imported_table generated from Excel_To_Table()
+
+        sdw_cip_fc_path: The path of the SDW CIP Feature Class.
+
+    RETURNS:
+        valid_table: A Boolean variable that is 'False' if there were ERRORS,
+          but is 'True' if there were NO errors or if there were only WARNINGS.
+          if valid_table = 'False' we can stop the script in main() so we do not
+          copy over bad/incomplete data to SDW.
+
+    FUNCTION:
+        To validate the newly imported FGDB table from the Excel table.  This
+        function:
+          1) Validates that the fields that need to be updated in SDW are found
+             in the import table.
+             "valid_table = False" if not.
+
+          2) Validates that all PROJECT_ID's in SDW are also in the import table,
+             warns user of ID's in SDW, but not in import table.
+             "valid_table = True" regardless of this validation result.
+
+          3) Validates that all PROJECT_ID's in the import table are also in SDW,
+             "valid_table = False" if it finds projects in import table, but not in SDW.
     """
 
     print 'Validating Table...'
@@ -98,28 +125,35 @@ def Validate_Table(sdw_field_ls, imported_table, sdw_cip_fc_path):
     #---------------------------------------------------------------------------
     #       Validate that the fields we need in SDW are in the import table
 
-    print '  Validating the field names in import table'
+    print '  Validating the field names in import table:'
+
+    # list to contain any fields in sdw_field_ls that is not in the imported table
+    fields_not_in_imprt_tbl = []
 
     # For each SDW field in the sdw_field_ls, make sure the imported table has the same field
     for sdw_field in sdw_field_ls:
         if sdw_field in imported_field_names:
-            ##print '    sdw_field: "{}" is in imported_field_names.'.format(sdw_field)
             pass
 
     # If there is a field in our sdw_field_ls that is NOT in the imported table,
     # Stop the function and return 'valid_table = False' so we do not copy incomplete data
         else:
-            print '\n    *** ERROR! Field: "{}" is NOT in imported_field_names. ***'.format(sdw_field)
-            print '      Please see why the field is not in the import table.\n      Script stopped.'
-            valid_table = False
-            return valid_table
-    print '  Done validating the field names in import table'
+            fields_not_in_imprt_tbl.append(sdw_field)
+
+    # If there were any fields in sdw_field_ls, but not in import table
+    if (len(fields_not_in_imprt_tbl) != 0):
+        print '*** ERROR! The below field(s) is/are NOT in the imported table. ***'
+        for field in fields_not_in_imprt_tbl:
+            print '        "{}"'.format(field)
+        print '      Please see why these fields are not in the import table.'
+        print '      valid_table = False'
+        valid_table = False
+
+    print '  Done validating the field names in import table\n'
 
     #---------------------------------------------------------------------------
     #---------------------------------------------------------------------------
     #               Validate that PROJECT_ID's exist in both datasets
-
-    print '  Validating PROJECT_ID\'s exist in both SDW FC and import table'
 
     # Get list of PROJECT_ID's in SDW FC
     sdw_project_ids = []
@@ -138,45 +172,65 @@ def Validate_Table(sdw_field_ls, imported_table, sdw_cip_fc_path):
     imprt_tbl_project_ids.sort()
 
     #---------------------------------------------------------------------------
-    # If a PROJECT_ID exists in SDW that is not in the import table, warn user but do not stop script
-    print '    Validating PROJECT_ID in SDW is also in import table'
+    # If a PROJECT_ID exists in SDW that is not in the import table, warn user but do not change valid_table
+    print '  Validating PROJECT_ID in SDW is also in import table:'
+
+    # List to contain any PROJECT_ID'S that are in SDW but not in the import table
+    proj_ids_not_in_imprt_tbl = []
 
     for project_id in sdw_project_ids:
         if project_id in imprt_tbl_project_ids:
-            ##print '      PROJECT_ID: "{}" in both import table and SDW FC'.format(project_id)
             pass
 
         # There is a project that is in SDW but not in import table.  This could
         # happen if CIP deleted a project in their Excel file.
         else:
-            print '      *** WARNING!  PROJECT_ID: "{}" is in SDW, but not in the import table'.format(project_id)
-            print '      Any project in SDW should have a project in the import table.'
-            print '      Please inform CIP that their "Excel sheet has missing data for this project,'
-            print '      and that this project still exists in their database, but it will not be updated if it is not in the Excel sheet."'
-            print '      Script NOT stopped however.'
+            proj_ids_not_in_imprt_tbl.append(project_id)
+
+    # If there were any projects in SDW, but not in import table warn user
+    if (len(proj_ids_not_in_imprt_tbl) != 0):
+        print '*** WARNING!  The below PROJECT_ID(s) is/are in the SDW FC, but not in the import table: ***'
+        for proj in proj_ids_not_in_imprt_tbl:
+            print '        {}'.format(proj)
+        print '    Any project in SDW should have a project in the import table.'
+        print '    Please inform CIP that their "Excel sheet may be missing these projects,'
+        print '    and that these project still exist in their database,'
+        print '    but they will not be updated if they are not in the Excel sheet."'
+        print '    Function NOT stopped however.'
+
+    print '  Done validating PROJECT_ID in SDW\n'
 
     #---------------------------------------------------------------------------
     # Make sure that every PROJECT_ID in the import table also exists in SDW
     # Stop script if an import table PROJECT_ID exists, but not in SDW FC
 
-    print '    Validating PROJECT_ID in import table is also in SDW'
+    print '  Validating PROJECT_ID in import table is also in SDW:'
+
+    # list to contain any PROJECT_ID's that are in import table, but not in SDW
+    proj_ids_not_in_sdw = []
 
     for project_id in imprt_tbl_project_ids:
         if project_id in sdw_project_ids:
-            ##print '      PROJECT_ID: "{}" in both import table and SDW FC'.format(project_id)
             pass
 
         # There is a project that is in the import table but not SDW.  This could happen
         # if CIP added a project, but GIS has not added the project footprint in SDW.
         else:
-            print '\n      *** ERROR! PROJECT_ID: "{}" in import table, but NOT in SDW FC.'.format(project_id)
-            print '      This means there will be no polygon to update info for in SDW.  Contact CIP for project footprint.'
-            print '      Please create a polygon in SDW with the above project number before continuing.  All other attributes in SDW can be <NULL>'
+            proj_ids_not_in_sdw.append(project_id)
 
-            valid_table = False
-            return valid_table
+    # If there were any projects in import table, but not SDW inform user and stop function:
+    if (len(proj_ids_not_in_sdw) != 0):
+        print '*** ERROR! The below PROJECT_ID(s) is/are in the import table, but NOT in the SDW FC: ***'
+        for proj in proj_ids_not_in_sdw:
+            print '        {}'.format(proj)
+        print '    This means there will be no polygon in SDW to update.  Contact CIP for project footprint.'
+        print '    Please create a polygon in SDW with the above project number before continuing.  All other attributes in SDW can be <NULL>'
+        print '    valid_table = False'
 
-    print '  Done Validating PROJECT_ID\'s\n'
+        valid_table = False
+
+    print '  Done validating PROJECT_IDs in import table'
+
 
 
 
