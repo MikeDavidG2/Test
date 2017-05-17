@@ -220,7 +220,7 @@ def Get_DT_To_Append():
 #-------------------------------------------------------------------------------
 #                          FUNCTION Join 2 Objects
 
-def Join_2_Objects(target_obj, target_join_field, to_join_obj, to_join_field):
+def Join_2_Objects(target_obj, target_join_field, to_join_obj, to_join_field, join_type):
     """
     PARAMETERS:
       target_obj (str): The full path to the FC or Table that you want to have
@@ -234,6 +234,11 @@ def Join_2_Objects(target_obj, target_join_field, to_join_obj, to_join_field):
 
       to_join_field (str): The field name in the to_join_obj to be used as the
         foreign key.
+
+      join_type (str): Specifies what will be done with records in the input
+        that match a record in the join table.
+          KEEP_ALL
+          KEEP_COMMON
 
     RETURNS:
       target_obj (lyr): Return the layer/view of the joined object so that
@@ -266,7 +271,7 @@ def Join_2_Objects(target_obj, target_join_field, to_join_obj, to_join_field):
 
     # Join the layers
     print '  Joining layers'
-    arcpy.AddJoin_management('target_obj', target_join_field, 'to_join_obj', to_join_field)
+    arcpy.AddJoin_management('target_obj', target_join_field, 'to_join_obj', to_join_field, join_type)
 
     # Print the fields
     fields = arcpy.ListFields('target_obj')
