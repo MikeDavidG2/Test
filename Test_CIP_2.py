@@ -1,7 +1,8 @@
 #-------------------------------------------------------------------------------
 # Name:        module1
 # Purpose:
-#
+"""
+"""
 # Author:      mgrue
 #
 # Created:     12/05/2017
@@ -66,8 +67,10 @@ def main():
     imported_table = os.path.join(FGDB_path, sheet_to_import + '_' + dt_to_append)
     Excel_To_Table(excel_file, imported_table, sheet_to_import)
 
-    # Validate the imported table data (make sure it has the correct fields
-    valid_table = Validate_Table(sdw_field_ls, imported_table, sdw_cip_fc_path)
+    # Validate the imported table data (make sure it has the correct fields)
+    # Get a boolean (True/False) if valid,
+    # Get 2 lists of the project id's that were not in both the import table and SDW
+    valid_table, ids_not_in_imprt_tbl, ids_not_in_sdw  = Validate_Table(sdw_field_ls, imported_table, sdw_cip_fc_path)
 
     # If import table was valid, Process table
     if valid_table:
@@ -75,21 +78,49 @@ def main():
 
     # Join processed table to SDW CIP Feature Class
     if valid_table:
-        joined_fc = Join_2_Objects(sdw_cip_fc_path, join_field, imported_table, join_field)
+        joined_fc = Join_2_Objects(sdw_cip_fc_path, join_field, imported_table, join_field, 'KEEP_COMMON')
 
     # Update fields from imported table to SDW Feature Class
     if valid_table:
         Update_Fields(joined_fc, sdw_cip_fc_name, imported_table, sdw_field_ls)
 
+    #---------------------------------------------------------------------------
+    #                          End of script reporting
+
+    print '--------------------------------------------------------------------'
+    print '                    End of script reporting\n'
+
     # Let user know that they need to review the data and update the LUEG_UPDATES table
     # in order for Blue SDE can be updated
-    # TODO: Uncomment the below print statements / raw_input
-    if valid_table:
+    if valid_table == True:
         print '***Updated the data in BLUE SDW, but you are NOT DONE YET! To update BLUE SDE please:***'
-        print '  1) Review the updated Feature Class at: "{}"'.format(sdw_cip_fc_path)
-        print '  2) Then, update the date for: "{}", in: "{}"'.format( sdw_cip_fc_name, sdw_lueg_updates_path)
-        print '  3) In a few days, check to confirm that the changes from BLUE SDE have replicated to County SDEP'
+        print '  1) Review the updated Feature Class at: {}'.format(sdw_cip_fc_path)
+        print '  2) Then, update the date for: {}, in: {}'.format( sdw_cip_fc_name, sdw_lueg_updates_path)
+        print '  3) In a few days, check to confirm that the changes from BLUE SDE have replicated to County SDEP\n'
 
+    # If there were any projects in SDW, but not in import table warn user
+    if (len(ids_not_in_imprt_tbl) != 0):
+        print '*** WARNING!  The below PROJECT_ID(s) is/are in the SDW FC, but not in the import table: ***'
+        for proj in ids_not_in_imprt_tbl:
+            print '  {}'.format(proj)
+        print '  Any project in SDW should have a project in the import table.  Please inform CIP that their "Excel sheet may be missing these projects,'
+        print '  and that these project still exist in their database, but they will not be updated if they are not in the Excel sheet."\n'
+
+    # If there were any projects in import table, but not SDW warn user
+    if (len(ids_not_in_sdw) != 0):
+        print '*** WARNING! The below PROJECT_ID(s) is/are in the import table, but NOT in the SDW FC: ***'
+        for proj in ids_not_in_sdw:
+            print '  {}'.format(proj)
+        print '  This means there is no feature in SDW to update attributes.  Contact CIP for project footprint.'
+        print '  Please create a polygon in SDW with the above project number to update this project with its attributes, all other attributes in SDW can be <NULL>\n'
+
+    # If the import table was not valid, have this error the last item in the report
+    if valid_table == False:
+        print '*** ERROR! The update cannot be completed. ***'
+        print '  Validate_Table function has found missing / incorrect info.  Please see above for *** ERROR! *** messages.'
+        print '  No features in SDW have been updated.'
+
+    # TODO: Uncomment the below raw_input
 ##    raw_input('Press ENTER to finish.')
 
 
@@ -215,6 +246,8 @@ def Validate_Table(sdw_field_ls, imported_table, sdw_cip_fc_path):
     # 'Blank projects' have a PROJECT_ID from the Excel table, but they don't
     # have any other attributes.  The Excel sheet has preset PROJECT_ID's for
     # our workflow to reduce the amount of editing needed by GIS in the Excel sheet.
+    # Script checks both the NAME and TYPE fields.  If both are blank, then that row
+    # is deleted.
 
     print '  Checking for "Blank Projects"'
     lyr_w_selection = Select_Object(imported_table, 'NEW_SELECTION', "NAME = '' and TYPE = '' ")
@@ -301,16 +334,8 @@ def Validate_Table(sdw_field_ls, imported_table, sdw_cip_fc_path):
         else:
             proj_ids_not_in_imprt_tbl.append(project_id)
 
-    # If there were any projects in SDW, but not in import table warn user
-    if (len(proj_ids_not_in_imprt_tbl) != 0):
-        print '*** WARNING!  The below PROJECT_ID(s) is/are in the SDW FC, but not in the import table: ***'
-        for proj in proj_ids_not_in_imprt_tbl:
-            print '        {}'.format(proj)
-        print '    Any project in SDW should have a project in the import table.'
-        print '    Please inform CIP that their "Excel sheet may be missing these projects,'
-        print '    and that these project still exist in their database,'
-        print '    but they will not be updated if they are not in the Excel sheet."'
-        print '    Function NOT stopped however.'
+    print '    There is/are {} project(s) that is/are in SDW, but not in the import table.'.format(len(proj_ids_not_in_imprt_tbl))
+    print '    See below for a report.'
 
     print '  Done validating PROJECT_ID in SDW\n'
 
@@ -332,13 +357,8 @@ def Validate_Table(sdw_field_ls, imported_table, sdw_cip_fc_path):
         else:
             proj_ids_not_in_sdw.append(project_id)
 
-    # If there were any projects in import table, but not SDW inform user and stop function:
-    if (len(proj_ids_not_in_sdw) != 0):
-        print '*** WARNING! The below PROJECT_ID(s) is/are in the import table, but NOT in the SDW FC: ***'
-        for proj in proj_ids_not_in_sdw:
-            print '        {}'.format(proj)
-        print '    This means there will be no polygon in SDW to update.  Contact CIP for project footprint.'
-        print '    Please create a polygon in SDW with the above project number to update this project with its attributes, all other attributes in SDW can be <NULL>'
+    print '    There is/are {} project(s) that is/are in the import table, but not in SDW.'.format(len(proj_ids_not_in_sdw))
+    print '    See below for a report.'
 
     print '  Done validating PROJECT_IDs in import table\n'
 
@@ -351,19 +371,15 @@ def Validate_Table(sdw_field_ls, imported_table, sdw_cip_fc_path):
     where_clause = "PROJECT_ID IS NULL OR NAME = ''"
     with arcpy.da.SearchCursor(imported_table, ['PROJECT_ID', 'NAME'], where_clause) as cursor:
         for row in cursor:
-            print '*** ERROR! The below project is missing either PROJECT_ID or NAME, both are needed for a valid table. ***'
+            print '*** ERROR! The below project is missing PROJECT_ID / NAME (or both), both are needed for a valid table. ***'
             print '    PROJECT_ID: "{}"      NAME: "{}"'.format(row[0], row[1])
             valid_table = False
 
     print '  Done Validating PROJECT_ID and NAME'
 
     #---------------------------------------------------------------------------
-    # Finish function notes
 
-    if valid_table == False:
-        print '*** ERROR! The update cannot be completed. ***'
-        print '  Validate_Table function has found missing / incorrect info.  Please see above for error messages.'
-
+    print '  valid_table = {}'.format(valid_table)
     print 'Finished Validating Table\n'
 
     return valid_table, proj_ids_not_in_imprt_tbl, proj_ids_not_in_sdw
@@ -430,7 +446,7 @@ def Process_Table(imported_table, type_dict):
 #-------------------------------------------------------------------------------
 #                          FUNCTION Join 2 Objects
 
-def Join_2_Objects(target_obj, target_join_field, to_join_obj, to_join_field):
+def Join_2_Objects(target_obj, target_join_field, to_join_obj, to_join_field, join_type):
     """
     PARAMETERS:
       target_obj (str): The full path to the FC or Table that you want to have
@@ -444,6 +460,11 @@ def Join_2_Objects(target_obj, target_join_field, to_join_obj, to_join_field):
 
       to_join_field (str): The field name in the to_join_obj to be used as the
         foreign key.
+
+      join_type (str): Specifies what will be done with records in the input
+        that match a record in the join table. Valid values:
+          KEEP_ALL
+          KEEP_COMMON
 
     RETURNS:
       target_obj (lyr): Return the layer/view of the joined object so that
@@ -476,7 +497,7 @@ def Join_2_Objects(target_obj, target_join_field, to_join_obj, to_join_field):
 
     # Join the layers
     print '  Joining layers'
-    arcpy.AddJoin_management('target_obj', target_join_field, 'to_join_obj', to_join_field)
+    arcpy.AddJoin_management('target_obj', target_join_field, 'to_join_obj', to_join_field, join_type)
 
     # Print the fields
     fields = arcpy.ListFields('target_obj')
