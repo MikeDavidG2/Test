@@ -37,7 +37,6 @@ Purpose:
 # Copyright:   (c) mgrue 2017
 # Licence:     <your licence>
 #-------------------------------------------------------------------------------
-# TODO: finish commenting in script / formatting for readability
 
 import arcpy, os
 arcpy.env.overwriteOutput = True
