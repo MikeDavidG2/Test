@@ -162,18 +162,25 @@ def Excel_To_Table(input_excel_file, out_table, sheet):
 def Validate_Table(sdw_field_ls, imported_table, sdw_cip_fc_path):
     """
     PARAMETERS:
-        sdw_field_ls: The list of fields that we defined in main() that are in
-          SDW FC that we want to update with the imported table.
+      sdw_field_ls (list of str): The list of fields that we defined in main()
+        that are in SDW FC that we want to update with the imported table.
 
-        imported_table: The path of the imported_table generated from Excel_To_Table()
+      imported_table (str): The full path of the imported_table generated from
+        Excel_To_Table()
 
-        sdw_cip_fc_path: The path of the SDW CIP Feature Class.
+      sdw_cip_fc_path (str): The full path of the SDW CIP Feature Class.
 
     RETURNS:
-        valid_table: A Boolean variable that is 'False' if there were ERRORS,
-          but is 'True' if there were NO errors or if there were only WARNINGS.
-          if valid_table = 'False' we can stop the script in main() so we do not
-          copy over bad/incomplete data to SDW.
+      valid_table (Boolean): A Boolean variable that is 'False' if there were ERRORS,
+        but is 'True' if there were NO errors or if there were only WARNINGS.
+        if valid_table = 'False' we can stop the script in main() so we do not
+        copy over bad/incomplete data to SDW.
+
+      proj_ids_not_in_imprt_tbl (list of str): Project ID's that are in SDW, but
+        are not found in the import table.
+
+      proj_ids_not_in_sdw (list of str): Project ID's that are in the import table,
+        but are not found in SDW.
 
     FUNCTION:
         To validate the newly imported FGDB table from the Excel table.  This
@@ -331,7 +338,7 @@ def Validate_Table(sdw_field_ls, imported_table, sdw_cip_fc_path):
         for proj in proj_ids_not_in_sdw:
             print '        {}'.format(proj)
         print '    This means there will be no polygon in SDW to update.  Contact CIP for project footprint.'
-        print '    Please create a polygon in SDW with the above project number before continuing.  All other attributes in SDW can be <NULL>'
+        print '    Please create a polygon in SDW with the above project number to update this project with its attributes, all other attributes in SDW can be <NULL>'
 
     print '  Done validating PROJECT_IDs in import table\n'
 
@@ -359,7 +366,7 @@ def Validate_Table(sdw_field_ls, imported_table, sdw_cip_fc_path):
 
     print 'Finished Validating Table\n'
 
-    return valid_table
+    return valid_table, proj_ids_not_in_imprt_tbl, proj_ids_not_in_sdw
 
 #-------------------------------------------------------------------------------
 #-------------------------------------------------------------------------------
