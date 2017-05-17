@@ -1,7 +1,35 @@
 #-------------------------------------------------------------------------------
-# Name:        module1
-# Purpose:
+# Name:        Update_CIP_5YEAR_POLY
 """
+Purpose:
+  To update the CIP_5YEAR_POLY feature class on the Blue Workspace (SDW) using
+  a constrained Excel spreadsheet that CIP maintains.  The spreadsheet has had
+  a number of modifications and constraints put on it so that any alterations
+  CIP makes to the spreadsheet, the spreadsheet will always be able to be used
+  to update the SDW feature class.
+
+  This script:
+    1) Imports the Excel file to a FGDB table.
+       FUNCTION: Excel_To_Table()
+
+    2) Validates for correct data (ERRORS result if script needs to stop,
+       WARNINGS result if there is potentially missing data).  These messages
+       are delivered at the end of the script.
+       FUNCTION: Validate_Table()
+
+    3) Processes the data (if valid).  i.e. change all values in [NAME] to be
+       all uppercase if there are any lowercase characters. And change the string
+       values in the Excel sheet in [TYPE] to the corresponding numeric values
+       that are used in the actual SDW FC.
+       FUNCTION: Process_Table()
+
+    4) Joins the imported FGDB table to the SDW CIP_5YEAR_POLY feature class,
+       FUNCTION: Join_2_Objects()
+
+    5) Calculates the fields from the imported table to the SDW FC (essentially
+       overwriting the attributes in the SDW with the attributes from the
+       imported table).
+       FUNCTION: Update_Fields()
 """
 # Author:      mgrue
 #
@@ -9,38 +37,40 @@
 # Copyright:   (c) mgrue 2017
 # Licence:     <your licence>
 #-------------------------------------------------------------------------------
-
+# TODO: finish commenting in script / formatting for readability
 
 import arcpy, os
 arcpy.env.overwriteOutput = True
 
 def main():
+    #---------------------------------------------------------------------------
     #                              Set variables
-    # FGDB to import the Excel table info
+
+    # FGDB to import the Excel table info, user must create FGDB
     FGDB_path = r'P:\CIP\20170403_CIP_to_App\Data\CIP_Imported_Excel.gdb'
 
-    # Update Excel file info
-    excel_file        = r'P:\CIP\20170403_CIP_to_App\Working\Test\CIP_5YEAR_POLY_testing.xlsx'
-    sheet_to_import   = 'CIP_5YEAR_POLY'
-    join_field        = 'PROJECT_ID'
+    # Excel file info
+    excel_file        = r'P:\CIP\20170403_CIP_to_App\Working\Test\CIP_5YEAR_POLY_testing.xlsx'  # Full path
+    sheet_to_import   = 'CIP_5YEAR_POLY'  # Sheet name
+    join_field        = 'PROJECT_ID'  # Field used to join (primary key)
 
     # SDW connection info
-    sdw_connection        = r'P:\CIP\20170403_CIP_to_App\Data\Fake_SDW.gdb'
+    sdw_connection        = r'P:\CIP\20170403_CIP_to_App\Data\Fake_SDW.gdb'  # Could change between users
     sdw_cip_fc_name       = 'CIP_5YEAR_POLY'
     sdw_cip_fc_path       = os.path.join(sdw_connection, sdw_cip_fc_name)
     sdw_lueg_updates_path = os.path.join(sdw_connection, 'SDW.PDS.LUEG_UPDATES')
 
-    # List of Fields to update in SDW/SDE Feature Class
+    # List of Fields to update in SDW Feature Class
     # 'PROJECT_ID' not in below list since that is the field used to join
-    sdw_field_ls =   ['NAME', 'TYPE', 'PROJECT_STATUS',
-                      'DETAIL_WK_PROG', 'FIVE_YR_PLAN', 'EST_START', 'EST_COMPLT',
+    sdw_field_ls =   ['NAME', 'TYPE', 'PROJECT_STATUS', 'DETAIL_WK_PROG',
+                      'FIVE_YR_PLAN', 'EST_START', 'EST_COMPLT',
                       'EST_PR_CST', 'FUNDING_STATUS', 'FUNDING', 'LENGTH',
                       'PLANNING_GROUP', 'SUPERVISOR_DISTRICT', 'THOMAS_BROTHERS',
                       'PROJECT_MANAGER', 'PM_EMAIL', 'PM_PHONE', 'ORACLE_NUMBER',
                       'DESCRIPTION']
 
     # Dictionary of [TYPE] domains.
-    #The left side is the text : The right side is the numerical value the [TYPE] field expects in SDW
+    #The left side is the text in Excel : The right side is the numerical value the [TYPE] field expects in SDW
     type_dict = {
     'Road Reconstruction':'1',
     'Community Development Block Grant':'2',
@@ -56,7 +86,6 @@ def main():
     'Watersheds':'9.4'
     }
 
-
     #---------------------------------------------------------------------------
     #                       Start calling FUNCTIONS
 
@@ -69,19 +98,19 @@ def main():
 
     # Validate the imported table data (make sure it has the correct fields)
     # Get a boolean (True/False) if valid,
-    # Get 2 lists of the project id's that were not in both the import table and SDW
+    # Get list of the project id's that were in SDW, but not in import table
+    # Get list of the project id's that were in import table, but not in SDW
     valid_table, ids_not_in_imprt_tbl, ids_not_in_sdw  = Validate_Table(sdw_field_ls, imported_table, sdw_cip_fc_path)
 
-    # If import table was valid, Process table
-    if valid_table:
+
+    if valid_table == True:
+        # If import table was valid, Process table
         Process_Table(imported_table, type_dict)
 
-    # Join processed table to SDW CIP Feature Class
-    if valid_table:
+        # Join processed table to SDW CIP Feature Class
         joined_fc = Join_2_Objects(sdw_cip_fc_path, join_field, imported_table, join_field, 'KEEP_COMMON')
 
-    # Update fields from imported table to SDW Feature Class
-    if valid_table:
+        # Update fields from imported table to SDW Feature Class
         Update_Fields(joined_fc, sdw_cip_fc_name, imported_table, sdw_field_ls)
 
     #---------------------------------------------------------------------------
@@ -122,7 +151,6 @@ def main():
 
     # TODO: Uncomment the below raw_input
 ##    raw_input('Press ENTER to finish.')
-
 
 #-------------------------------------------------------------------------------
 #*******************************************************************************
@@ -239,7 +267,7 @@ def Validate_Table(sdw_field_ls, imported_table, sdw_cip_fc_path):
 
     print 'Starting Validate_Table()...'
 
-    valid_table = True
+    valid_table = True  # Will change to 'False' if we want to stop script
 
     #---------------------------------------------------------------------------
     #                    1) Delete any blank projects
@@ -250,12 +278,16 @@ def Validate_Table(sdw_field_ls, imported_table, sdw_cip_fc_path):
     # is deleted.
 
     print '  Checking for "Blank Projects"'
+
+    # Get new selection in the imported table and return the layer with the selection
     lyr_w_selection = Select_Object(imported_table, 'NEW_SELECTION', "NAME = '' and TYPE = '' ")
 
+    # Get the count of the number of selected records
     count = Get_Count_Selected(lyr_w_selection)
 
     print '    There are {} blank projects to delete'.format(count)
 
+    # Only delete the rows if there is at least one selected feature
     if count != 0:
         print '    Deleting...'
         arcpy.DeleteRows_management(lyr_w_selection)
@@ -288,7 +320,7 @@ def Validate_Table(sdw_field_ls, imported_table, sdw_cip_fc_path):
 
     # If there were any fields in sdw_field_ls, but not in import table
     if (len(fields_not_in_imprt_tbl) != 0):
-        print '*** ERROR! The below field(s) is/are NOT in the imported table. ***'
+        print '*** ERROR! The below FIELD(s) is/are NOT in the imported table. ***'
         for field in fields_not_in_imprt_tbl:
             print '        "{}"'.format(field)
         print '      Please see why these fields are not in the import table.'
@@ -327,15 +359,16 @@ def Validate_Table(sdw_field_ls, imported_table, sdw_cip_fc_path):
 
     for project_id in sdw_project_ids:
         if project_id in imprt_tbl_project_ids:
+            # Don't do anything if the SDW project_id is also in the import table
             pass
 
         # There is a project that is in SDW but not in import table.  This could
         # happen if CIP deleted a project in their Excel file.
+        # Add this project_id to list
         else:
             proj_ids_not_in_imprt_tbl.append(project_id)
 
     print '    There is/are {} project(s) that is/are in SDW, but not in the import table.'.format(len(proj_ids_not_in_imprt_tbl))
-    print '    See below for a report.'
 
     print '  Done validating PROJECT_ID in SDW\n'
 
@@ -350,15 +383,16 @@ def Validate_Table(sdw_field_ls, imported_table, sdw_cip_fc_path):
 
     for project_id in imprt_tbl_project_ids:
         if project_id in sdw_project_ids:
+            # Don't do anything if the import table project_id is also in SDW
             pass
 
         # There is a project that is in the import table but not SDW.  This could happen
         # if CIP added a project, but GIS has not added the project footprint in SDW.
+        # Add this project_id to list
         else:
             proj_ids_not_in_sdw.append(project_id)
 
     print '    There is/are {} project(s) that is/are in the import table, but not in SDW.'.format(len(proj_ids_not_in_sdw))
-    print '    See below for a report.'
 
     print '  Done validating PROJECT_IDs in import table\n'
 
@@ -367,7 +401,7 @@ def Validate_Table(sdw_field_ls, imported_table, sdw_cip_fc_path):
 
     print '  Validating that every project has a PROJECT_ID and a NAME'
 
-    # Where clause to select only the invalid
+    # Where clause to select only the invalid rows
     where_clause = "PROJECT_ID IS NULL OR NAME = ''"
     with arcpy.da.SearchCursor(imported_table, ['PROJECT_ID', 'NAME'], where_clause) as cursor:
         for row in cursor:
@@ -375,7 +409,7 @@ def Validate_Table(sdw_field_ls, imported_table, sdw_cip_fc_path):
             print '    PROJECT_ID: "{}"      NAME: "{}"'.format(row[0], row[1])
             valid_table = False
 
-    print '  Done Validating PROJECT_ID and NAME'
+    print '  Done Validating PROJECT_ID and NAME\n'
 
     #---------------------------------------------------------------------------
 
@@ -408,7 +442,7 @@ def Process_Table(imported_table, type_dict):
            corresponding numeric values that are used in the actual SDW FC.
     """
 
-    print 'Processing Table...'
+    print 'Starting Process_Table()...'
 
     #---------------------------------------------------------------------------
     # 1)  Calculate field [NAME] to have all upper case letters for consistency
@@ -480,7 +514,7 @@ def Join_2_Objects(target_obj, target_join_field, to_join_obj, to_join_field, jo
 
     print 'Starting Join_2_Objects()...'
 
-    # Create the layers or views using try/except
+    # Create the layer or view for the target_obj using try/except
     try:
         arcpy.MakeFeatureLayer_management(target_obj, 'target_obj')
         print '  Made FEATURE LAYER for {}'.format(target_obj)
@@ -488,6 +522,7 @@ def Join_2_Objects(target_obj, target_join_field, to_join_obj, to_join_field, jo
         arcpy.MakeTableView_management(target_obj, 'target_obj')
         print '  Made TABLE VIEW for {}'.format(target_obj)
 
+    # Create the layer or view for the to_join_obj using try/except
     try:
         arcpy.MakeFeatureLayer_management(to_join_obj, 'to_join_obj')
         print '  Made FEATURE LAYER for {}'.format(to_join_obj)
@@ -499,11 +534,11 @@ def Join_2_Objects(target_obj, target_join_field, to_join_obj, to_join_field, jo
     print '  Joining layers'
     arcpy.AddJoin_management('target_obj', target_join_field, 'to_join_obj', to_join_field, join_type)
 
-    # Print the fields
-    fields = arcpy.ListFields('target_obj')
-    print '  Fields in joined layer:'
-    for field in fields:
-        print '    ' + field.name
+    # Print the fields (only really needed during testing)
+##    fields = arcpy.ListFields('target_obj')
+##    print '  Fields in joined layer:'
+##    for field in fields:
+##        print '    ' + field.name
 
     print 'Finished Join_2_Objects()...\n'
 
@@ -538,7 +573,7 @@ def Update_Fields(joined_fc, sdw_cip_fc_name, imported_table, sdw_field_ls):
         table to the SDW feature class.
     """
 
-    print 'Updating Fields in Joined Feature Class...'
+    print 'Starting Update_Fields()...'
 
     # Get the basename of the imported table, i.e. "CIP_5YEAR_POLY_2017_5_15__9_38_50"
     # Will be used in 'expression' below
@@ -580,18 +615,20 @@ def Select_Object(path_to_obj, selection_type, where_clause):
       To perform a selection on the object.
     """
 
-    print '    Starting Select_Object()...'
+##    print '    Starting Select_Object()...'
 
+    # Make a feature layer or a table view
     # Use try/except to handle either object type (Feature Layer / Table)
     try:
         arcpy.MakeFeatureLayer_management(path_to_obj, 'lyr')
     except:
         arcpy.MakeTableView_management(path_to_obj, 'lyr')
 
+    # Select layer by Attribute
     print '      Selecting "lyr" with a selection type: {}, where: "{}"'.format(selection_type, where_clause)
     arcpy.SelectLayerByAttribute_management('lyr', selection_type, where_clause)
 
-    ##print '    Finished Select_Object()'
+##    print '    Finished Select_Object()'
     return 'lyr'
 
 #-------------------------------------------------------------------------------
@@ -609,7 +646,7 @@ def Get_Count_Selected(lyr):
       To get the count of the number of selected records in the lyr.
     """
 
-    print '    Starting Get_Count()...'
+##    print '    Starting Get_Count()...'
 
     # See if there are any selected records
     desc = arcpy.Describe(lyr)
@@ -624,7 +661,7 @@ def Get_Count_Selected(lyr):
 
     print '      Count of Selected: {}'.format(str(count_selected))
 
-    ##print '    Finished Get_Count()'
+##    print '    Finished Get_Count()'
 
     return count_selected
 
