@@ -51,10 +51,14 @@ def Create_FGDB(path_name_FGDB, overwrite_if_exists=False):
 def Copy_FC(in_features, out_feature_class):
     """
     PARAMETERS:
+      in_features (str): Full path to a Feature Class.
+      out_feature_class: Full path to another existing Feature Class.
 
     RETURNS:
+      None
 
     FUNCTION:
+      To copy Features from one FC to another existing FC.
     """
 
     print 'Starting Copy_FC()...'
@@ -67,14 +71,41 @@ def Copy_FC(in_features, out_feature_class):
 
 #-------------------------------------------------------------------------------
 #-------------------------------------------------------------------------------
+#                                 FUNCTION Delete_Rows()
+def Delete_Rows(in_table):
+    """
+    PARAMETERS:
+      in_table (str): Full path to a table.
+
+    RETURNS:
+      None
+
+    FUNCTION:
+      To delete the rows from one table.
+    """
+
+    print 'Starting Delete_Rows()...'
+
+    print '  Deleting Rows from: "{}"'.format(in_table)
+
+    arcpy.DeleteRows_management(in_table, out_table)
+
+    print 'Finished Delete_Rows()\n'
+
+#-------------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 #                                 FUNCTION Copy_Rows()
 def Copy_Rows(in_table, out_table):
     """
     PARAMETERS:
+      in_table (str): Full path to an input table.
+      out_table (str): Full path to an existing output table.
 
     RETURNS:
+      None
 
     FUNCTION:
+      To copy the rows from one table to another table.
     """
 
     print 'Starting Copy_Rows()...'
