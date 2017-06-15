@@ -110,7 +110,8 @@ def Copy_Rows(in_table, out_table):
 
     print 'Starting Copy_Rows()...'
 
-    print '  Copying Rows from: "{}" to: "{}"'.format(in_table, out_table)
+    print '  Copying Rows from: "{}"'.format(in_table)
+    print '                 To: "{}"'.format(out_table)
 
     arcpy.CopyRows_management(in_table, out_table)
 
@@ -314,6 +315,33 @@ def Join_2_Objects(target_obj, target_join_field, to_join_obj, to_join_field, jo
 
     # Return the layer/view of the joined object so it can be processed
     return 'target_obj'
+
+#-------------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
+#                          FUNCTION Test_Schema_Lock()
+def Test_Schema_Lock(dataset):
+    """
+    PARAMETERS:
+      dataset (str): Full path to a dataset to be tested if there is a schema lock
+
+    RETURNS:
+      no_schema_lock (Boolean): "True" or "False" if there is no schema lock
+
+    FUNCTION:
+      To perform a test on a dataset and return "True" if there is no schema
+      lock, and "False" if a schema lock already exists.
+    """
+
+    print 'Starting Test_Schema_Lock()...'
+
+    print '  Testing dataset: {}'.format(dataset)
+
+    no_schema_lock = arcpy.TestSchemaLock(dataset)
+    print '  Dataset available to have a schema lock applied to it = "{}"'.format(no_schema_lock)
+
+    print 'Finished Test_Schema_Lock()\n'
+
+    return no_schema_lock
 
 #-------------------------------------------------------------------------------
 #-------------------------------------------------------------------------------
