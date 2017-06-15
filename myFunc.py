@@ -181,7 +181,7 @@ def Get_Count_Selected(lyr):
 
 #-------------------------------------------------------------------------------
 #-------------------------------------------------------------------------------
-#                          FUNCTION Get dt_to_append
+#                          FUNCTION Get_dt_to_append
 def Get_DT_To_Append():
     """
     PARAMETERS:
@@ -341,6 +341,56 @@ def Test_Schema_Lock(dataset):
     print 'Finished Test_Schema_Lock()\n'
 
     return no_schema_lock
+
+#-------------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
+#                          FUNCTION Write_Print_To_Log()
+def Write_Print_To_Log(log_file):
+    """
+    PARAMETERS:
+      log_file (str): Path to log file.  The part after the last "\" will be the
+        name of the .log file after the date, time, and ".log" is appended to it.
+
+    RETURNS:
+      orig_stdout (os object): The original stdout is saved in this variable so
+        that the script can access it and return stdout back to its orig settings.
+
+    FUNCTION:
+      To turn all the 'print' statements into a log-writing object.  A new log
+        file will be created based on log_file with the date, time, ".log"
+        appended to it.  And any print statements after the command
+        "sys.stdout = write_to_log" will be written to this log.
+      It is a good idea to use the returned orig_stdout variable to return sys.stdout
+        back to its original setting.
+      NOTE: This function needs the function Get_DT_To_Append() to run
+
+    """
+    print 'Starting Write_Print_To_Log()...'
+
+    # Get the original sys.stdout so it can be returned to normal at the
+    #    end of the script.
+    orig_stdout = sys.stdout
+
+    # Get DateTime to append
+    dt_to_append = Get_DT_To_Append()
+
+    # Create the log file with the datetime appended to the file name
+    log_file_date = '{}_{}.log'.format(log_file,dt_to_append)
+    write_to_log = open(log_file_date, 'w')
+
+    # Make the 'print' statement write to the log file
+    print '  Setting "print" command to write to a log file found at:\n  {}'.format(log_file_date)
+    sys.stdout = write_to_log
+
+    # Header for log file
+    start_time = datetime.datetime.now()
+    start_time_str = [start_time.strftime('%m/%d/%Y  %I:%M:%S %p')][0]
+    print '++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++'
+    print '                  {}'.format(start_time_str)
+    print '             START Update_DPW_w_MasterData.py'
+    print '++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n'
+
+    return orig_stdout
 
 #-------------------------------------------------------------------------------
 #-------------------------------------------------------------------------------
