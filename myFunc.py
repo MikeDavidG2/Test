@@ -2,8 +2,57 @@ import os, arcpy, datetime
 ##arcpy.env.overwriteOutput = True
 
 #-------------------------------------------------------------------------------
-#                         FUNCTION: Create_FGDB()
+#-------------------------------------------------------------------------------
+#                                 FUNCTION Copy_FC()
+def Copy_FC(in_features, out_feature_class):
+    """
+    PARAMETERS:
+      in_features (str): Full path to a Feature Class.
+      out_feature_class: Full path to another existing Feature Class.
 
+    RETURNS:
+      None
+
+    FUNCTION:
+      To copy Features from one FC to another existing FC.
+    """
+
+    print 'Starting Copy_FC()...'
+
+    print '  Copying features from: "{}" to: "{}"'.format(in_features, out_feature_class)
+
+    arcpy.CopyFeatures_management(in_features, out_feature_class)
+
+    print 'Finished Copy_FC()\n'
+
+#-------------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
+#                                 FUNCTION Copy_Rows()
+def Copy_Rows(in_table, out_table):
+    """
+    PARAMETERS:
+      in_table (str): Full path to an input table.
+      out_table (str): Full path to an existing output table.
+
+    RETURNS:
+      None
+
+    FUNCTION:
+      To copy the rows from one table to another table.
+    """
+
+    print 'Starting Copy_Rows()...'
+
+    print '  Copying Rows from: "{}"'.format(in_table)
+    print '                 To: "{}"'.format(out_table)
+
+    arcpy.CopyRows_management(in_table, out_table)
+
+    print 'Finished Copy_Rows()\n'
+
+#-------------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
+#                           FUNCTION Create_FGDB()
 def Create_FGDB(path_name_FGDB, overwrite_if_exists=False):
     """
     PARAMETERS:
@@ -47,30 +96,6 @@ def Create_FGDB(path_name_FGDB, overwrite_if_exists=False):
 
 #-------------------------------------------------------------------------------
 #-------------------------------------------------------------------------------
-#                                 FUNCTION Copy_FC()
-def Copy_FC(in_features, out_feature_class):
-    """
-    PARAMETERS:
-      in_features (str): Full path to a Feature Class.
-      out_feature_class: Full path to another existing Feature Class.
-
-    RETURNS:
-      None
-
-    FUNCTION:
-      To copy Features from one FC to another existing FC.
-    """
-
-    print 'Starting Copy_FC()...'
-
-    print '  Copying features from: "{}" to: "{}"'.format(in_features, out_feature_class)
-
-    arcpy.CopyFeatures_management(in_features, out_feature_class)
-
-    print 'Finished Copy_FC()\n'
-
-#-------------------------------------------------------------------------------
-#-------------------------------------------------------------------------------
 #                                 FUNCTION Delete_Rows()
 def Delete_Rows(in_table):
     """
@@ -91,31 +116,6 @@ def Delete_Rows(in_table):
     arcpy.DeleteRows_management(in_table, out_table)
 
     print 'Finished Delete_Rows()\n'
-
-#-------------------------------------------------------------------------------
-#-------------------------------------------------------------------------------
-#                                 FUNCTION Copy_Rows()
-def Copy_Rows(in_table, out_table):
-    """
-    PARAMETERS:
-      in_table (str): Full path to an input table.
-      out_table (str): Full path to an existing output table.
-
-    RETURNS:
-      None
-
-    FUNCTION:
-      To copy the rows from one table to another table.
-    """
-
-    print 'Starting Copy_Rows()...'
-
-    print '  Copying Rows from: "{}"'.format(in_table)
-    print '                 To: "{}"'.format(out_table)
-
-    arcpy.CopyRows_management(in_table, out_table)
-
-    print 'Finished Copy_Rows()\n'
 
 #-------------------------------------------------------------------------------
 #-------------------------------------------------------------------------------
@@ -144,45 +144,6 @@ def Excel_To_Table(input_excel_file, out_table, sheet):
     arcpy.ExcelToTable_conversion(input_excel_file, out_table, sheet)
 
     print 'Finished Excel_To_Table()\n'
-#-------------------------------------------------------------------------------
-#-------------------------------------------------------------------------------
-#                       FUNCTION Select_Object()
-def Select_Object(path_to_obj, selection_type, where_clause):
-    """
-    PARAMETERS:
-      path_to_obj (str): Full path to the object (Feature Layer or Table) that
-        is to be selected.
-
-      selection_type (str): Selection type.  Valid values are:
-        NEW_SELECTION
-        ADD_TO_SELECTION
-        REMOVE_FROM_SELECTION
-        SUBSET_SELECTION
-        SWITCH_SELECTION
-        CLEAR_SELECTION
-
-      where_clause (str): The SQL where clause.
-
-    RETURNS:
-      'lyr' (lyr): The layer/view with the selection on it.
-
-    FUNCTION:
-      To perform a selection on the object.
-    """
-
-    print 'Starting Select_Object()...'
-
-    # Use try/except to handle either object type (Feature Layer / Table)
-    try:
-        arcpy.MakeFeatureLayer_management(path_to_obj, 'lyr')
-    except:
-        arcpy.MakeTableView_management(path_to_obj, 'lyr')
-
-    print '  Selecting "lyr" with a selection type: {}, where: "{}"'.format(selection_type, where_clause)
-    arcpy.SelectLayerByAttribute_management('lyr', selection_type, where_clause)
-
-    print 'Finished Select_Object()\n'
-    return 'lyr'
 
 #-------------------------------------------------------------------------------
 #-------------------------------------------------------------------------------
@@ -221,7 +182,6 @@ def Get_Count_Selected(lyr):
 #-------------------------------------------------------------------------------
 #-------------------------------------------------------------------------------
 #                          FUNCTION Get dt_to_append
-
 def Get_DT_To_Append():
     """
     PARAMETERS:
@@ -251,7 +211,6 @@ def Get_DT_To_Append():
 #-------------------------------------------------------------------------------
 #-------------------------------------------------------------------------------
 #                          FUNCTION Join 2 Objects
-
 def Join_2_Objects(target_obj, target_join_field, to_join_obj, to_join_field, join_type):
     """
     PARAMETERS:
@@ -315,6 +274,46 @@ def Join_2_Objects(target_obj, target_join_field, to_join_obj, to_join_field, jo
 
     # Return the layer/view of the joined object so it can be processed
     return 'target_obj'
+
+#-------------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
+#                       FUNCTION Select_Object()
+def Select_Object(path_to_obj, selection_type, where_clause):
+    """
+    PARAMETERS:
+      path_to_obj (str): Full path to the object (Feature Layer or Table) that
+        is to be selected.
+
+      selection_type (str): Selection type.  Valid values are:
+        NEW_SELECTION
+        ADD_TO_SELECTION
+        REMOVE_FROM_SELECTION
+        SUBSET_SELECTION
+        SWITCH_SELECTION
+        CLEAR_SELECTION
+
+      where_clause (str): The SQL where clause.
+
+    RETURNS:
+      'lyr' (lyr): The layer/view with the selection on it.
+
+    FUNCTION:
+      To perform a selection on the object.
+    """
+
+    print 'Starting Select_Object()...'
+
+    # Use try/except to handle either object type (Feature Layer / Table)
+    try:
+        arcpy.MakeFeatureLayer_management(path_to_obj, 'lyr')
+    except:
+        arcpy.MakeTableView_management(path_to_obj, 'lyr')
+
+    print '  Selecting "lyr" with a selection type: {}, where: "{}"'.format(selection_type, where_clause)
+    arcpy.SelectLayerByAttribute_management('lyr', selection_type, where_clause)
+
+    print 'Finished Select_Object()\n'
+    return 'lyr'
 
 #-------------------------------------------------------------------------------
 #-------------------------------------------------------------------------------
