@@ -387,7 +387,7 @@ def Write_Print_To_Log(log_file):
     start_time_str = [start_time.strftime('%m/%d/%Y  %I:%M:%S %p')][0]
     print '++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++'
     print '                  {}'.format(start_time_str)
-    print '             START Update_DPW_w_MasterData.py'
+    print '             START <name_of_script_here>.py'
     print '++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n'
 
     return orig_stdout
