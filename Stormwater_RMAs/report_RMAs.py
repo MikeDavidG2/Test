@@ -5,23 +5,61 @@
 ###  Karen Chadwick                      August 2015  ###
 #########################################################
 
-### Import modules
+# Import modules
 import sys, string, os, time, datetime, math, ConfigParser, json, urllib, urllib2, smtplib, mimetypes
+import arcpy as gpRMA
+from dateutil.relativedelta import relativedelta
+
 #import requests
 from email.mime.multipart import MIMEMultipart
 from email import encoders
 from email.message import Message
 from email.mime.text import MIMEText
-import arcpy as gpRMA
 
-old_outputRMA = sys.stdout
 timestart = str(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()))
 stimes = time.time()
 
-### Set some variables
+#######################################################################################
+#######################################################################################
+###  Set any changeable variables between here ---------------------------------->  ###
+
+# MG 6/23/17: Added manually_entered_dates so users can make script auto generate
+# the dates (datestart = last months 1st day of the month, dateend = the current date),
+# or the user can enter their own dates below.
+# 'True' when you want to manually enter 'datestart' and 'dateend'
+# 'False' when the script is called from a scheduled task on the 1st of each month
+manually_entered_dates = False
+
+#-------------------------------------------------------------------------------
+if (manually_entered_dates == True):
+    #######################################################################
+    ####### Note: dates are *INCLUSIVE* --> for a report covering Sep, Oct,
+    ### Nov of 2015, use: datestart = "2015-09-01" dateend = "2015-11-30"
+    datestart   = "2017-04-01"  ## Date should be in format yyyy-mm-dd"
+    dateend     = "2017-04-30"  ## Date should be in format yyyy-mm-dd"
+    ####### --> the start and end dates will be included in the report
+    #######################################################################
+#-------------------------------------------------------------------------------
+
+roadbuffer  = 40    ###  <-- Change the road buffer distance (number of FEET) here!
+distcutoff  = 5280  ###  <-- Change the cutoff distance (number of FEET) here!
+cfgFile     = "M:\\scripts\\configFiles\\accounts.txt"
+# MG 6/23/17 Changed email addresses to Mike Grue's
+##stmwtrPeeps = ["alex.romo@sdcounty.ca.gov","randy.yakos@sdcounty.ca.gov","gary.ross@sdcounty.ca.gov"]
+##scriptAdmin = ["randy.yakos@sdcounty.ca.gov","gary.ross@sdcounty.ca.gov"]
+stmwtrPeeps = ['michael.grue@sdcounty.ca.gov']
+scriptAdmin = ['michael.grue@sdcounty.ca.gov']
+fromEmail   = "dplugis@gmail.com"
+###  <-------------------------------------------------------------------  and here ###
+#######################################################################################
+#######################################################################################
+
+# Set variables that shouldn't change much
 todaystr    = str(time.strftime("%Y%m%d", time.localtime()))
 trackURL    = "http://services1.arcgis.com/1vIhDJwtG5eNmiqX/arcgis/rest/services/Track_line/FeatureServer/0/query"
-wkgFolder   = "P:\\stormwater\\scripts\\data"
+#MG changed wkgFolder
+##wkgFolder   = "P:\\stormwater\\scripts\\data"
+wkgFolder   = r'U:\grue\Scripts\GitHub\Test\Stormwater_RMAs\data'
 wkgGDB      = "RMAsummaryWKG.gdb"
 wkgPath     = wkgFolder + "\\" + wkgGDB
 indataFC    = "Track_line"
@@ -34,40 +72,38 @@ cmroads     = warehouse + "SDE.SANGIS.ROAD_SEGMENTS"
 gtURL       = "https://www.arcgis.com/sharing/rest/generateToken"
 dsslvFields = ["NAME","DATE","EDITOR","EDITDATE"]
 AGOfields   = "NAME,DATE,GlobalID,EDITOR,EDITDATE"
-#######################################################################
-####### Note: dates are *INCLUSIVE* --> for a report covering Sep, Oct,
-### Nov of 2015, use: datestart = "2015-09-01" dateend = "2015-11-30"
-datestart   = "2017-04-01"  ## Date should be in format yyyy-mm-dd"
-dateend     = "2017-05-31"  ## Date should be in format yyyy-mm-dd"
-####### --> the start and end dates will be included in the report
-#######################################################################
 
+#-------------------------------------------------------------------------------
+#MG 6/23/17: Added below to auto calculate dates
+# If manually_entered_dates == False, get the datestart and dateend
+if (manually_entered_dates == False):
+
+    # Get datestart
+    today = datetime.date.today()
+    last_month = today + relativedelta(months=-1)  # Subtract one month from the current month
+    last_month_1st = last_month.replace(day=1)     # Change the day to the 1st of the previous month
+    datestart = last_month_1st.strftime('%Y-%m-%d') # datestart is last months 1st of the month
+    ##print 'Date Start: ' + datestart
+
+    # Get dateend
+    dateend = today.strftime('%Y-%m-%d')
+    ##print 'Date End: ' + dateend
+#-------------------------------------------------------------------------------
+
+# Make print statements write to a log file
 logFileNameRMA = str(wkgFolder) + "\\..\\log\\reportRMAs_" + str(time.strftime("%Y%m%d%H%M", time.localtime())) + ".txt"
 logFileRMA = open(logFileNameRMA,"w")
+old_outputRMA = sys.stdout
 sys.stdout = logFileRMA
 
-#######################################################################################
-#######################################################################################
-###  Set any changeable variables between here ---------------------------------->  ###
-roadbuffer  = 40    ###  <-- Change the road buffer distance (number of FEET) here!
-distcutoff  = 5280  ###  <-- Change the cutoff distance (number of FEET) here!
-cfgFile     = "M:\\scripts\\configFiles\\accounts.txt"
-stmwtrPeeps = ["alex.romo@sdcounty.ca.gov","randy.yakos@sdcounty.ca.gov","gary.ross@sdcounty.ca.gov"]
-scriptAdmin = ["randy.yakos@sdcounty.ca.gov","gary.ross@sdcounty.ca.gov"]
-fromEmail   = "dplugis@gmail.com"
-###  <-------------------------------------------------------------------  and here ###
-#######################################################################################
-#######################################################################################
-
-
-### START processing
+# START processing
 gpRMA.env.overwriteOutput = True
 gpRMA.env.workspace = wkgFolder
 errorSTATUS = 0
 
 print "************************* REPORT_RMAS.PY *************************"
 
-### Preliminary setup
+# Preliminary setup
 try:
     # Get dates and report name
     print "Start date = " + str(datestart)
@@ -94,11 +130,12 @@ try:
     rptPath = wkgFolder + "\\" + rptName
     print "Report = " + rptPath
     gpRMA.env.workspace = wkgPath
-except:
+except Exception as e:
     errorSTATUS = 1
     print "********* ERROR during preliminary setup... *********"
+    print '  ' + str(e)
 
-### Get AGOL token
+# Get AGOL token
 try:
     if errorSTATUS == 0:
         print "Getting token..."
@@ -117,7 +154,7 @@ except:
     errorSTATUS = 1
     print "********* ERROR while generating token... *********"
 
-### Copy the track data
+# Copy the track data
 try:
 #############################################################################################################
 ### http://blogs.esri.com/esri/arcgis/2013/10/10/quick-tips-consuming-feature-services-with-geoprocessing/
@@ -144,7 +181,7 @@ except:
     errorSTATUS = 1
     print "********* ERROR while copying data... *********"
 
-### Process the data
+# Process the data
 try:
     if errorSTATUS == 0:
         # Select the tracks within the date range
@@ -246,7 +283,7 @@ except:
     errorSTATUS = 1
     print "********* ERROR while processing... *********"
 
-### Email the results
+# Email the results
 try:
     if errorSTATUS == 0:  ## No errors
         print "Emailing report..."
@@ -333,7 +370,7 @@ except:
     print "********* ERROR while emailing... *********"
 
 
-##### END processing - do clerical messaging
+# END processing - do clerical messaging
 timeend = str(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()))
 etimee = time.time()
 # Calculate time duration
@@ -352,6 +389,6 @@ else: strdseconds = str(dseconds)
 print "\n***************************************************************************"
 print "Process started at " + str(timestart)
 print "      and ended at " + str(timeend)
-print "   Duration = " + strdhours + ":" + strdminutes + ":" + strdseconds + " hours"
+print "   Duration = " + strdhours + ":" + strdminutes + ":" + strdseconds
 print "***************************************************************************"
 
