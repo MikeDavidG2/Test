@@ -44,11 +44,8 @@ if (manually_entered_dates == True):
 roadbuffer  = 40    ###  <-- Change the road buffer distance (number of FEET) here!
 distcutoff  = 5280  ###  <-- Change the cutoff distance (number of FEET) here!
 cfgFile     = "M:\\scripts\\configFiles\\accounts.txt"
-# MG 6/23/17 Changed email addresses to Mike Grue's
-##stmwtrPeeps = ["alex.romo@sdcounty.ca.gov","randy.yakos@sdcounty.ca.gov","gary.ross@sdcounty.ca.gov"]
-##scriptAdmin = ["randy.yakos@sdcounty.ca.gov","gary.ross@sdcounty.ca.gov"]
-stmwtrPeeps = ['michael.grue@sdcounty.ca.gov']
-scriptAdmin = ['michael.grue@sdcounty.ca.gov']
+stmwtrPeeps = ["alex.romo@sdcounty.ca.gov","randy.yakos@sdcounty.ca.gov","gary.ross@sdcounty.ca.gov"]
+scriptAdmin = ["randy.yakos@sdcounty.ca.gov","gary.ross@sdcounty.ca.gov", 'michael.grue@sdcounty.ca.gov']
 fromEmail   = "dplugis@gmail.com"
 ###  <-------------------------------------------------------------------  and here ###
 #######################################################################################
@@ -57,9 +54,7 @@ fromEmail   = "dplugis@gmail.com"
 # Set variables that shouldn't change much
 todaystr    = str(time.strftime("%Y%m%d", time.localtime()))
 trackURL    = "http://services1.arcgis.com/1vIhDJwtG5eNmiqX/arcgis/rest/services/Track_line/FeatureServer/0/query"
-#MG changed wkgFolder
-##wkgFolder   = "P:\\stormwater\\scripts\\data"
-wkgFolder   = r'U:\grue\Scripts\GitHub\Test\Stormwater_RMAs\data'
+wkgFolder   = "P:\\stormwater\\scripts\\data"
 wkgGDB      = "RMAsummaryWKG.gdb"
 wkgPath     = wkgFolder + "\\" + wkgGDB
 indataFC    = "Track_line"
