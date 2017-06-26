@@ -35,8 +35,8 @@ if (manually_entered_dates == True):
     #######################################################################
     ####### Note: dates are *INCLUSIVE* --> for a report covering Sep, Oct,
     ### Nov of 2015, use: datestart = "2015-09-01" dateend = "2015-11-30"
-    datestart   = "2017-04-01"  ## Date should be in format yyyy-mm-dd"
-    dateend     = "2017-04-30"  ## Date should be in format yyyy-mm-dd"
+    datestart   = "2017-06-02"  ## Date should be in format yyyy-mm-dd"
+    dateend     = "2017-06-15"  ## Date should be in format yyyy-mm-dd"
     ####### --> the start and end dates will be included in the report
     #######################################################################
 #-------------------------------------------------------------------------------
@@ -44,8 +44,10 @@ if (manually_entered_dates == True):
 roadbuffer  = 40    ###  <-- Change the road buffer distance (number of FEET) here!
 distcutoff  = 5280  ###  <-- Change the cutoff distance (number of FEET) here!
 cfgFile     = "M:\\scripts\\configFiles\\accounts.txt"
-stmwtrPeeps = ["alex.romo@sdcounty.ca.gov","randy.yakos@sdcounty.ca.gov","gary.ross@sdcounty.ca.gov"]
-scriptAdmin = ["randy.yakos@sdcounty.ca.gov","gary.ross@sdcounty.ca.gov", 'michael.grue@sdcounty.ca.gov']
+##stmwtrPeeps = ["alex.romo@sdcounty.ca.gov","randy.yakos@sdcounty.ca.gov","gary.ross@sdcounty.ca.gov"]
+##scriptAdmin = ["randy.yakos@sdcounty.ca.gov","gary.ross@sdcounty.ca.gov", 'michael.grue@sdcounty.ca.gov']
+stmwtrPeeps = ['michael.grue@sdcounty.ca.gov'] # MG 06/26/17: made my email the target for testing purposes
+scriptAdmin = ['michael.grue@sdcounty.ca.gov'] # MG 06/26/17: made my email the target for testing purposes
 fromEmail   = "dplugis@gmail.com"
 ###  <-------------------------------------------------------------------  and here ###
 #######################################################################################
@@ -54,7 +56,8 @@ fromEmail   = "dplugis@gmail.com"
 # Set variables that shouldn't change much
 todaystr    = str(time.strftime("%Y%m%d", time.localtime()))
 trackURL    = "http://services1.arcgis.com/1vIhDJwtG5eNmiqX/arcgis/rest/services/Track_line/FeatureServer/0/query"
-wkgFolder   = "P:\\stormwater\\scripts\\data"
+##wkgFolder   = "P:\\stormwater\\scripts\\data"
+wkgFolder   = r'U:\grue\Scripts\GitHub\Test\Stormwater_RMAs\data' # MG 06/26/17: changes working folder for testing purposes
 wkgGDB      = "RMAsummaryWKG.gdb"
 wkgPath     = wkgFolder + "\\" + wkgGDB
 indataFC    = "Track_line"
@@ -89,7 +92,8 @@ if (manually_entered_dates == False):
 logFileNameRMA = str(wkgFolder) + "\\..\\log\\reportRMAs_" + str(time.strftime("%Y%m%d%H%M", time.localtime())) + ".txt"
 logFileRMA = open(logFileNameRMA,"w")
 old_outputRMA = sys.stdout
-sys.stdout = logFileRMA
+# MG 06/26/17: commented out for testing purposes
+##sys.stdout = logFileRMA
 
 # START processing
 gpRMA.env.overwriteOutput = True
@@ -160,8 +164,38 @@ try:
 #############################################################################################################
     if errorSTATUS == 0:
         print "Getting data..."
-        where = "1=1"
-        query = "?where={}&outFields={}&returnGeometry=true&f=json&token={}".format(where,AGOfields,token)
+        # The format for the where query is "DATE BETWEEN 'First Date' and
+        # 'Second Date'".  The data collected on the first date will be retrieved,
+        # while the data collected on the second date will NOT be retrieved.
+        # In other words: the first date is inclusive, the second date is exclusive
+        # For ex: If data is collected on the 28th, and 29th and the where clause is:
+        #   BETWEEN the 28th and 29th. You will get the data collected on the 28th only
+        #   BETWEEN the 29th and 30th. You will get the data collected on the 29th only
+        #   BETWEEN the 28th and 30th. You will get the data collected on the 28th AND 29th
+
+        # The time manipulation below does NOT affect the selection
+        # process that happens in the 'Process the data' step.
+        # We want to set the 'where' clause to get records where the [DATE]
+        # field is BETWEEN the 'datestart' and 'dateend + two days'.
+        # By adding 2 days into the future we ensure that we are grabbing all of
+        # the data from AGOL that we may need to process, while ENSURING that we
+        # do not try to grab more than 2000 records (which is the limit of this
+        # feature service)
+        two_days = datetime.timedelta(days=2)
+        dateend_td_obj = datetime.datetime.strptime(dateend, '%Y-%m-%d')
+        dateend_2_days = dateend_td_obj + two_days
+        dateend_2_days_str = dateend_2_days.strftime('%Y-%m-%d')
+
+        # Set where to between 'datestart' and 'dateend + 2 days'
+        where = "DATE BETWEEN '{}' and '{}'".format(datestart, dateend_2_days_str)
+        ##where = "1=1" # Grabs the whole database (up to 2000 records)
+        print 'Where clause used to query Feature Service: \n  '+ where
+
+        # Encode the where statement so it is readable by URL protocol (ie %27 = ' in URL
+        # visit http://meyerweb.com/eric/tools/dencoder to test URL encoding
+        where_encoded = urllib.quote(where)
+
+        query = "?where={}&outFields={}&returnGeometry=true&f=json&token={}".format(where_encoded,AGOfields,token)
         fsURL = trackURL + query
         print str(fsURL)
         fs = gpRMA.FeatureSet()
