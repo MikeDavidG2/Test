@@ -20,7 +20,7 @@ import string
 import sys
 import time
 import urllib
-import urllib2 
+import urllib2
 
 from email.mime.multipart import MIMEMultipart
 from email import encoders
@@ -28,47 +28,65 @@ from email.message import Message
 from email.mime.text import MIMEText
 
 
-old_outputRMA = sys.stdout
 timestart = str(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()))
 stimes = time.time()
 
-### Set some variables
+#######################################################################################
+#######################################################################################
+###  Set any changeable variables between here ---------------------------------->  ###
+
+distcutoff  = 5280  ###  cutoff distance (FEET)
+cfgFile     = "M:\\scripts\\configFiles\\accounts.txt"
+##stmwtrPeeps = ["alex.romo@sdcounty.ca.gov","randy.yakos@sdcounty.ca.gov","gary.ross@sdcounty.ca.gov"]
+##scriptAdmin = ["randy.yakos@sdcounty.ca.gov","gary.ross@sdcounty.ca.gov"]
+# TODO before going to prod: remove the below variables and uncomment the above. MG: 6/26/17
+stmwtrPeeps = ['michael.grue@sdcounty.ca.gov']
+scriptAdmin = ['michael.grue@sdcounty.ca.gov']
+fromEmail   = "dplugis@gmail.com"
+
+###  <-------------------------------------------------------------------  and here ###
+#######################################################################################
+#######################################################################################
+
+
+# Set variables that shouldn't change much
 trackURL    = "http://services1.arcgis.com/1vIhDJwtG5eNmiqX/arcgis/rest/services/Track_line/FeatureServer/0/query"
-wkgFolder   = "D:\\Projects\\stormwater\\scripts\\data"
+##wkgFolder   = "P:\\stormwater\\scripts\\data"
+# TODO: before going to prod script: remove below variable and uncomment the above. MG: 6/26/17
+wkgFolder   = r'U:\grue\Scripts\GitHub\Test\Stormwater_RMAs\data' # MG 06/26/17: changed working folder for testing purposes
 wkgGDB      = "RMAuserWKG.gdb"
 wkgPath     = wkgFolder + "\\" + wkgGDB
 indataFC    = "Track_line"
 outTrackFC  = "outUserTracksRMA"
-rmaZones    = "D:\\Projects\\stormwater\\data_ago\\agol_stormdata.gdb\\RMA_HSA_JUR1"
+rmaZones    = "P:\\stormwater\\data_ago\\agol_stormdata.gdb\\RMA_HSA_JUR1"
 gtURL       = "https://www.arcgis.com/sharing/rest/generateToken"
 dsslvFields = ["NAME","DATE","EDITOR","EDITDATE"]
 AGOfields   = "NAME,DATE,GlobalID,EDITOR,EDITDATE"
 
+# Make print statements write to a log file
 logFileNameRMA = str(wkgFolder) + "\\..\\log\\dailyUserRMAs_" + str(time.strftime("%Y%m%d%H%M", time.localtime())) + ".txt"
 logFileRMA = open(logFileNameRMA,"w")
-sys.stdout = logFileRMA
+old_outputRMA = sys.stdout
 
-distcutoff  = 5280  ###  cutoff distance (FEET)
-cfgFile     = "D:\\sde_maintenance\\scripts\\configFiles\\accounts.txt"
-stmwtrPeeps = ["alex.romo@sdcounty.ca.gov","randy.yakos@sdcounty.ca.gov","gary.ross@sdcounty.ca.gov"]
-scriptAdmin = ["randy.yakos@sdcounty.ca.gov","gary.ross@sdcounty.ca.gov"]
-fromEmail   = "dplugis@gmail.com"
+# TODO before going to prod: Uncomment out below and remove comment
+# MG 06/26/17: commented out for testing purposes
+##sys.stdout = logFileRMA
 
-### START processing
+# START processing
 arcpy.env.overwriteOutput = True
 arcpy.env.workspace = wkgFolder
 errorSTATUS = 0
 
 print "************************* DAILY_USER_RMAS.PY *************************"
 
-### Preliminary setup
+# Preliminary setup
 try:
     # Get dates and report name
     # Assumes start time *AFTER* midnight
     today = datetime.date.today()
     todaystr = str(today)
     print "todaystr = " + todaystr
-    de = today + datetime.timedelta(days=-1) ## To show the right day for the report name 
+    de = today + datetime.timedelta(days=-1) # To show the right day for the report name
     dateend = str(de)
     print "dateend = " + dateend
     ds = today + datetime.timedelta(days=-7)
@@ -76,7 +94,7 @@ try:
     print "datestart = " + datestart
     # Dates are in UTC, converted to view in PST --> adjust for PST (8 hours)
     dec = datetime.datetime(de.year,de.month,de.day)
-    dateendconv = str(dec + datetime.timedelta(days=1,hours=8)) ## To search for the correct date range
+    dateendconv = str(dec + datetime.timedelta(days=1,hours=8)) # To search for the correct date range
     dsc = datetime.datetime(ds.year,ds.month,ds.day)
     datestartconv = str(dsc + datetime.timedelta(hours=8))
     rptName = "RMA_daily_user_report_" + str(dateend) + ".csv"
@@ -93,8 +111,8 @@ try:
 except:
     errorSTATUS = 1
     print "********* ERROR during preliminary setup... *********"
-    
-### Get AGOL token
+
+# Get AGOL token
 try:
     if errorSTATUS == 0:
         print "Getting token..."
@@ -113,19 +131,51 @@ except:
     errorSTATUS = 1
     print "********* ERROR while generating token... *********"
 
-### Copy the track data
+# Copy the track data
 try:
 #############################################################################################################
 ### http://blogs.esri.com/esri/arcgis/2013/10/10/quick-tips-consuming-feature-services-with-geoprocessing/
 ### https://geonet.esri.com/thread/118781
-### WARNING: Script currently only pulls up to the first 10,000 (1,000?) records - more records will require
-###     a loop for iteration - see, e.g., "Max Records" section at the first (blogs) URL listed above or for
-###     example code see the second (geonet) URL listed above
 #############################################################################################################
     if errorSTATUS == 0:
         print "Getting data..."
-        where = "1=1"
-        query = "?where={}&outFields={}&returnGeometry=true&f=json&token={}".format(where,AGOfields,token)
+        #-----------------------------------------------------------------------
+        # MG 6/26/17: Changed the 'where' clause to have a date component so that
+        #  we don't have to worry about bumping up to the 2000 record limit.
+
+        # The format for the where query is "DATE BETWEEN 'First Date' and
+        # 'Second Date'".  The data collected on the first date will be retrieved,
+        # while the data collected on the second date will NOT be retrieved.
+        # In other words: the first date is inclusive, the second date is exclusive
+        # For ex: If data is collected on the 28th, and 29th and the where clause is:
+        #   BETWEEN the 28th and 29th. You will get the data collected on the 28th only
+        #   BETWEEN the 29th and 30th. You will get the data collected on the 29th only
+        #   BETWEEN the 28th and 30th. You will get the data collected on the 28th AND 29th
+
+        # The time manipulation below does NOT affect the selection
+        # process that happens in the 'Process the data' step.
+        # We want to set the 'where' clause to get records where the [DATE]
+        # field is BETWEEN the 'datestart' and 'dateend + two days'.
+        # By adding 2 days into the future we ensure that we are grabbing all of
+        # the data from AGOL that we may need to process, while ENSURING that we
+        # do not try to grab more than 2000 records (which is the limit of this
+        # feature service)
+        two_days = datetime.timedelta(days=2)
+        dateend_td_obj = datetime.datetime.strptime(dateend, '%Y-%m-%d')  # Get a datetime object from dateend
+        dateend_2_days = dateend_td_obj + two_days
+        dateend_2_days_str = dateend_2_days.strftime('%Y-%m-%d')
+
+        # Set where to between 'datestart' and 'dateend + 2 days'
+        where = "DATE BETWEEN '{}' and '{}'".format(datestart, dateend_2_days_str)
+        ##where = "1=1" # Grabs the whole database (up to 2000 records)
+        print 'Where clause used to query Feature Service: \n  '+ where
+
+        # Encode the where statement so it is readable by URL protocol (ie %27 = ' in URL
+        # visit http://meyerweb.com/eric/tools/dencoder to test URL encoding
+        where_encoded = urllib.quote(where)
+
+        query = "?where={}&outFields={}&returnGeometry=true&f=json&token={}".format(where_encoded,AGOfields,token)
+        #-----------------------------------------------------------------------
         print "10"
         fsURL = trackURL + query
         print "20"
@@ -175,9 +225,11 @@ try:
                 if count == 0:
                     errorSTATUS = 99
                 else:
-                    # Add fields for information
+                    # Add field COLLECTDATE
                     arcpy.AddField_management("rmaTrack","COLLECTDATE","TEXT","","",12)
                     arcpy.MakeTableView_management("rmaTrack","rmaTrackView")
+
+                    # Update COLLECTDATE with DATE values as a string and without the time component
                     with arcpy.da.UpdateCursor("rmaTrackView",["DATE","COLLECTDATE"]) as rowcursor:
                         for row in rowcursor:
                             datetimeVal = row[0]
@@ -185,12 +237,16 @@ try:
                             row[1] = dateVal
                             rowcursor.updateRow(row)
                         del rowcursor, row
+
+                    # Add field INFOSTR and calc as a string aggregate of all info we want to report
                     arcpy.AddField_management("rmaTrack","INFOSTR","TEXT","","",300)
                     arcpy.CalculateField_management("rmaTrack","INFOSTR",'[NAME] & "__" & [COLLECTDATE] & "__" & [HUNAME] & "/" & [HANAME] & "/" & [HSANAME] & "/" & [HBNUM]')
+
                     # Get data summaries
                     print "Running frequencies..."
                     arcpy.MakeFeatureLayer_management("rmaTrack","rmaTrackLyr","\"HBNUM\" <> 0")
                     arcpy.Frequency_analysis("rmaTrackLyr","sumTracks",["INFOSTR"])
+
                     # Write report file
                     with arcpy.da.SearchCursor("sumTracks",["INFOSTR"]) as rowcursor:
                         tracklist = list(rowcursor)
@@ -205,8 +261,10 @@ try:
                                 rmastr = str(rmainfo[1])
                             else:
                                 rmastr = str(rmainfo[2])
+                            #              NAME           ,        DATE           ,    RMA       ,        HUNAME
                             csvf.write(str(usrinfo[0]) + "," + str(usrinfo[1]) + "," + rmastr + "," + str(rmainfo[0]) + "," + \
                                        str(rmainfo[1]) + "," + str(rmainfo[3]) + "\n")
+                            #              HANAME         ,        HBNUM
 except:
     errorSTATUS = 1
     print "********* ERROR while processing... *********"
@@ -234,7 +292,7 @@ try:
             ctype = "application/octet-stream"
         maintype, subtype = ctype.split("/", 1)
         with open (rptPath) as fpRMA:
-            attachmentRMA = MIMEText(fpRMA.read(), _subtype=subtype)        
+            attachmentRMA = MIMEText(fpRMA.read(), _subtype=subtype)
         attachmentRMA.add_header("Content-Disposition","attachment",filename=rptPath)
         msgRMA.attach(attachmentRMA)
         # Send the email
@@ -256,7 +314,7 @@ try:
         msgString = "Daily stormwater user/RMA report--no data found for period " + datestart + " to " + dateend
         msgRMA = MIMEText(msgString)
         fromaddrRMA         = fromEmail
-        toaddrRMA           = stmwtrPeeps  
+        toaddrRMA           = stmwtrPeeps
         msgRMA['Subject']   = msgString
         msgRMA['From']      = "Python Script"
         msgRMA['To']        = "Stormwater personnel"
@@ -296,8 +354,8 @@ try:
 except:
     errorSTATUS = 1
     print "********* ERROR while emailing... *********"
-    
-        
+
+
 ##### END processing - do clerical messaging
 timeend = str(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()))
 etimee = time.time()
@@ -317,6 +375,6 @@ else: strdseconds = str(dseconds)
 print "\n***************************************************************************"
 print "Process started at " + str(timestart)
 print "      and ended at " + str(timeend)
-print "   Duration = " + strdhours + ":" + strdminutes + ":" + strdseconds + " hours"
+print "   Duration = " + strdhours + ":" + strdminutes + ":" + strdseconds
 print "***************************************************************************"
 
