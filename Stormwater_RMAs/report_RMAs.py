@@ -60,7 +60,7 @@ todaystr    = str(time.strftime("%Y%m%d", time.localtime()))
 trackURL    = "http://services1.arcgis.com/1vIhDJwtG5eNmiqX/arcgis/rest/services/Track_line/FeatureServer/0/query"
 ##wkgFolder   = "P:\\stormwater\\scripts\\data"
 # TODO: before going to prod script: remove below variable and uncomment the above
-wkgFolder   = r'U:\grue\Scripts\GitHub\Test\Stormwater_RMAs\data' # MG 06/26/17: changes working folder for testing purposes
+wkgFolder   = r'U:\grue\Scripts\GitHub\Test\Stormwater_RMAs\data' # MG 06/26/17: changed working folder for testing purposes
 wkgGDB      = "RMAsummaryWKG.gdb"
 wkgPath     = wkgFolder + "\\" + wkgGDB
 indataFC    = "Track_line"
@@ -163,9 +163,6 @@ try:
 #############################################################################################################
 ### http://blogs.esri.com/esri/arcgis/2013/10/10/quick-tips-consuming-feature-services-with-geoprocessing/
 ### https://geonet.esri.com/thread/118781
-### WARNING: Script currently only pulls up to the first 10,000 (1,000?) records - more records will require
-###     a loop for iteration - see, e.g., "Max Records" section at the first (blogs) URL listed above or for
-###     example code see the second (geonet) URL listed above
 #############################################################################################################
     if errorSTATUS == 0:
         print "Getting data..."
