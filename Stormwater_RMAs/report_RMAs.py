@@ -28,7 +28,8 @@ stimes = time.time()
 # or the user can enter their own dates below.
 # 'True' when you want to manually enter 'datestart' and 'dateend'
 # 'False' when the script is called from a scheduled task on the 1st of each month
-manually_entered_dates = False
+#TODO before going to prod: make sure this is 'False'
+manually_entered_dates = True
 
 #-------------------------------------------------------------------------------
 if (manually_entered_dates == True):
@@ -36,7 +37,7 @@ if (manually_entered_dates == True):
     ####### Note: dates are *INCLUSIVE* --> for a report covering Sep, Oct,
     ### Nov of 2015, use: datestart = "2015-09-01" dateend = "2015-11-30"
     datestart   = "2017-06-02"  ## Date should be in format yyyy-mm-dd"
-    dateend     = "2017-06-15"  ## Date should be in format yyyy-mm-dd"
+    dateend     = "2017-06-08"  ## Date should be in format yyyy-mm-dd"
     ####### --> the start and end dates will be included in the report
     #######################################################################
 #-------------------------------------------------------------------------------
@@ -46,6 +47,7 @@ distcutoff  = 5280  ###  <-- Change the cutoff distance (number of FEET) here!
 cfgFile     = "M:\\scripts\\configFiles\\accounts.txt"
 ##stmwtrPeeps = ["alex.romo@sdcounty.ca.gov","randy.yakos@sdcounty.ca.gov","gary.ross@sdcounty.ca.gov"]
 ##scriptAdmin = ["randy.yakos@sdcounty.ca.gov","gary.ross@sdcounty.ca.gov", 'michael.grue@sdcounty.ca.gov']
+# TODO before going to prod script: remove the below variables and uncomment the above
 stmwtrPeeps = ['michael.grue@sdcounty.ca.gov'] # MG 06/26/17: made my email the target for testing purposes
 scriptAdmin = ['michael.grue@sdcounty.ca.gov'] # MG 06/26/17: made my email the target for testing purposes
 fromEmail   = "dplugis@gmail.com"
@@ -57,6 +59,7 @@ fromEmail   = "dplugis@gmail.com"
 todaystr    = str(time.strftime("%Y%m%d", time.localtime()))
 trackURL    = "http://services1.arcgis.com/1vIhDJwtG5eNmiqX/arcgis/rest/services/Track_line/FeatureServer/0/query"
 ##wkgFolder   = "P:\\stormwater\\scripts\\data"
+# TODO: before going to prod script: remove below variable and uncomment the above
 wkgFolder   = r'U:\grue\Scripts\GitHub\Test\Stormwater_RMAs\data' # MG 06/26/17: changes working folder for testing purposes
 wkgGDB      = "RMAsummaryWKG.gdb"
 wkgPath     = wkgFolder + "\\" + wkgGDB
@@ -92,6 +95,8 @@ if (manually_entered_dates == False):
 logFileNameRMA = str(wkgFolder) + "\\..\\log\\reportRMAs_" + str(time.strftime("%Y%m%d%H%M", time.localtime())) + ".txt"
 logFileRMA = open(logFileNameRMA,"w")
 old_outputRMA = sys.stdout
+
+# TODO before going to prod: Uncomment out below and remove comment
 # MG 06/26/17: commented out for testing purposes
 ##sys.stdout = logFileRMA
 
@@ -164,6 +169,10 @@ try:
 #############################################################################################################
     if errorSTATUS == 0:
         print "Getting data..."
+        #-----------------------------------------------------------------------
+        # MG 6/26/17: Changed the 'where' clause to have a date component so that
+        #  we don't have to worry about bumping up to the 2000 record limit.
+
         # The format for the where query is "DATE BETWEEN 'First Date' and
         # 'Second Date'".  The data collected on the first date will be retrieved,
         # while the data collected on the second date will NOT be retrieved.
@@ -196,6 +205,7 @@ try:
         where_encoded = urllib.quote(where)
 
         query = "?where={}&outFields={}&returnGeometry=true&f=json&token={}".format(where_encoded,AGOfields,token)
+        #-----------------------------------------------------------------------
         fsURL = trackURL + query
         print str(fsURL)
         fs = gpRMA.FeatureSet()
@@ -289,7 +299,13 @@ try:
                 with gpRMA.da.SearchCursor("sumCMR",["RMAINFO","MILES"]) as rowcursor:
                     cmrlist = list(rowcursor)
                 del rowcursor
+
                 print "Writing report..."
+                # MG: 6/26/17: Create vars to hold sums
+                sum_miles     = 0
+                sum_cmr_miles = 0
+                sum_parcels   = 0
+
                 with open(rptPath,"w") as csvf:
                     csvf.write("RMA,HUNAME,HANAME,HBNUM,JURISDICTION,MILES,CMRMILES,PARCELS\n")
                     for track in tracklist:
@@ -306,8 +322,21 @@ try:
                             rmastr = str(rmainfo[1])
                         else:
                             rmastr = str(rmainfo[2])
+
+                                   # RMA     ,          HUNAME       ,          HANAME       ,          HBNUM
                         csvf.write(rmastr + "," + str(rmainfo[0]) + "," + str(rmainfo[1]) + "," + str(rmainfo[3]) + "," + \
                                    str(rmainfo[4]) + "," + str(track[1]) + "," + str(cmrmiles) + "," + str(int(numparcels)) + "\n")
+                                   #   JURISDICTION   ,         MILES       ,        CMRMILES     ,             PARCELS
+
+                        # MG: 6/26/17: Get sums
+                        sum_miles     = sum_miles + track[1]
+                        sum_cmr_miles = sum_cmr_miles + cmrmiles
+                        sum_parcels   = sum_parcels + numparcels
+
+                    # # MG: 6/26/17: Write the sums to the CSV
+                    csvf.write('------, -----, -----, -----, -----, ----- , ----- , -----\n')
+                    csvf.write('      ,      ,      ,      ,TOTALS:,' + str(sum_miles) + ',' + str(sum_cmr_miles) + ',' + str(sum_parcels))
+
 except:
     errorSTATUS = 1
     print "********* ERROR while processing... *********"
