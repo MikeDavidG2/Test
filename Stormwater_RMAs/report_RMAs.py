@@ -36,8 +36,8 @@ if (manually_entered_dates == True):
     #######################################################################
     ####### Note: dates are *INCLUSIVE* --> for a report covering Sep, Oct,
     ### Nov of 2015, use: datestart = "2015-09-01" dateend = "2015-11-30"
-    datestart   = "2017-06-02"  ## Date should be in format yyyy-mm-dd"
-    dateend     = "2017-06-08"  ## Date should be in format yyyy-mm-dd"
+    datestart   = "2017-06-20"  ## Date should be in format yyyy-mm-dd"
+    dateend     = "2017-06-27"  ## Date should be in format yyyy-mm-dd"
     ####### --> the start and end dates will be included in the report
     #######################################################################
 #-------------------------------------------------------------------------------
