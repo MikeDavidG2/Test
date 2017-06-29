@@ -255,9 +255,13 @@ try:
                     with arcpy.da.SearchCursor("sumTracks",["INFOSTR"]) as rowcursor:
                         tracklist = list(rowcursor)
                     del rowcursor
+
                     print "Writing report..."
+                    # MG: 6/26/17: Create vars to hold sums
+                    sum_miles = 0
+
                     with open(rptPath,"w") as csvf:
-                        csvf.write("NAME,DATE,RMA,HUNAME,HANAME,HBNUM, MILES, CMRMILES, PARCELS\n")
+                        csvf.write("NAME,DATE,RMA,HUNAME,HANAME,HBNUM, MILES\n")
                         for track in tracklist:
                             usrinfo = str(track[0]).split("__")
                                 # Above turns: "paola_dpw__06/26/2017__CARLSBAD/Escondido Creek/Escondido/904.62"
@@ -271,9 +275,16 @@ try:
                             #              NAME           ,        DATE           ,    RMA       ,        HUNAME                  HANAME         ,        HBNUM          ,        MILES
                             csvf.write(str(usrinfo[0]) + "," + str(usrinfo[1]) + "," + rmastr + "," + str(rmainfo[0]) + "," + str(rmainfo[1]) + "," + str(rmainfo[3]) + "," + str(rmainfo[4]) + "\n")
 
-except:
+                            # MG: 6/26/17: Get sums
+                            sum_miles     = sum_miles + float(rmainfo[4])
+
+                        # # MG: 6/26/17: Write the sums to the CSV
+                        csvf.write('------, -----, -----, -----, -----, ----- , -----\n')
+                        csvf.write('      ,      ,      ,      ,      ,TOTALS:,' + str(sum_miles))
+except Exception as e:
     errorSTATUS = 1
     print "********* ERROR while processing... *********"
+    print str(e)
 
 ### Email the results
 try:
@@ -357,10 +368,11 @@ try:
         sRMA.sendmail(fromaddrRMA,toaddrRMA,msgRMA.as_string())
         sRMA.quit()
         print "   Emailed log file."
-except:
+
+except Exception as e:
     errorSTATUS = 1
     print "********* ERROR while emailing... *********"
-
+    print str(e)
 
 ##### END processing - do clerical messaging
 timeend = str(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()))
