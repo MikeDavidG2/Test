@@ -320,10 +320,8 @@ try:
                         else:
                             rmastr = str(rmainfo[2])
 
-                                   # RMA     ,          HUNAME       ,          HANAME       ,          HBNUM
-                        csvf.write(rmastr + "," + str(rmainfo[0]) + "," + str(rmainfo[1]) + "," + str(rmainfo[3]) + "," + \
-                                   str(rmainfo[4]) + "," + str(track[1]) + "," + str(cmrmiles) + "," + str(int(numparcels)) + "\n")
-                                   #   JURISDICTION   ,         MILES       ,        CMRMILES     ,             PARCELS
+                                   # RMA     ,          HUNAME       ,          HANAME       ,          HBNUM                 JURISDICTION   ,         MILES       ,        CMRMILES     ,             PARCELS
+                        csvf.write(rmastr + "," + str(rmainfo[0]) + "," + str(rmainfo[1]) + "," + str(rmainfo[3]) + "," + str(rmainfo[4]) + "," + str(track[1]) + "," + str(cmrmiles) + "," + str(int(numparcels)) + "\n")
 
                         # MG: 6/26/17: Get sums
                         sum_miles     = sum_miles + track[1]
