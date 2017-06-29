@@ -225,11 +225,11 @@ try:
                 if count == 0:
                     errorSTATUS = 99
                 else:
-                    # Add field COLLECTDATE
+                    # Add field [COLLECTDATE]
                     arcpy.AddField_management("rmaTrack","COLLECTDATE","TEXT","","",12)
                     arcpy.MakeTableView_management("rmaTrack","rmaTrackView")
 
-                    # Update COLLECTDATE with DATE values as a string and without the time component
+                    # Update [COLLECTDATE] with [DATE] values as a string and without the time component
                     with arcpy.da.UpdateCursor("rmaTrackView",["DATE","COLLECTDATE"]) as rowcursor:
                         for row in rowcursor:
                             datetimeVal = row[0]
@@ -238,9 +238,13 @@ try:
                             rowcursor.updateRow(row)
                         del rowcursor, row
 
-                    # Add field INFOSTR and calc as a string aggregate of all info we want to report
+                    # Add field [MILES] and calc as a value from [Shape_Length]
+                    arcpy.AddField_management("rmaTrack","MILES","DOUBLE")
+                    arcpy.CalculateField_management("rmaTrack","MILES","!Shape.Length@MILES!","PYTHON_9.3")
+
+                    # Add field [INFOSTR] and calc as a string aggregate of all info we want to report
                     arcpy.AddField_management("rmaTrack","INFOSTR","TEXT","","",300)
-                    arcpy.CalculateField_management("rmaTrack","INFOSTR",'[NAME] & "__" & [COLLECTDATE] & "__" & [HUNAME] & "/" & [HANAME] & "/" & [HSANAME] & "/" & [HBNUM]')
+                    arcpy.CalculateField_management("rmaTrack","INFOSTR",'[NAME] & "__" & [COLLECTDATE] & "__" & [HUNAME] & "/" & [HANAME] & "/" & [HSANAME] & "/" & [HBNUM] & "/" & [MILES]')
 
                     # Get data summaries
                     print "Running frequencies..."
@@ -253,18 +257,20 @@ try:
                     del rowcursor
                     print "Writing report..."
                     with open(rptPath,"w") as csvf:
-                        csvf.write("NAME,DATE,RMA,HUNAME,HANAME,HBNUM\n")
+                        csvf.write("NAME,DATE,RMA,HUNAME,HANAME,HBNUM, MILES, CMRMILES, PARCELS\n")
                         for track in tracklist:
                             usrinfo = str(track[0]).split("__")
+                                # Above turns: "paola_dpw__06/26/2017__CARLSBAD/Escondido Creek/Escondido/904.62"
+                                #          to: "paola_dpw  06/26/2017  CARLSBAD/Escondido Creek/Escondido/904.62"
+                                #              usrinfo[0]  usrinfo[1]  usrinfo[2]
                             rmainfo = str(usrinfo[2]).split("/")
                             if "SAME AS HANAME" in str(rmainfo[2]):
                                 rmastr = str(rmainfo[1])
                             else:
                                 rmastr = str(rmainfo[2])
-                            #              NAME           ,        DATE           ,    RMA       ,        HUNAME
-                            csvf.write(str(usrinfo[0]) + "," + str(usrinfo[1]) + "," + rmastr + "," + str(rmainfo[0]) + "," + \
-                                       str(rmainfo[1]) + "," + str(rmainfo[3]) + "\n")
-                            #              HANAME         ,        HBNUM
+                            #              NAME           ,        DATE           ,    RMA       ,        HUNAME                  HANAME         ,        HBNUM          ,        MILES
+                            csvf.write(str(usrinfo[0]) + "," + str(usrinfo[1]) + "," + rmastr + "," + str(rmainfo[0]) + "," + str(rmainfo[1]) + "," + str(rmainfo[3]) + "," + str(rmainfo[4]) + "\n")
+
 except:
     errorSTATUS = 1
     print "********* ERROR while processing... *********"
