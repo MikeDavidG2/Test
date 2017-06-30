@@ -221,7 +221,8 @@ try:
             else:
                 arcpy.CopyFeatures_management("tempTESTtrackSPLIT_lyr","tempTESTtrackSPLITrefine")
                 #---------------------------------------------------------------
-                # MG 6/30/17: Find the MILES and CMRMILES using the refined split tracks
+                #---------------------------------------------------------------
+                # MG 6/30/17: Find the values for MILES, CMRMILES, and PARCELS
 
                 # Intersect the split tracks with rma zones so we can dissolve on the rma zones
                 arcpy.Intersect_analysis(['tempTESTtrackSPLITrefine', rmaZones], 'refine_rma_INT')
@@ -234,7 +235,7 @@ try:
                 arcpy.AddField_management("refine_rma_INT","CMRMILES","DOUBLE")
                 arcpy.CalculateField_management("refine_rma_INT","CMRMILES",0,"PYTHON_9.3")
 
-
+                #---------------------------------------------------------------
                 # Find which split tracks are on CMR's and calculate their mileage
 
                 # Buffer the track data
@@ -267,11 +268,18 @@ try:
                 else:
                     arcpy.CalculateField_management('refine_rma_INTLyr', 'CMRMILES', '!Shape.Length@MILES!', 'PYTHON_9.3')
 
-                # Dissolve data on all fields we need (and sum [MILES] and [CMRMILES])
+                #---------------------------------------------------------------
+                # Dissolve data on all fields we need (and sum [MILES], [CMRMILES])
                 arcpy.Dissolve_management("refine_rma_INT","rmaTrack",dsslvFields,[['MILES','SUM'],['CMRMILES','SUM']],"MULTI_PART","DISSOLVE_LINES")
+
+                #---------------------------------------------------------------
+                # Find number of parcels per RMA Track
+
+
+                #---------------------------------------------------------------
                 #---------------------------------------------------------------
                 # Compare to RMAs
-                print "Intersecting data..."
+                print "Adding/calculating COLLECTDATE and INFOSTR fields..."
                 numfeats = arcpy.GetCount_management("rmaTrack")
                 count = int(numfeats.getOutput(0))
                 if count == 0:
