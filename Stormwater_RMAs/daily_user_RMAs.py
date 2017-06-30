@@ -58,9 +58,9 @@ wkgGDB      = "RMAuserWKG.gdb"
 wkgPath     = wkgFolder + "\\" + wkgGDB
 indataFC    = "Track_line"
 outTrackFC  = "outUserTracksRMA"
-rmaZones    = "P:\\stormwater\\data_ago\\agol_stormdata.gdb\\RMA_HSA_JUR1"
+rmaZones    = r"P:\stormwater\data_ago\agol_stormdata.gdb\RMA_HSA_JUR1"
 gtURL       = "https://www.arcgis.com/sharing/rest/generateToken"
-dsslvFields = ["NAME","DATE","EDITOR","EDITDATE"]
+dsslvFields = ['NAME', 'DATE', 'EDITOR', 'EDITDATE', 'HUNAME', 'HANAME', 'HSANAME', 'HBNUM']
 AGOfields   = "NAME,DATE,GlobalID,EDITOR,EDITDATE"
 
 # Make print statements write to a log file
@@ -219,22 +219,26 @@ try:
                 #---------------------------------------------------------------
                 # MG 6/30/17: Find the MILES and CMRMILES using the refined split tracks
 
+                # Intersect rmaZones so we can dissolve on the different zones
+                arcpy.Intersect_analysis(['tempTESTtrackSPLITrefine', rmaZones], 'refine_rma_INT')
+
                 # Add field [MILES] and calc as a value from [Shape_Length]
-                arcpy.AddField_management("tempTESTtrackSPLITrefine","MILES","DOUBLE")
-                arcpy.CalculateField_management("tempTESTtrackSPLITrefine","MILES","!Shape.Length@MILES!","PYTHON_9.3")
+                arcpy.AddField_management("refine_rma_INT","MILES","DOUBLE")
+                arcpy.CalculateField_management("refine_rma_INT","MILES","!Shape.Length@MILES!","PYTHON_9.3")
 
                 # Add field [CMRMILES] and calc as 0 (to start with)
-                arcpy.AddField_management("tempTESTtrackSPLITrefine","CMRMILES","DOUBLE")
-                arcpy.CalculateField_management("tempTESTtrackSPLITrefine","CMRMILES",0,"PYTHON_9.3")
+                arcpy.AddField_management("refine_rma_INT","CMRMILES","DOUBLE")
+                arcpy.CalculateField_management("refine_rma_INT","CMRMILES",0,"PYTHON_9.3")
 
                 # Find which split tracks are on CMR's and calculate their mileage
                 # TODO: fill out here
 
-                arcpy.Dissolve_management("tempTESTtrackSPLITrefine","trackTEMP",dsslvFields,[['MILES','SUM'],['CMRMILES','SUM']],"MULTI_PART","UNSPLIT_LINES")
+                # Dissolve ...SPLITrefine to sum [MILES] and [CMRMILES]
+                arcpy.Dissolve_management("refine_rma_INT","rmaTrack",dsslvFields,[['MILES','SUM'],['CMRMILES','SUM']],"MULTI_PART","DISSOLVE_LINES")
                 #---------------------------------------------------------------
                 # Compare to RMAs
                 print "Intersecting data..."
-                arcpy.Intersect_analysis(["trackTEMP",rmaZones],"rmaTrack")
+##                arcpy.Intersect_analysis(["trackTEMP",rmaZones],"rmaTrack")  # MG: I believe not needed.  TODO: remove if possible
                 numfeats = arcpy.GetCount_management("rmaTrack")
                 count = int(numfeats.getOutput(0))
                 if count == 0:
