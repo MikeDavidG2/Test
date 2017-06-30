@@ -210,7 +210,63 @@ def Get_DT_To_Append():
 
 #-------------------------------------------------------------------------------
 #-------------------------------------------------------------------------------
-#                          FUNCTION Join 2 Objects
+#                          FUNCTION: Get_List_Of_Parcels
+def Get_List_Of_Parcels(rmaTrack, parcel_fc, roadBufferVal):
+    """
+    """
+
+    # Make feature layers needed below
+    arcpy.MakeFeatureLayer_management(rmaTrack, 'rmaTrackLyr')
+    arcpy.MakeFeatureLayer_management(parcel_fc,  'parcel_fcLyr')
+
+
+    # Create a cursor to loop through all features in rmaTrack
+    with arcpy.da.SearchCursor(rmaTrack, ['OBJECTID']) as trackCursor:
+        for row in trackCursor:
+            where_clause = "OBJECTID = {}".format(str(row[0])) # Select track by OBJECTID
+            print 'Selecting where: ' + where_clause
+            arcpy.SelectLayerByAttribute_management('rmaTrackLyr', 'NEW_SELECTION', where_clause)
+
+            # Confirm one track was selected
+            numfeats = arcpy.GetCount_management("rmaTrackLyr")
+            count = int(numfeats.getOutput(0))
+            ##print 'Count: ' + str(count)
+            if count == 1:
+
+                # Select parcels by location based on the selected track
+                arcpy.SelectLayerByLocation_management('parcel_fcLyr', 'WITHIN_A_DISTANCE', 'rmaTrackLyr', roadBufferVal, 'NEW_SELECTION')
+
+                # Confirm at least one parcel was selected
+                numfeats = arcpy.GetCount_management("parcel_fcLyr")
+                count = numfeats.getOutput(0)
+                print 'Number of selected parcels: ' + str(count)
+                if count > 0:
+
+                    # Get a list of ALL the PARCELID's of the selected parcels
+                    # Use PARCELID so we don't count 'stacked' parcels,
+                    # but only parcel footprints.
+                    parcel_ids = []
+                    with arcpy.da.SearchCursor('parcel_fcLyr', ['PARCELID']) as parcelCursor:
+                        for row in parcelCursor:
+                            parcel_ids.append(row[0])
+
+                    # Get a list of all the UNIQUE PARCELID's
+                    # set() returns a list of only unique values
+                    unique_parcel_ids = sorted(set(parcel_ids))
+                    num_unique_parcel_ids = len(unique_parcel_ids)
+                    print 'Number of PARCELID\'s: {}'.format(str(num_unique_parcel_ids))
+
+                    # Calculate the PARCEL field in rmaTrack as the number of unique parcel ids
+                    # Only the selected feature in rmaTrack will have it's field calculated.
+                    arcpy.CalculateField_management('rmaTrackLyr', 'PARCELS', num_unique_parcel_ids, 'PYTHON_9.3')
+
+
+
+            print ''
+
+#-------------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
+#                          FUNCTION: Join_2_Objects
 def Join_2_Objects(target_obj, target_join_field, to_join_obj, to_join_field, join_type):
     """
     PARAMETERS:
