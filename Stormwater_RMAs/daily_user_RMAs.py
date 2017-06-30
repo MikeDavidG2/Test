@@ -193,7 +193,7 @@ except:
     errorSTATUS = 1
     print "********* ERROR while copying data... *********"
 
-### Process the data
+# Process the data
 try:
     if errorSTATUS == 0:
         # Select the tracks within the date range
@@ -216,7 +216,22 @@ try:
                 errorSTATUS = 99
             else:
                 arcpy.CopyFeatures_management("tempTESTtrackSPLIT_lyr","tempTESTtrackSPLITrefine")
-                arcpy.Dissolve_management("tempTESTtrackSPLITrefine","trackTEMP",dsslvFields,"","MULTI_PART","UNSPLIT_LINES")
+                #---------------------------------------------------------------
+                # MG 6/30/17: Find the MILES and CMRMILES using the refined split tracks
+
+                # Add field [MILES] and calc as a value from [Shape_Length]
+                arcpy.AddField_management("tempTESTtrackSPLITrefine","MILES","DOUBLE")
+                arcpy.CalculateField_management("tempTESTtrackSPLITrefine","MILES","!Shape.Length@MILES!","PYTHON_9.3")
+
+                # Add field [CMRMILES] and calc as 0 (to start with)
+                arcpy.AddField_management("tempTESTtrackSPLITrefine","CMRMILES","DOUBLE")
+                arcpy.CalculateField_management("tempTESTtrackSPLITrefine","CMRMILES",0,"PYTHON_9.3")
+
+                # Find which split tracks are on CMR's and calculate their mileage
+                # TODO: fill out here
+
+                arcpy.Dissolve_management("tempTESTtrackSPLITrefine","trackTEMP",dsslvFields,[['MILES','SUM'],['CMRMILES','SUM']],"MULTI_PART","UNSPLIT_LINES")
+                #---------------------------------------------------------------
                 # Compare to RMAs
                 print "Intersecting data..."
                 arcpy.Intersect_analysis(["trackTEMP",rmaZones],"rmaTrack")
@@ -238,13 +253,9 @@ try:
                             rowcursor.updateRow(row)
                         del rowcursor, row
 
-                    # Add field [MILES] and calc as a value from [Shape_Length]
-                    arcpy.AddField_management("rmaTrack","MILES","DOUBLE")
-                    arcpy.CalculateField_management("rmaTrack","MILES","!Shape.Length@MILES!","PYTHON_9.3")
-
                     # Add field [INFOSTR] and calc as a string aggregate of all info we want to report
                     arcpy.AddField_management("rmaTrack","INFOSTR","TEXT","","",300)
-                    arcpy.CalculateField_management("rmaTrack","INFOSTR",'[NAME] & "__" & [COLLECTDATE] & "__" & [HUNAME] & "/" & [HANAME] & "/" & [HSANAME] & "/" & [HBNUM] & "/" & [MILES]')
+                    arcpy.CalculateField_management("rmaTrack","INFOSTR",'[NAME] & "__" & [COLLECTDATE] & "__" & [HUNAME] & "/" & [HANAME] & "/" & [HSANAME] & "/" & [HBNUM] & "/" & [SUM_MILES]')
 
                     # Get data summaries
                     print "Running frequencies..."
