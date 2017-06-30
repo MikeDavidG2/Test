@@ -35,6 +35,7 @@ stimes = time.time()
 #######################################################################################
 ###  Set any changeable variables between here ---------------------------------->  ###
 
+roadbuffer  = 40
 distcutoff  = 5280  ###  cutoff distance (FEET)
 cfgFile     = "M:\\scripts\\configFiles\\accounts.txt"
 ##stmwtrPeeps = ["alex.romo@sdcounty.ca.gov","randy.yakos@sdcounty.ca.gov","gary.ross@sdcounty.ca.gov"]
@@ -62,6 +63,9 @@ rmaZones    = r"P:\stormwater\data_ago\agol_stormdata.gdb\RMA_HSA_JUR1"
 gtURL       = "https://www.arcgis.com/sharing/rest/generateToken"
 dsslvFields = ['NAME', 'DATE', 'EDITOR', 'EDITDATE', 'HUNAME', 'HANAME', 'HSANAME', 'HBNUM']
 AGOfields   = "NAME,DATE,GlobalID,EDITOR,EDITDATE"
+warehouse   = "M:\\scripts\\Database Connections\\Atlantic Warehouse (sangis user).sde\\"
+cmroads     = warehouse + "SDE.SANGIS.ROAD_SEGMENTS"
+
 
 # Make print statements write to a log file
 logFileNameRMA = str(wkgFolder) + "\\..\\log\\dailyUserRMAs_" + str(time.strftime("%Y%m%d%H%M", time.localtime())) + ".txt"
@@ -219,26 +223,55 @@ try:
                 #---------------------------------------------------------------
                 # MG 6/30/17: Find the MILES and CMRMILES using the refined split tracks
 
-                # Intersect rmaZones so we can dissolve on the different zones
+                # Intersect the split tracks with rma zones so we can dissolve on the rma zones
                 arcpy.Intersect_analysis(['tempTESTtrackSPLITrefine', rmaZones], 'refine_rma_INT')
 
                 # Add field [MILES] and calc as a value from [Shape_Length]
                 arcpy.AddField_management("refine_rma_INT","MILES","DOUBLE")
                 arcpy.CalculateField_management("refine_rma_INT","MILES","!Shape.Length@MILES!","PYTHON_9.3")
 
-                # Add field [CMRMILES] and calc as 0 (to start with)
+                # Add field [CMRMILES] and calc as 0 (As a default.  Mileage of CMR calculated below)
                 arcpy.AddField_management("refine_rma_INT","CMRMILES","DOUBLE")
                 arcpy.CalculateField_management("refine_rma_INT","CMRMILES",0,"PYTHON_9.3")
 
-                # Find which split tracks are on CMR's and calculate their mileage
-                # TODO: fill out here
 
-                # Dissolve ...SPLITrefine to sum [MILES] and [CMRMILES]
+                # Find which split tracks are on CMR's and calculate their mileage
+
+                # Buffer the track data
+                roadbufferVal = str(roadbuffer) + " Feet"
+                print "road buffer = " + roadbufferVal
+                print "Buffering tracks..."
+                arcpy.Buffer_analysis("refine_rma_INT","bufferTrack",roadbufferVal)
+
+                # Make feature layers of the buffered track data, and active/County Maintained Roads
+                arcpy.MakeFeatureLayer_management("bufferTrack","bufferTrackLyr")
+                arcpy.management.MakeFeatureLayer(cmroads,"cmrLyr","\"ASSET_STATUS\" = 'ACTIVE' AND \"JURISDICTION\" = 'CMR - COUNTY-MAINTAINED ROAD'")
+
+                # Select buffered tracks that Intersect the County Maintained Roads
+                # Export those selected buffers as CMR buffers
+                arcpy.SelectLayerByLocation_management("bufferTrackLyr","INTERSECT","cmrLyr")
+                arcpy.CopyFeatures_management("bufferTrackLyr","cmrbuffer")
+
+                # Make feature layer of the split tracks and select the split tracks
+                # that are COMPLETELY_WITHIN
+                #    (to reduce errors occuring from interstate driving on underpasses under CMR's)
+                # the CMR buffers.
+                # The selected tracks represent tracks on County Maintained Roads,
+                # Calculate their length
+                arcpy.MakeFeatureLayer_management("refine_rma_INT","refine_rma_INTLyr")
+                arcpy.SelectLayerByLocation_management("refine_rma_INTLyr","COMPLETELY_WITHIN","cmrbuffer")
+                numfeats = arcpy.GetCount_management("refine_rma_INTLyr")
+                count = int(numfeats.getOutput(0))
+                if count == 0:
+                    errorSTATUS = 99
+                else:
+                    arcpy.CalculateField_management('refine_rma_INTLyr', 'CMRMILES', '!Shape.Length@MILES!', 'PYTHON_9.3')
+
+                # Dissolve data on all fields we need (and sum [MILES] and [CMRMILES])
                 arcpy.Dissolve_management("refine_rma_INT","rmaTrack",dsslvFields,[['MILES','SUM'],['CMRMILES','SUM']],"MULTI_PART","DISSOLVE_LINES")
                 #---------------------------------------------------------------
                 # Compare to RMAs
                 print "Intersecting data..."
-##                arcpy.Intersect_analysis(["trackTEMP",rmaZones],"rmaTrack")  # MG: I believe not needed.  TODO: remove if possible
                 numfeats = arcpy.GetCount_management("rmaTrack")
                 count = int(numfeats.getOutput(0))
                 if count == 0:
@@ -259,7 +292,7 @@ try:
 
                     # Add field [INFOSTR] and calc as a string aggregate of all info we want to report
                     arcpy.AddField_management("rmaTrack","INFOSTR","TEXT","","",300)
-                    arcpy.CalculateField_management("rmaTrack","INFOSTR",'[NAME] & "__" & [COLLECTDATE] & "__" & [HUNAME] & "/" & [HANAME] & "/" & [HSANAME] & "/" & [HBNUM] & "/" & [SUM_MILES]')
+                    arcpy.CalculateField_management("rmaTrack","INFOSTR",'[NAME] & "__" & [COLLECTDATE] & "__" & [HUNAME] & "/" & [HANAME] & "/" & [HSANAME] & "/" & [HBNUM] & "/" & [SUM_MILES] & "/" & [SUM_CMRMILES]')
 
                     # Get data summaries
                     print "Running frequencies..."
@@ -273,10 +306,11 @@ try:
 
                     print "Writing report..."
                     # MG: 6/26/17: Create vars to hold sums
-                    sum_miles = 0
+                    sum_miles    = 0
+                    sum_cmrmiles = 0
 
                     with open(rptPath,"w") as csvf:
-                        csvf.write("NAME,DATE,RMA,HUNAME,HANAME,HBNUM, MILES\n")
+                        csvf.write("NAME,DATE,RMA,HUNAME,HANAME,HBNUM, MILES, CMRMILES\n")
                         for track in tracklist:
                             usrinfo = str(track[0]).split("__")
                                 # Above turns: "paola_dpw__06/26/2017__CARLSBAD/Escondido Creek/Escondido/904.62"
@@ -288,14 +322,18 @@ try:
                             else:
                                 rmastr = str(rmainfo[2])
                             #              NAME           ,        DATE           ,    RMA       ,        HUNAME                  HANAME         ,        HBNUM          ,        MILES
-                            csvf.write(str(usrinfo[0]) + "," + str(usrinfo[1]) + "," + rmastr + "," + str(rmainfo[0]) + "," + str(rmainfo[1]) + "," + str(rmainfo[3]) + "," + str(rmainfo[4]) + "\n")
+                            csvf.write(str(usrinfo[0]) + "," + str(usrinfo[1]) + "," + rmastr + "," + str(rmainfo[0]) + "," + str(rmainfo[1]) + "," + str(rmainfo[3]) + "," + str(rmainfo[4]) + "," + str(rmainfo[5]) + "\n")
 
                             # MG: 6/26/17: Get sums
                             sum_miles     = sum_miles + float(rmainfo[4])
+                            sum_cmrmiles  = sum_cmrmiles + float(rmainfo[5])
+
+                        print 'sum_cmrmiles: ' + str(sum_cmrmiles)
+                        print sum_cmrmiles
 
                         # # MG: 6/26/17: Write the sums to the CSV
                         csvf.write('------, -----, -----, -----, -----, ----- , -----\n')
-                        csvf.write('      ,      ,      ,      ,      ,TOTALS:,' + str(sum_miles))
+                        csvf.write('      ,      ,      ,      ,      ,TOTALS:,' + str(sum_miles) + "," + str(sum_cmrmiles))
 except Exception as e:
     errorSTATUS = 1
     print "********* ERROR while processing... *********"
