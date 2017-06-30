@@ -1,6 +1,9 @@
 #My Files to Ignore
 Test_Geolocator/Addresses.gdb
 Test_Geolocator/Addresses.xlsx
+Stormwater_RMAs/*.mxd
+Stormwater_RMAs/data
+Stormwater_RMAs/log
 ~*
 
 # Byte-compiled / optimized / DLL files
