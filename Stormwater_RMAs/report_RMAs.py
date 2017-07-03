@@ -99,6 +99,7 @@ if (manually_entered_dates == False):
 logFileNameRMA = str(wkgFolder) + "\\..\\log\\reportRMAs_" + str(time.strftime("%Y%m%d%H%M", time.localtime())) + ".txt"
 logFileRMA = open(logFileNameRMA,"w")
 old_outputRMA = sys.stdout
+print 'Setting all print statements to write to a file found at:\n  {}'.format(logFileNameRMA)
 sys.stdout = logFileRMA
 
 # START processing
