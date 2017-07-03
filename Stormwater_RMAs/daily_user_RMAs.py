@@ -217,49 +217,49 @@ def main():
             else:
                 # Split the lines and discard segments that are too long
                 print 'Splitting tracks and discarding segments > {}'.format(distcutoff)
-                arcpy.SplitLine_management("trackLyr","tempTESTtrackSPLIT")
+                arcpy.SplitLine_management("trackLyr","B_TrackLine_SPLIT")
                 selectClause = '"Shape_Length" < ' + str(distcutoff)
-                arcpy.MakeFeatureLayer_management("tempTESTtrackSPLIT","tempTESTtrackSPLIT_lyr",selectClause)
-                numfeats = arcpy.GetCount_management("tempTESTtrackSPLIT_lyr")
+                arcpy.MakeFeatureLayer_management("B_TrackLine_SPLIT","B_TrackLine_SPLIT_lyr",selectClause)
+                numfeats = arcpy.GetCount_management("B_TrackLine_SPLIT_lyr")
                 count = int(numfeats.getOutput(0))
                 if count == 0:
                     errorSTATUS = 99
                 else:
-                    arcpy.CopyFeatures_management("tempTESTtrackSPLIT_lyr","tempTESTtrackSPLITrefine")
+                    arcpy.CopyFeatures_management("B_TrackLine_SPLIT_lyr","C_TrackLine_SPLIT_refine")
                     #---------------------------------------------------------------
                     #---------------------------------------------------------------
                     # MG 6/30/17: Find the values for MILES, and CMRMILES
 
                     # Intersect the split tracks with rma zones so we can dissolve on the rma zones
                     print 'Intersecting split tracks with rma zones'
-                    arcpy.Intersect_analysis(['tempTESTtrackSPLITrefine', rmaZones], 'refine_rma_INT')
+                    arcpy.Intersect_analysis(['C_TrackLine_SPLIT_refine', rmaZones], 'D_refine_rma_INT')
 
                     # Add field [MILES] and calc as a value from [Shape_Length]
                     print 'Adding / calculating field [MILES]'
-                    arcpy.AddField_management("refine_rma_INT","MILES","DOUBLE")
-                    arcpy.CalculateField_management("refine_rma_INT","MILES","!Shape.Length@MILES!","PYTHON_9.3")
+                    arcpy.AddField_management("D_refine_rma_INT","MILES","DOUBLE")
+                    arcpy.CalculateField_management("D_refine_rma_INT","MILES","!Shape.Length@MILES!","PYTHON_9.3")
 
                     #-----------------------------------------------------------
                     # Add field [CMRMILES] and calc as 0 (As a default.  Mileage of CMR calculated below)
                     print 'Adding / calculating field [CMRMILES]'
-                    arcpy.AddField_management("refine_rma_INT","CMRMILES","DOUBLE")
-                    arcpy.CalculateField_management("refine_rma_INT","CMRMILES",0,"PYTHON_9.3")
+                    arcpy.AddField_management("D_refine_rma_INT","CMRMILES","DOUBLE")
+                    arcpy.CalculateField_management("D_refine_rma_INT","CMRMILES",0,"PYTHON_9.3")
 
                     # Find which split tracks are on CMR's and calculate their mileage
 
                     # Buffer the track data
                     print "  Buffering tracks..."
                     print "  road buffer = " + road_buffer
-                    arcpy.Buffer_analysis("refine_rma_INT","bufferTrack",road_buffer)
+                    arcpy.Buffer_analysis("D_refine_rma_INT","E_bufferTrack",road_buffer)
 
                     # Make feature layers of the buffered track data, and active/County Maintained Roads
-                    arcpy.MakeFeatureLayer_management("bufferTrack","bufferTrackLyr")
+                    arcpy.MakeFeatureLayer_management("E_bufferTrack","E_bufferTrackLyr")
                     arcpy.management.MakeFeatureLayer(cmroads_fc,"cmrLyr","\"ASSET_STATUS\" = 'ACTIVE' AND \"JURISDICTION\" = 'CMR - COUNTY-MAINTAINED ROAD'")
 
                     # Select buffered tracks that Intersect the County Maintained Roads
                     # Export those selected buffers as CMR buffers
-                    arcpy.SelectLayerByLocation_management("bufferTrackLyr","INTERSECT","cmrLyr")
-                    arcpy.CopyFeatures_management("bufferTrackLyr","cmrbuffer")
+                    arcpy.SelectLayerByLocation_management("E_bufferTrackLyr","INTERSECT","cmrLyr")
+                    arcpy.CopyFeatures_management("E_bufferTrackLyr","F_cmrBuffer")
 
                     # Make feature layer of the split tracks and select the split tracks
                     # that are COMPLETELY_WITHIN
@@ -267,20 +267,20 @@ def main():
                     # the CMR buffers.
                     # The selected tracks represent tracks on County Maintained Roads,
                     # Calculate their length
-                    arcpy.MakeFeatureLayer_management("refine_rma_INT","refine_rma_INTLyr")
-                    arcpy.SelectLayerByLocation_management("refine_rma_INTLyr","COMPLETELY_WITHIN","cmrbuffer")
-                    numfeats = arcpy.GetCount_management("refine_rma_INTLyr")
+                    arcpy.MakeFeatureLayer_management("D_refine_rma_INT","D_refine_rma_INTLyr")
+                    arcpy.SelectLayerByLocation_management("D_refine_rma_INTLyr","COMPLETELY_WITHIN","F_cmrBuffer")
+                    numfeats = arcpy.GetCount_management("D_refine_rma_INTLyr")
                     count = int(numfeats.getOutput(0))
                     if count == 0:
                         errorSTATUS = 99
                     else:
-                        arcpy.CalculateField_management('refine_rma_INTLyr', 'CMRMILES', '!Shape.Length@MILES!', 'PYTHON_9.3')
+                        arcpy.CalculateField_management('D_refine_rma_INTLyr', 'CMRMILES', '!Shape.Length@MILES!', 'PYTHON_9.3')
 
                     #---------------------------------------------------------------
                     # Dissolve data on all fields we need (and sum [MILES], [CMRMILES])
                     #   to get RMA Track
                     print 'Dissolving to get unique "User and Date" tracks and summing fields [MILES] and [CMRMILES]'
-                    arcpy.Dissolve_management("refine_rma_INT","rmaTrack",dsslvFields,[['MILES','SUM'],['CMRMILES','SUM']],"MULTI_PART","DISSOLVE_LINES")
+                    arcpy.Dissolve_management("D_refine_rma_INT","G_rmaTrack",dsslvFields,[['MILES','SUM'],['CMRMILES','SUM']],"MULTI_PART","DISSOLVE_LINES")
 
                     #-----------------------------------------------------------
                     #===========================================================
@@ -288,28 +288,28 @@ def main():
 
                     # Add field [PARCELS]
                     print 'Adding / calculating field [PARCELS]'
-                    arcpy.AddField_management("rmaTrack","PARCELS","DOUBLE")
+                    arcpy.AddField_management("G_rmaTrack","PARCELS","DOUBLE")
 
-                    # Send FC 'rmaTrack', the 'SDE.SANGIS.PARCELS_ALL', and the
+                    # Send FC 'G_rmaTrack', the 'SDE.SANGIS.PARCELS_ALL', and the
                     #  parcel buffer to a FUNCTION (find at bottom of this script)
-                    Get_List_Of_Parcels('rmaTrack', parcels_fc, parcel_buffer)
+                    Get_List_Of_Parcels('G_rmaTrack', parcels_fc, parcel_buffer)
                     #===========================================================
 
                     #---------------------------------------------------------------
                     #---------------------------------------------------------------
                     # Add fields COLLECTDATE and INFOSTR
                     print "Adding/calculating COLLECTDATE and INFOSTR fields..."
-                    numfeats = arcpy.GetCount_management("rmaTrack")
+                    numfeats = arcpy.GetCount_management("G_rmaTrack")
                     count = int(numfeats.getOutput(0))
                     if count == 0:
                         errorSTATUS = 99
                     else:
                         # Add field [COLLECTDATE]
-                        arcpy.AddField_management("rmaTrack","COLLECTDATE","TEXT","","",12)
-                        arcpy.MakeTableView_management("rmaTrack","rmaTrackView")
+                        arcpy.AddField_management("G_rmaTrack","COLLECTDATE","TEXT","","",12)
+                        arcpy.MakeTableView_management("G_rmaTrack","G_rmaTrackView")
 
                         # Update [COLLECTDATE] with [DATE] values as a string and without the time component
-                        with arcpy.da.UpdateCursor("rmaTrackView",["DATE","COLLECTDATE"]) as rowcursor:
+                        with arcpy.da.UpdateCursor("G_rmaTrackView",["DATE","COLLECTDATE"]) as rowcursor:
                             for row in rowcursor:
                                 datetimeVal = row[0]
                                 dateVal = datetime.datetime.strftime(datetimeVal,"%m/%d/%Y")
@@ -318,17 +318,17 @@ def main():
                             del rowcursor, row
 
                         # Add field [INFOSTR] and calc as a string aggregate of all info we want to report
-                        arcpy.AddField_management("rmaTrack","INFOSTR","TEXT","","",300)
-                        arcpy.CalculateField_management("rmaTrack","INFOSTR",'[NAME] & "__" & [COLLECTDATE] & "__" & [HUNAME] & "/" & [HANAME] & "/" & [HSANAME] & "/" & [HBNUM] & "/" & [SUM_MILES] & "/" & [SUM_CMRMILES] & "/" & [PARCELS]')
+                        arcpy.AddField_management("G_rmaTrack","INFOSTR","TEXT","","",300)
+                        arcpy.CalculateField_management("G_rmaTrack","INFOSTR",'[NAME] & "__" & [COLLECTDATE] & "__" & [HUNAME] & "/" & [HANAME] & "/" & [HSANAME] & "/" & [HBNUM] & "/" & [SUM_MILES] & "/" & [SUM_CMRMILES] & "/" & [PARCELS]')
 
                         # Get data summaries
                         print "Getting Summaries..."
-                        arcpy.MakeFeatureLayer_management("rmaTrack","rmaTrackLyr","\"HBNUM\" <> 0")
-                        arcpy.Frequency_analysis("rmaTrackLyr","sumTracks",["INFOSTR"])
+                        arcpy.MakeFeatureLayer_management("G_rmaTrack","G_rmaTrackLyr","\"HBNUM\" <> 0")
+                        arcpy.Frequency_analysis("G_rmaTrackLyr","H_sumTracks",["INFOSTR"])
 
                         # Write report file
                         print "Writing report..."
-                        with arcpy.da.SearchCursor("sumTracks",["INFOSTR"]) as rowcursor:
+                        with arcpy.da.SearchCursor("H_sumTracks",["INFOSTR"]) as rowcursor:
                             tracklist = list(rowcursor)
                         del rowcursor
 
@@ -341,10 +341,13 @@ def main():
                             csvf.write("NAME,DATE,RMA,HUNAME,HANAME,HBNUM, MILES, CMRMILES, PARCELS\n")
                             for track in tracklist:
                                 usrinfo = track[0].split("__")
-                                    # Above turns: "paola_dpw__06/26/2017__CARLSBAD/Escondido Creek/Escondido/904.62"
-                                    #          to: "paola_dpw  06/26/2017  CARLSBAD/Escondido Creek/Escondido/904.62"
-                                    #              usrinfo[0]  usrinfo[1]  usrinfo[2]
+                                    # Above turns: "myamanak__06/26/2017__TIJUANA/Tijuana Valley/Water Tanks/911.12/2.66/1.81/12"
+                                    #          to: ['myamanak', '06/26/2017', 'TIJUANA/Tijuana Valley/Water Tanks/911.12/2.66/1.81/12']
+                                    #              usrinfo[0]    usrinfo[1]    usrinfo[2]
                                 rmainfo = usrinfo[2].split("/")
+                                    # Above turns: "TIJUANA/Tijuana Valley/Water Tanks/911.12/2.66/1.81/12"
+                                    #          to: ['TIJUANA', 'Tijuana Valley', 'Water Tanks', '911.12', '2.66', '1.81', '12']
+                                    #               rmainfo[0]    rmainfo[1]      rmainfo[2]   ... etc.
                                 if "SAME AS HANAME" in rmainfo[2]:
                                     rmastr = rmainfo[1]
                                 else:
@@ -489,32 +492,32 @@ def main():
 #-------------------------------------------------------------------------------
 #                         Function: Get_List_Of_Parcels
 
-def Get_List_Of_Parcels(rmaTrack, parcel_fc, roadBufferVal):
+def Get_List_Of_Parcels(G_rmaTrack, parcel_fc, roadBufferVal):
     #TODO: Document this function
     """
     """
 
     # Make feature layers needed below
-    arcpy.MakeFeatureLayer_management(rmaTrack, 'rmaTrackLyr')
+    arcpy.MakeFeatureLayer_management(G_rmaTrack, 'G_rmaTrackLyr')
     arcpy.MakeFeatureLayer_management(parcel_fc,  'parcel_fcLyr')
 
 
-    # Create a cursor to loop through all features in rmaTrack
+    # Create a cursor to loop through all features in G_rmaTrack
     print '  Starting to get number of parcels per track.'
-    with arcpy.da.SearchCursor(rmaTrack, ['OBJECTID']) as trackCursor:
+    with arcpy.da.SearchCursor(G_rmaTrack, ['OBJECTID']) as trackCursor:
         for row in trackCursor:
             where_clause = "OBJECTID = {}".format(str(row[0])) # Select track by OBJECTID
             ##print 'Selecting where: ' + where_clause
-            arcpy.SelectLayerByAttribute_management('rmaTrackLyr', 'NEW_SELECTION', where_clause)
+            arcpy.SelectLayerByAttribute_management('G_rmaTrackLyr', 'NEW_SELECTION', where_clause)
 
             # Confirm one track was selected
-            numfeats = arcpy.GetCount_management("rmaTrackLyr")
+            numfeats = arcpy.GetCount_management("G_rmaTrackLyr")
             count = int(numfeats.getOutput(0))
             ##print 'Count: ' + str(count)
             if count == 1:
 
                 # Select parcels by location based on the selected track
-                arcpy.SelectLayerByLocation_management('parcel_fcLyr', 'WITHIN_A_DISTANCE', 'rmaTrackLyr', roadBufferVal, 'NEW_SELECTION')
+                arcpy.SelectLayerByLocation_management('parcel_fcLyr', 'WITHIN_A_DISTANCE', 'G_rmaTrackLyr', roadBufferVal, 'NEW_SELECTION')
 
                 # Find out how many parcels selected
                 numfeats = arcpy.GetCount_management("parcel_fcLyr")
@@ -535,9 +538,9 @@ def Get_List_Of_Parcels(rmaTrack, parcel_fc, roadBufferVal):
                 num_unique_parcel_ids = len(unique_parcel_ids)
                 ##print 'Number of PARCELID\'s: {}'.format(str(num_unique_parcel_ids))
 
-                # Calculate the PARCEL field in rmaTrack as the number of unique parcel ids
-                # Only the selected feature in rmaTrack will have it's field calculated.
-                arcpy.CalculateField_management('rmaTrackLyr', 'PARCELS', num_unique_parcel_ids, 'PYTHON_9.3')
+                # Calculate the PARCEL field in G_rmaTrack as the number of unique parcel ids
+                # Only the selected feature in G_rmaTrack will have it's field calculated.
+                arcpy.CalculateField_management('G_rmaTrackLyr', 'PARCELS', num_unique_parcel_ids, 'PYTHON_9.3')
 
             ##print ''
     print '  FINISHED getting number of parcels per track.'
