@@ -29,7 +29,7 @@ stimes = time.time()
 # 'True' when you want to manually enter 'datestart' and 'dateend'
 # 'False' when the script should auto calculate 'datestart' and 'dateend':
 #    datestart = last month's 1st day of the month
-#    dateend   = the current month's 1st day of the month
+#    dateend   = last month's last day of the month
 manually_entered_dates = False
 
 #-------------------------------------------------------------------------------
@@ -38,7 +38,7 @@ if (manually_entered_dates == True):
     ####### Note: dates are *INCLUSIVE* --> for a report covering Sep, Oct,
     ### Nov of 2015, use: datestart = "2015-09-01" dateend = "2015-11-30"
     datestart   = "2017-06-01"  ## Date should be in format yyyy-mm-dd"
-    dateend     = "2017-07-01"  ## Date should be in format yyyy-mm-dd"
+    dateend     = "2017-06-30"  ## Date should be in format yyyy-mm-dd"
     ####### --> the start and end dates will be included in the report
     #######################################################################
 #-------------------------------------------------------------------------------
@@ -59,6 +59,8 @@ fromEmail   = "dplugis@gmail.com"
 # Set variables that shouldn't change much
 todaystr    = str(time.strftime("%Y%m%d", time.localtime()))
 trackURL    = "http://services1.arcgis.com/1vIhDJwtG5eNmiqX/arcgis/rest/services/Track_line/FeatureServer/0/query"
+##wkgFolder   = r'P:\stormwater\scripts\data'
+# TODO: remove the below variable when done testing and uncomment the above
 wkgFolder   = r"U:\grue\Scripts\GitHub\Test\Stormwater_RMAs\data"
 wkgGDB      = "RMAsummaryWKG.gdb"
 wkgPath     = wkgFolder + "\\" + wkgGDB
@@ -82,13 +84,15 @@ if (manually_entered_dates == False):
     today = datetime.date.today()                   # Get today as a datetime object
     last_month = today + relativedelta(months=-1)   # Subtract one month from the current month
     last_month_1st = last_month.replace(day=1)      # Change the day to the 1st of the previous month
-    datestart = last_month_1st.strftime('%Y-%m-%d') # Datestart is last months 1st of the month
-    ##print 'Date Start: ' + datestart
+    datestart = last_month_1st.strftime('%Y-%m-%d') # datestart is last months 1st of the month
+    print 'Date Start: ' + datestart
 
     # Get dateend
-    this_month_1st = today.replace(day=1)
-    dateend = this_month_1st.strftime('%Y-%m-%d')
-    ##print 'Date End: ' + dateend
+    one_day             = datetime.timedelta(days=1) # Create a timedelta of 1 day
+    this_month_1st      = today.replace(day=1)       # Set the date to the 1st of the current month
+    last_month_last_day = this_month_1st - one_day   # Subtract 1 day from 1st of the current month
+    dateend             = last_month_last_day.strftime('%Y-%m-%d') # dateend is last day of last month
+    print 'Date End: ' + dateend
 #-------------------------------------------------------------------------------
 
 # Make print statements write to a log file
@@ -109,7 +113,8 @@ try:
     # Get dates and report name
     print 'Start and end dates manually entered = ' + str(manually_entered_dates)
     if (manually_entered_dates == False):
-        print '  The Script auto calculated the below dates:'
+        print '  The Script auto calculated the below dates.'
+        print '  To set dates manually, change manually_entered_dates to "True".'
     print "    Start date = " + str(datestart)
     datestartstr = datestart.replace("-","")
     dsvals = datestart.split("-")
@@ -347,7 +352,7 @@ try:
         configRMA.read(cfgFile)
         emailusrRMA = configRMA.get("email","usr")
         emailpwdRMA = configRMA.get("email","pwd")
-        msgString = "Stormwater RMA report " + datestart + " to " + dateend
+        msgString = "Stormwater RMA report " + datestart + " through " + dateend
         msgRMA = MIMEMultipart()
         fromaddrRMA        = fromEmail
         toaddrRMA          = stmwtrPeeps
@@ -380,7 +385,7 @@ try:
         configRMA.read(cfgFile)
         emailusrRMA = configRMA.get("email","usr")
         emailpwdRMA = configRMA.get("email","pwd")
-        msgString = "Daily stormwater user/RMA report--no data found for period " + datestart + " to " + dateend
+        msgString = "Daily stormwater user/RMA report--no data found for period " + datestart + " through " + dateend
         msgRMA = MIMEText(msgString)
         fromaddrRMA         = fromEmail
         toaddrRMA           = scriptAdmin  ## <-- LUEG-GIS script administrator
