@@ -36,9 +36,11 @@ def main():
     #######################################################################################
     #######################################################################################
     ###  Set any changeable variables between here ---------------------------------->  ###
+    road_buffer   = '40 Feet'
+    distcutoff    = 5280  #  Max Shape_Length for split tracks (in FEET)
 
-    roadbuffer  = 40
-    distcutoff  = 5280  ###  cutoff distance (FEET)
+    parcel_buffer = '40 Feet'
+
     cfgFile     = "M:\\scripts\\configFiles\\accounts.txt"
     ##stmwtrPeeps = ["alex.romo@sdcounty.ca.gov","randy.yakos@sdcounty.ca.gov","gary.ross@sdcounty.ca.gov"]
     ##scriptAdmin = ["randy.yakos@sdcounty.ca.gov","gary.ross@sdcounty.ca.gov"]
@@ -59,8 +61,8 @@ def main():
     wkgFolder   = r'U:\grue\Scripts\GitHub\Test\Stormwater_RMAs\data' # MG 06/26/17: changed working folder for testing purposes
     wkgGDB      = "RMAuserWKG.gdb"
     wkgPath     = wkgFolder + "\\" + wkgGDB
-    indataFC    = "Track_line"
-    outTrackFC  = "outUserTracksRMA"
+    indataFC    = "A_TrackLine_OrigData"
+    ##outTrackFC  = "outUserTracksRMA"
     rmaZones    = r"P:\stormwater\data_ago\agol_stormdata.gdb\RMA_HSA_JUR1"
     gtURL       = "https://www.arcgis.com/sharing/rest/generateToken"
     dsslvFields = ['NAME', 'DATE', 'EDITOR', 'EDITDATE', 'HUNAME', 'HANAME', 'HSANAME', 'HBNUM']
@@ -74,6 +76,7 @@ def main():
     logFileNameRMA = str(wkgFolder) + "\\..\\log\\dailyUserRMAs_" + str(time.strftime("%Y%m%d%H%M", time.localtime())) + ".txt"
     logFileRMA = open(logFileNameRMA,"w")
     old_outputRMA = sys.stdout
+    print 'Setting all print statements to write to a file found at:\n  {}'.format(logFileNameRMA)
 
     # TODO before going to prod: Uncomment out below and remove comment
     # MG 06/26/17: commented out for testing purposes
@@ -92,13 +95,14 @@ def main():
         # Assumes start time *AFTER* midnight
         today = datetime.date.today()
         todaystr = str(today)
-        print "todaystr = " + todaystr
         de = today + datetime.timedelta(days=-1) # To show the right day for the report name
         dateend = str(de)
-        print "dateend = " + dateend
         ds = today + datetime.timedelta(days=-7)
         datestart = str(ds)
-        print "datestart = " + datestart
+        print 'Dates:'
+        print "  todaystr  = {}".format(today)
+        print "  datestart = {}".format(datestart)
+        print "  dateend   = {}".format(dateend)
         # Dates are in UTC, converted to view in PST --> adjust for PST (8 hours)
         dec = datetime.datetime(de.year,de.month,de.day)
         dateendconv = str(dec + datetime.timedelta(days=1,hours=8)) # To search for the correct date range
@@ -106,18 +110,19 @@ def main():
         datestartconv = str(dsc + datetime.timedelta(hours=8))
         rptName = "RMA_daily_user_report_" + str(dateend) + ".csv"
         rptPath = wkgFolder + "\\" + rptName
-        print rptPath
+        print 'Report Path:\n  {}\n'.format(rptPath)
         # Create a working GDB
         if arcpy.Exists(wkgPath):
             print "Deleting existing instance of working GDB..."
             arcpy.Delete_management(wkgPath)
             print "   Successfully deleted working GDB."
         arcpy.CreateFileGDB_management(wkgFolder,wkgGDB)
-        print "   Successfully created working GDB."
+        print "   Successfully created working GDB.\n"
         arcpy.env.workspace = wkgPath
-    except:
+    except Exception as e:
         errorSTATUS = 1
         print "********* ERROR during preliminary setup... *********"
+        print str(e)
 
     # Get AGOL token
     try:
@@ -133,10 +138,11 @@ def main():
             gtResponse = urllib2.urlopen(gtRequest)
             gtJson = json.load(gtResponse)
             token = gtJson['token']
-            print "   Successfully retrieved token."
-    except:
+            print "Successfully retrieved token.\n"
+    except Exception as e:
         errorSTATUS = 1
         print "********* ERROR while generating token... *********"
+        print str(e)
 
     # Copy the track data
     try:
@@ -175,7 +181,7 @@ def main():
             # Set where to between 'datestart' and 'dateend + 2 days'
             where = "DATE BETWEEN '{}' and '{}'".format(datestart, dateend_2_days_str)
             ##where = "1=1" # Grabs the whole database (up to 2000 records)
-            print 'Where clause used to query Feature Service: \n  '+ where
+            print '  Where clause used to query Feature Service: \n    {}'.format(where)
 
             # Encode the where statement so it is readable by URL protocol (ie %27 = ' in URL
             # visit http://meyerweb.com/eric/tools/dencoder to test URL encoding
@@ -183,22 +189,18 @@ def main():
 
             query = "?where={}&outFields={}&returnGeometry=true&f=json&token={}".format(where_encoded,AGOfields,token)
             #-----------------------------------------------------------------------
-            print "10"
             fsURL = trackURL + query
-            print "20"
             fs = arcpy.FeatureSet()
-            print "30"
-            print str(fsURL)
-            print "32"
+            print '  FS URL:\n    {}'.format(str(fsURL))
             fs.load(fsURL)
-            print "40"
             arcpy.CreateFileGDB_management(wkgFolder,wkgGDB) #E:\\Projects\\stormwater\\scripts\\data\\RMAuserWKG.gdb
-            print "50"
             arcpy.CopyFeatures_management(fs,wkgPath + "\\" + indataFC)
-            print "   Successfully retrieved data."
-    except:
+            print "Successfully retrieved data.\n"
+
+    except Exception as e:
         errorSTATUS = 1
         print "********* ERROR while copying data... *********"
+        print str(e)
 
     # Process the data
     try:
@@ -214,6 +216,7 @@ def main():
                 errorSTATUS = 99
             else:
                 # Split the lines and discard segments that are too long
+                print 'Splitting tracks and discarding segments > {}'.format(distcutoff)
                 arcpy.SplitLine_management("trackLyr","tempTESTtrackSPLIT")
                 selectClause = '"Shape_Length" < ' + str(distcutoff)
                 arcpy.MakeFeatureLayer_management("tempTESTtrackSPLIT","tempTESTtrackSPLIT_lyr",selectClause)
@@ -225,27 +228,29 @@ def main():
                     arcpy.CopyFeatures_management("tempTESTtrackSPLIT_lyr","tempTESTtrackSPLITrefine")
                     #---------------------------------------------------------------
                     #---------------------------------------------------------------
-                    # MG 6/30/17: Find the values for MILES, CMRMILES, and PARCELS
+                    # MG 6/30/17: Find the values for MILES, and CMRMILES
 
                     # Intersect the split tracks with rma zones so we can dissolve on the rma zones
+                    print 'Intersecting split tracks with rma zones'
                     arcpy.Intersect_analysis(['tempTESTtrackSPLITrefine', rmaZones], 'refine_rma_INT')
 
                     # Add field [MILES] and calc as a value from [Shape_Length]
+                    print 'Adding / calculating field [MILES]'
                     arcpy.AddField_management("refine_rma_INT","MILES","DOUBLE")
                     arcpy.CalculateField_management("refine_rma_INT","MILES","!Shape.Length@MILES!","PYTHON_9.3")
 
+                    #-----------------------------------------------------------
                     # Add field [CMRMILES] and calc as 0 (As a default.  Mileage of CMR calculated below)
+                    print 'Adding / calculating field [CMRMILES]'
                     arcpy.AddField_management("refine_rma_INT","CMRMILES","DOUBLE")
                     arcpy.CalculateField_management("refine_rma_INT","CMRMILES",0,"PYTHON_9.3")
 
-                    #---------------------------------------------------------------
                     # Find which split tracks are on CMR's and calculate their mileage
 
                     # Buffer the track data
-                    roadbufferVal = str(roadbuffer) + " Feet"
-                    print "road buffer = " + roadbufferVal
-                    print "Buffering tracks..."
-                    arcpy.Buffer_analysis("refine_rma_INT","bufferTrack",roadbufferVal)
+                    print "  Buffering tracks..."
+                    print "  road buffer = " + road_buffer
+                    arcpy.Buffer_analysis("refine_rma_INT","bufferTrack",road_buffer)
 
                     # Make feature layers of the buffered track data, and active/County Maintained Roads
                     arcpy.MakeFeatureLayer_management("bufferTrack","bufferTrackLyr")
@@ -273,17 +278,26 @@ def main():
 
                     #---------------------------------------------------------------
                     # Dissolve data on all fields we need (and sum [MILES], [CMRMILES])
+                    #   to get RMA Track
+                    print 'Dissolving to get unique "User and Date" tracks and summing fields [MILES] and [CMRMILES]'
                     arcpy.Dissolve_management("refine_rma_INT","rmaTrack",dsslvFields,[['MILES','SUM'],['CMRMILES','SUM']],"MULTI_PART","DISSOLVE_LINES")
 
-                    #---------------------------------------------------------------
-                    # Find number of parcels per RMA Track
+                    #-----------------------------------------------------------
+                    #===========================================================
+                    #          Find number of parcels per RMA Track
+
+                    # Add field [PARCELS]
+                    print 'Adding / calculating field [PARCELS]'
                     arcpy.AddField_management("rmaTrack","PARCELS","DOUBLE")
-                    ##arcpy.CalculateField_management('rmaTrack', 'PARCELS', 0)
-                    Get_List_Of_Parcels('rmaTrack', parcels_fc, roadbufferVal)
+
+                    # Send FC 'rmaTrack', the 'SDE.SANGIS.PARCELS_ALL', and the
+                    #  parcel buffer to a FUNCTION (find at bottom of this script)
+                    Get_List_Of_Parcels('rmaTrack', parcels_fc, parcel_buffer)
+                    #===========================================================
 
                     #---------------------------------------------------------------
                     #---------------------------------------------------------------
-                    # Compare to RMAs
+                    # Add fields COLLECTDATE and INFOSTR
                     print "Adding/calculating COLLECTDATE and INFOSTR fields..."
                     numfeats = arcpy.GetCount_management("rmaTrack")
                     count = int(numfeats.getOutput(0))
@@ -308,16 +322,16 @@ def main():
                         arcpy.CalculateField_management("rmaTrack","INFOSTR",'[NAME] & "__" & [COLLECTDATE] & "__" & [HUNAME] & "/" & [HANAME] & "/" & [HSANAME] & "/" & [HBNUM] & "/" & [SUM_MILES] & "/" & [SUM_CMRMILES] & "/" & [PARCELS]')
 
                         # Get data summaries
-                        print "Running frequencies..."
+                        print "Getting Summaries..."
                         arcpy.MakeFeatureLayer_management("rmaTrack","rmaTrackLyr","\"HBNUM\" <> 0")
                         arcpy.Frequency_analysis("rmaTrackLyr","sumTracks",["INFOSTR"])
 
                         # Write report file
+                        print "Writing report..."
                         with arcpy.da.SearchCursor("sumTracks",["INFOSTR"]) as rowcursor:
                             tracklist = list(rowcursor)
                         del rowcursor
 
-                        print "Writing report..."
                         # MG: 6/26/17: Create vars to hold sums
                         sum_miles    = 0
                         sum_cmrmiles = 0
@@ -343,12 +357,12 @@ def main():
                                 #          NAME          ,    DATE          ,    RMA       ,    HUNAME        ,    HANAME        ,    HBNUM         ,    MILES         ,    CMRMILES          ,    PARCELS
                                 csvf.write(usrinfo[0] + "," + usrinfo[1] + "," + rmastr + "," + rmainfo[0] + "," + rmainfo[1] + "," + rmainfo[3] + "," + str(miles) + "," + str(cmr_miles) + ',' + rmainfo[6] + "\n")
 
-                                # MG: 6/26/17: Get sums
+                                # Get sums
                                 sum_miles     = sum_miles + miles
                                 sum_cmrmiles  = sum_cmrmiles + cmr_miles
                                 sum_parcels   = sum_parcels + int(rmainfo[6])
 
-                            # # MG: 6/26/17: Write the sums to the CSV
+                            # Write the sums to the CSV
                             csvf.write('------, -----, -----, -----, -----, ----- , ----- , ----- , -----\n')
                             csvf.write('      ,      ,      ,      ,      ,TOTALS:,' + str(sum_miles) + "," + str(sum_cmrmiles) + ',' + str(sum_parcels))
     except Exception as e:
@@ -486,10 +500,11 @@ def Get_List_Of_Parcels(rmaTrack, parcel_fc, roadBufferVal):
 
 
     # Create a cursor to loop through all features in rmaTrack
+    print '  Starting to get number of parcels per track.'
     with arcpy.da.SearchCursor(rmaTrack, ['OBJECTID']) as trackCursor:
         for row in trackCursor:
             where_clause = "OBJECTID = {}".format(str(row[0])) # Select track by OBJECTID
-            print 'Selecting where: ' + where_clause
+            ##print 'Selecting where: ' + where_clause
             arcpy.SelectLayerByAttribute_management('rmaTrackLyr', 'NEW_SELECTION', where_clause)
 
             # Confirm one track was selected
@@ -504,7 +519,7 @@ def Get_List_Of_Parcels(rmaTrack, parcel_fc, roadBufferVal):
                 # Find out how many parcels selected
                 numfeats = arcpy.GetCount_management("parcel_fcLyr")
                 count = int(numfeats.getOutput(0))
-                print 'Number of selected parcels: ' + str(count)
+                ##print 'Number of selected parcels: ' + str(count)
 
                 # Get a list of ALL the PARCELID's of the selected parcels
                 # Use PARCELID so we don't count 'stacked' parcels,
@@ -518,14 +533,14 @@ def Get_List_Of_Parcels(rmaTrack, parcel_fc, roadBufferVal):
                 # set() returns a list of only unique values
                 unique_parcel_ids = sorted(set(parcel_ids))
                 num_unique_parcel_ids = len(unique_parcel_ids)
-                print 'Number of PARCELID\'s: {}'.format(str(num_unique_parcel_ids))
+                ##print 'Number of PARCELID\'s: {}'.format(str(num_unique_parcel_ids))
 
                 # Calculate the PARCEL field in rmaTrack as the number of unique parcel ids
                 # Only the selected feature in rmaTrack will have it's field calculated.
                 arcpy.CalculateField_management('rmaTrackLyr', 'PARCELS', num_unique_parcel_ids, 'PYTHON_9.3')
 
-            print ''
-
+            ##print ''
+    print '  FINISHED getting number of parcels per track.'
 #-------------------------------------------------------------------------------
 #-------------------------------------------------------------------------------
 
