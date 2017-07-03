@@ -24,20 +24,21 @@ stimes = time.time()
 ###  Set any changeable variables between here ---------------------------------->  ###
 
 # MG 6/23/17: Added manually_entered_dates so users can make script auto generate
-# the dates (datestart = last months 1st day of the month, dateend = the current date),
+# the dates.
 # or the user can enter their own dates below.
 # 'True' when you want to manually enter 'datestart' and 'dateend'
-# 'False' when the script is called from a scheduled task on the 1st of each month
-#TODO before going to prod: make sure this is 'False'
-manually_entered_dates = True
+# 'False' when the script should auto calculate 'datestart' and 'dateend':
+#    datestart = last month's 1st day of the month
+#    dateend   = the current month's 1st day of the month
+manually_entered_dates = False
 
 #-------------------------------------------------------------------------------
 if (manually_entered_dates == True):
     #######################################################################
     ####### Note: dates are *INCLUSIVE* --> for a report covering Sep, Oct,
     ### Nov of 2015, use: datestart = "2015-09-01" dateend = "2015-11-30"
-    datestart   = "2017-06-20"  ## Date should be in format yyyy-mm-dd"
-    dateend     = "2017-06-27"  ## Date should be in format yyyy-mm-dd"
+    datestart   = "2017-06-01"  ## Date should be in format yyyy-mm-dd"
+    dateend     = "2017-07-01"  ## Date should be in format yyyy-mm-dd"
     ####### --> the start and end dates will be included in the report
     #######################################################################
 #-------------------------------------------------------------------------------
@@ -47,9 +48,9 @@ distcutoff  = 5280  ###  <-- Change the cutoff distance (number of FEET) here!
 cfgFile     = "M:\\scripts\\configFiles\\accounts.txt"
 ##stmwtrPeeps = ["alex.romo@sdcounty.ca.gov","randy.yakos@sdcounty.ca.gov","gary.ross@sdcounty.ca.gov"]
 ##scriptAdmin = ["randy.yakos@sdcounty.ca.gov","gary.ross@sdcounty.ca.gov", 'michael.grue@sdcounty.ca.gov']
-# TODO before going to prod script: remove the below variables and uncomment the above
-stmwtrPeeps = ['michael.grue@sdcounty.ca.gov'] # MG 06/26/17: made my email the target for testing purposes
-scriptAdmin = ['michael.grue@sdcounty.ca.gov'] # MG 06/26/17: made my email the target for testing purposes
+# TODO: remove the below two variables when done testing and uncomment the two above
+stmwtrPeeps = ['michael.grue@sdcounty.ca.gov']
+scriptAdmin = ['michael.grue@sdcounty.ca.gov']
 fromEmail   = "dplugis@gmail.com"
 ###  <-------------------------------------------------------------------  and here ###
 #######################################################################################
@@ -58,9 +59,7 @@ fromEmail   = "dplugis@gmail.com"
 # Set variables that shouldn't change much
 todaystr    = str(time.strftime("%Y%m%d", time.localtime()))
 trackURL    = "http://services1.arcgis.com/1vIhDJwtG5eNmiqX/arcgis/rest/services/Track_line/FeatureServer/0/query"
-##wkgFolder   = "P:\\stormwater\\scripts\\data"
-# TODO: before going to prod script: remove below variable and uncomment the above
-wkgFolder   = r'U:\grue\Scripts\GitHub\Test\Stormwater_RMAs\data' # MG 06/26/17: changed working folder for testing purposes
+wkgFolder   = r"U:\grue\Scripts\GitHub\Test\Stormwater_RMAs\data"
 wkgGDB      = "RMAsummaryWKG.gdb"
 wkgPath     = wkgFolder + "\\" + wkgGDB
 indataFC    = "Track_line"
@@ -75,19 +74,20 @@ dsslvFields = ["NAME","DATE","EDITOR","EDITDATE"]
 AGOfields   = "NAME,DATE,GlobalID,EDITOR,EDITDATE"
 
 #-------------------------------------------------------------------------------
-#MG 6/23/17: Added below to auto calculate dates
+#MG 7/03/17: Added below to auto calculate dates
 # If manually_entered_dates == False, get the datestart and dateend
 if (manually_entered_dates == False):
 
     # Get datestart
-    today = datetime.date.today()
-    last_month = today + relativedelta(months=-1)  # Subtract one month from the current month
-    last_month_1st = last_month.replace(day=1)     # Change the day to the 1st of the previous month
-    datestart = last_month_1st.strftime('%Y-%m-%d') # datestart is last months 1st of the month
+    today = datetime.date.today()                   # Get today as a datetime object
+    last_month = today + relativedelta(months=-1)   # Subtract one month from the current month
+    last_month_1st = last_month.replace(day=1)      # Change the day to the 1st of the previous month
+    datestart = last_month_1st.strftime('%Y-%m-%d') # Datestart is last months 1st of the month
     ##print 'Date Start: ' + datestart
 
     # Get dateend
-    dateend = today.strftime('%Y-%m-%d')
+    this_month_1st = today.replace(day=1)
+    dateend = this_month_1st.strftime('%Y-%m-%d')
     ##print 'Date End: ' + dateend
 #-------------------------------------------------------------------------------
 
@@ -95,10 +95,7 @@ if (manually_entered_dates == False):
 logFileNameRMA = str(wkgFolder) + "\\..\\log\\reportRMAs_" + str(time.strftime("%Y%m%d%H%M", time.localtime())) + ".txt"
 logFileRMA = open(logFileNameRMA,"w")
 old_outputRMA = sys.stdout
-
-# TODO before going to prod: Uncomment out below and remove comment
-# MG 06/26/17: commented out for testing purposes
-##sys.stdout = logFileRMA
+sys.stdout = logFileRMA
 
 # START processing
 gpRMA.env.overwriteOutput = True
@@ -110,11 +107,14 @@ print "************************* REPORT_RMAS.PY *************************"
 # Preliminary setup
 try:
     # Get dates and report name
-    print "Start date = " + str(datestart)
+    print 'Start and end dates manually entered = ' + str(manually_entered_dates)
+    if (manually_entered_dates == False):
+        print '  The Script auto calculated the below dates:'
+    print "    Start date = " + str(datestart)
     datestartstr = datestart.replace("-","")
     dsvals = datestart.split("-")
     ds = datetime.datetime(int(dsvals[0]),int(dsvals[1]),int(dsvals[2]))
-    print "  End date = " + str(dateend)
+    print "    End date = " + str(dateend)
     dateendstr = dateend.replace("-","")
     devals = dateend.split("-")
     de = datetime.datetime(int(devals[0]),int(devals[1]),int(devals[2]))
@@ -320,8 +320,10 @@ try:
                         else:
                             rmastr = str(rmainfo[2])
 
-                                   # RMA     ,          HUNAME       ,          HANAME       ,          HBNUM                 JURISDICTION   ,         MILES       ,        CMRMILES     ,             PARCELS
-                        csvf.write(rmastr + "," + str(rmainfo[0]) + "," + str(rmainfo[1]) + "," + str(rmainfo[3]) + "," + str(rmainfo[4]) + "," + str(track[1]) + "," + str(cmrmiles) + "," + str(int(numparcels)) + "\n")
+                                   # RMA     ,          HUNAME       ,          HANAME       ,          HBNUM
+                        csvf.write(rmastr + "," + str(rmainfo[0]) + "," + str(rmainfo[1]) + "," + str(rmainfo[3]) + "," + \
+                                   str(rmainfo[4]) + "," + str(track[1]) + "," + str(cmrmiles) + "," + str(int(numparcels)) + "\n")
+                                   #   JURISDICTION   ,         MILES       ,        CMRMILES     ,             PARCELS
 
                         # MG: 6/26/17: Get sums
                         sum_miles     = sum_miles + track[1]
