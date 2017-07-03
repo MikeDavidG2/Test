@@ -78,9 +78,8 @@ def main():
     old_outputRMA = sys.stdout
     print 'Setting all print statements to write to a file found at:\n  {}'.format(logFileNameRMA)
 
-    # TODO before going to prod: Uncomment out below and remove comment
-    # MG 06/26/17: commented out for testing purposes
-    ##sys.stdout = logFileRMA
+    # TODO before testing auto run: Uncomment out below and remove comment
+    sys.stdout = logFileRMA
 
     # START processing
     arcpy.env.overwriteOutput = True
