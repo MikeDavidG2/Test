@@ -1,12 +1,55 @@
-##############################################
-###           daily_user_RMAs.py           ###
-###  Python script to report daily values  ###
-###     from user tracks (user and RMA)    ###
-###  Karen Chadwick           August 2015  ###
-###  *** ASSUMES START AFTER MIDNIGHT ***  ###
-##############################################
-# TODO: Document this script
-# TODO: Go through all print statements in both main() and Get_List...()
+#-------------------------------------------------------------------------------
+# Name:        daily_user_RMAs.py
+# Purpose:
+"""
+To report daily values from user tracks (user and RMA).
+Script:
+  1) Starts a log file.
+  2) Gets the dates that should be reported in CSV.
+  3) Creates a FGDB to perform processing on (deletes existing FGDB if needed).
+  4) Gets a token from AGOL to give permission to access hosted Feature Service
+  5) Downloads the data from AGOL.  Script uses a URL Query with dates in the
+     query to limit the downloaded data to include data between 'datestart' and
+     'dateend'.
+  6) Processes the data:
+     A_TrackLine_OrigData:
+       Original data
+
+     B_TrackLine_SPLIT:
+       Split tracks where every vertex is the start/end of a new line.
+       each split track has the attributes of the original track.
+       (user name and creation date)
+
+     C_TrackLine_SPLIT_refine:
+       Any split tracks that are longer than 'distcutoff' are removed.  This eliminates
+       impossibly long lines that were probably GPS errors.
+
+     D_refine_rma_INT:
+       Intersects split tracks and the RMA zones.
+
+     E_bufferTrack:
+       Buffered tracks that can be used to find which split tracks are on
+       County Maintained Roads (CMR).
+
+     F_cmrBuffer:
+       The buffers from E_ that represent CMR's.
+
+     G_rmaTrack:
+       Feature class that has the aggregated data we need.
+
+     H_sumTracks:
+       The table used to write the report
+
+  7) Writes a CSV report.
+  8) Emails the CSV report.
+
+NOTE: Assumes start after midnight.
+"""
+# Author:      Karen Chadwick
+# Created:     August 2015
+# Editor:      Mike Grue
+# Edited:      7/03/17
+#-------------------------------------------------------------------------------
 
 # Import modules
 import arcpy
@@ -38,9 +81,7 @@ def main():
     ###  Set any changeable variables between here ---------------------------------->  ###
     road_buffer   = '40 Feet'
     distcutoff    = 5280  #  Max Shape_Length for split tracks (in FEET)
-
     parcel_buffer = '40 Feet'
-
     cfgFile     = "M:\\scripts\\configFiles\\accounts.txt"
     ##stmwtrPeeps = ["alex.romo@sdcounty.ca.gov","randy.yakos@sdcounty.ca.gov","gary.ross@sdcounty.ca.gov"]
     ##scriptAdmin = ["randy.yakos@sdcounty.ca.gov","gary.ross@sdcounty.ca.gov"]
@@ -52,7 +93,6 @@ def main():
     ###  <-------------------------------------------------------------------  and here ###
     #######################################################################################
     #######################################################################################
-
 
     # Set variables that shouldn't change much
     trackURL    = "http://services1.arcgis.com/1vIhDJwtG5eNmiqX/arcgis/rest/services/Track_line/FeatureServer/0/query"
@@ -78,7 +118,7 @@ def main():
     old_outputRMA = sys.stdout
     print 'Setting all print statements to write to a file found at:\n  {}'.format(logFileNameRMA)
 
-    # TODO before testing auto run: Uncomment out below and remove comment
+    # TODO before testing auto run: Uncomment out below
     sys.stdout = logFileRMA
 
     # START processing
@@ -365,8 +405,8 @@ def main():
                                 sum_parcels   = sum_parcels + int(rmainfo[6])
 
                             # Write the sums to the CSV
-                            csvf.write('------, -----, -----, -----, -----, ----- , ----- , ----- , -----\n')
-                            csvf.write('      ,      ,      ,      ,      ,TOTALS:,' + str(sum_miles) + "," + str(sum_cmrmiles) + ',' + str(sum_parcels))
+                            csvf.write('-----------,----------,----------,----------,----------,----------,----------,----------,----------,\n')
+                            csvf.write(' , , , , ,TOTALS:,{},{},{}'.format(str(sum_miles), str(sum_cmrmiles), str(sum_parcels)))
     except Exception as e:
         errorSTATUS = 1
         print "********* ERROR while processing... *********"
@@ -491,10 +531,29 @@ def main():
 #-------------------------------------------------------------------------------
 #                         Function: Get_List_Of_Parcels
 
-def Get_List_Of_Parcels(G_rmaTrack, parcel_fc, roadBufferVal):
-    #TODO: Document this function
+def Get_List_Of_Parcels(G_rmaTrack, parcel_fc, parcel_buffer):
     """
+    PARAMETERS:
+      G_rmaTrack (str): The name of the Feature Class that represents the features
+        that should be cycled through to select the features in 'parcel_fc' at a
+        distance of 'parcel_buffer'.  Doesn't need to be a full path since this
+        FC is in the workspace set earlier in the script.
+
+      parcel_fc (str): The full path to the PARCELS_ALL feature class in SDE.
+
+      parcel_buffer (str): The distance that features in 'parcel_fc' will be
+        selected if they are within 'parcel_buffer' of the selected 'G_rmaTrack'.
+        For example: '40 Feet'
+
+    RETURNS:
+      None
+
+    FUNCTION:
+      To populate the 'field_to_calc' with the # of parcels that are within
+      a specified disdance ('parcel_buffer') of each feature in 'G_rmaTrack'.
     """
+
+    field_to_calc = 'PARCELS'
 
     # Make feature layers needed below
     arcpy.MakeFeatureLayer_management(G_rmaTrack, 'G_rmaTrackLyr')
@@ -516,12 +575,7 @@ def Get_List_Of_Parcels(G_rmaTrack, parcel_fc, roadBufferVal):
             if count == 1:
 
                 # Select parcels by location based on the selected track
-                arcpy.SelectLayerByLocation_management('parcel_fcLyr', 'WITHIN_A_DISTANCE', 'G_rmaTrackLyr', roadBufferVal, 'NEW_SELECTION')
-
-                # Find out how many parcels selected
-                numfeats = arcpy.GetCount_management("parcel_fcLyr")
-                count = int(numfeats.getOutput(0))
-                ##print 'Number of selected parcels: ' + str(count)
+                arcpy.SelectLayerByLocation_management('parcel_fcLyr', 'WITHIN_A_DISTANCE', 'G_rmaTrackLyr', parcel_buffer, 'NEW_SELECTION')
 
                 # Get a list of ALL the PARCELID's of the selected parcels
                 # Use PARCELID so we don't count 'stacked' parcels,
@@ -537,9 +591,9 @@ def Get_List_Of_Parcels(G_rmaTrack, parcel_fc, roadBufferVal):
                 num_unique_parcel_ids = len(unique_parcel_ids)
                 ##print 'Number of PARCELID\'s: {}'.format(str(num_unique_parcel_ids))
 
-                # Calculate the PARCEL field in G_rmaTrack as the number of unique parcel ids
+                # Calculate the field in G_rmaTrack as the number of unique parcel ids
                 # Only the selected feature in G_rmaTrack will have it's field calculated.
-                arcpy.CalculateField_management('G_rmaTrackLyr', 'PARCELS', num_unique_parcel_ids, 'PYTHON_9.3')
+                arcpy.CalculateField_management('G_rmaTrackLyr', field_to_calc, num_unique_parcel_ids, 'PYTHON_9.3')
 
             ##print ''
     print '  FINISHED getting number of parcels per track.'
