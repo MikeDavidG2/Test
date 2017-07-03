@@ -160,7 +160,7 @@ def main():
             #   BETWEEN the 28th and 30th. You will get the data collected on the 28th AND 29th
 
             # The time manipulation below does NOT affect the selection
-            # process that happens in the 'Process the data' step.
+            # process that happens in the 'Process the data' step, only the URL query.
             # We want to set the 'where' clause to get records where the [DATE]
             # field is BETWEEN the 'datestart' and 'dateend + two days'.
             # By adding 2 days into the future we ensure that we are grabbing all of
@@ -278,7 +278,7 @@ def main():
                     #---------------------------------------------------------------
                     # Find number of parcels per RMA Track
                     arcpy.AddField_management("rmaTrack","PARCELS","DOUBLE")
-                    arcpy.CalculateField_management('rmaTrack', 'PARCELS', 0)
+                    ##arcpy.CalculateField_management('rmaTrack', 'PARCELS', 0)
                     Get_List_Of_Parcels('rmaTrack', parcels_fc, roadbufferVal)
 
                     #---------------------------------------------------------------
@@ -326,22 +326,27 @@ def main():
                         with open(rptPath,"w") as csvf:
                             csvf.write("NAME,DATE,RMA,HUNAME,HANAME,HBNUM, MILES, CMRMILES, PARCELS\n")
                             for track in tracklist:
-                                usrinfo = str(track[0]).split("__")
+                                usrinfo = track[0].split("__")
                                     # Above turns: "paola_dpw__06/26/2017__CARLSBAD/Escondido Creek/Escondido/904.62"
                                     #          to: "paola_dpw  06/26/2017  CARLSBAD/Escondido Creek/Escondido/904.62"
                                     #              usrinfo[0]  usrinfo[1]  usrinfo[2]
-                                rmainfo = str(usrinfo[2]).split("/")
-                                if "SAME AS HANAME" in str(rmainfo[2]):
-                                    rmastr = str(rmainfo[1])
+                                rmainfo = usrinfo[2].split("/")
+                                if "SAME AS HANAME" in rmainfo[2]:
+                                    rmastr = rmainfo[1]
                                 else:
-                                    rmastr = str(rmainfo[2])
-                                #              NAME           ,        DATE           ,    RMA       ,        HUNAME                  HANAME         ,        HBNUM          ,        MILES                   CMRMILES                PARCELS
-                                csvf.write(str(usrinfo[0]) + "," + str(usrinfo[1]) + "," + rmastr + "," + str(rmainfo[0]) + "," + str(rmainfo[1]) + "," + str(rmainfo[3]) + "," + str(rmainfo[4]) + "," + str(rmainfo[5]) + ',' + str(rmainfo[6]) + "\n")
+                                    rmastr = rmainfo[2]
+
+                                # Round MILES and CMRMILES to 2 decimal pts.
+                                miles = round(float(rmainfo[4]), 2)
+                                cmr_miles = round(float(rmainfo[5]), 2)
+
+                                #          NAME          ,    DATE          ,    RMA       ,    HUNAME        ,    HANAME        ,    HBNUM         ,    MILES         ,    CMRMILES          ,    PARCELS
+                                csvf.write(usrinfo[0] + "," + usrinfo[1] + "," + rmastr + "," + rmainfo[0] + "," + rmainfo[1] + "," + rmainfo[3] + "," + str(miles) + "," + str(cmr_miles) + ',' + rmainfo[6] + "\n")
 
                                 # MG: 6/26/17: Get sums
-                                sum_miles     = sum_miles + float(rmainfo[4])
-                                sum_cmrmiles  = sum_cmrmiles + float(rmainfo[5])
-                                sum_parcels   = sum_parcels + float(rmainfo[6])
+                                sum_miles     = sum_miles + miles
+                                sum_cmrmiles  = sum_cmrmiles + cmr_miles
+                                sum_parcels   = sum_parcels + int(rmainfo[6])
 
                             # # MG: 6/26/17: Write the sums to the CSV
                             csvf.write('------, -----, -----, -----, -----, ----- , ----- , ----- , -----\n')
@@ -472,7 +477,6 @@ def main():
 
 def Get_List_Of_Parcels(rmaTrack, parcel_fc, roadBufferVal):
     #TODO: Document this function
-    #TODO: Why are there PARCELID numbers being printed out and not being recorded in PARCELS field?
     """
     """
 
@@ -497,29 +501,28 @@ def Get_List_Of_Parcels(rmaTrack, parcel_fc, roadBufferVal):
                 # Select parcels by location based on the selected track
                 arcpy.SelectLayerByLocation_management('parcel_fcLyr', 'WITHIN_A_DISTANCE', 'rmaTrackLyr', roadBufferVal, 'NEW_SELECTION')
 
-                # Confirm at least one parcel was selected
+                # Find out how many parcels selected
                 numfeats = arcpy.GetCount_management("parcel_fcLyr")
                 count = int(numfeats.getOutput(0))
                 print 'Number of selected parcels: ' + str(count)
-                if count > 0:
 
-                    # Get a list of ALL the PARCELID's of the selected parcels
-                    # Use PARCELID so we don't count 'stacked' parcels,
-                    # but only parcel footprints.
-                    parcel_ids = []
-                    with arcpy.da.SearchCursor('parcel_fcLyr', ['PARCELID']) as parcelCursor:
-                        for row in parcelCursor:
-                            parcel_ids.append(row[0])
+                # Get a list of ALL the PARCELID's of the selected parcels
+                # Use PARCELID so we don't count 'stacked' parcels,
+                # but only parcel footprints.
+                parcel_ids = []
+                with arcpy.da.SearchCursor('parcel_fcLyr', ['PARCELID']) as parcelCursor:
+                    for row in parcelCursor:
+                        parcel_ids.append(row[0])
 
-                    # Get a list of all the UNIQUE PARCELID's
-                    # set() returns a list of only unique values
-                    unique_parcel_ids = sorted(set(parcel_ids))
-                    num_unique_parcel_ids = len(unique_parcel_ids)
-                    print 'Number of PARCELID\'s: {}'.format(str(num_unique_parcel_ids))
+                # Get a list of all the UNIQUE PARCELID's.
+                # set() returns a list of only unique values
+                unique_parcel_ids = sorted(set(parcel_ids))
+                num_unique_parcel_ids = len(unique_parcel_ids)
+                print 'Number of PARCELID\'s: {}'.format(str(num_unique_parcel_ids))
 
-                    # Calculate the PARCEL field in rmaTrack as the number of unique parcel ids
-                    # Only the selected feature in rmaTrack will have it's field calculated.
-                    arcpy.CalculateField_management('rmaTrackLyr', 'PARCELS', num_unique_parcel_ids, 'PYTHON_9.3')
+                # Calculate the PARCEL field in rmaTrack as the number of unique parcel ids
+                # Only the selected feature in rmaTrack will have it's field calculated.
+                arcpy.CalculateField_management('rmaTrackLyr', 'PARCELS', num_unique_parcel_ids, 'PYTHON_9.3')
 
             print ''
 
