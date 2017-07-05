@@ -3,27 +3,28 @@ import os, arcpy, datetime
 
 #-------------------------------------------------------------------------------
 #-------------------------------------------------------------------------------
-#                                 FUNCTION Copy_FC()
-def Copy_FC(in_features, out_feature_class):
+#                                 FUNCTION Copy_Features()
+def Copy_Features(in_FC, out_FC):
     """
     PARAMETERS:
-      in_features (str): Full path to a Feature Class.
-      out_feature_class: Full path to another existing Feature Class.
+      in_FC (str): Full path to an input feature class.
+      out_FC (str): Full path to an existing output feature class.
 
     RETURNS:
       None
 
     FUNCTION:
-      To copy Features from one FC to another existing FC.
+      To copy the features from one feature class to another feature class.
     """
 
-    print 'Starting Copy_FC()...'
+    print 'Starting Copy_Features()...'
 
-    print '  Copying features from: "{}" to: "{}"'.format(in_features, out_feature_class)
+    print '  Copying Features from: "{}"'.format(in_FC)
+    print '                 To: "{}"'.format(out_FC)
 
-    arcpy.CopyFeatures_management(in_features, out_feature_class)
+    arcpy.CopyFeatures_management(in_FC, out_FC)
 
-    print 'Finished Copy_FC()\n'
+    print 'Finished Copy_Features()\n'
 
 #-------------------------------------------------------------------------------
 #-------------------------------------------------------------------------------
@@ -178,6 +179,42 @@ def Get_Count_Selected(lyr):
     print 'Finished Get_Count()\n'
 
     return count_selected
+
+#-------------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
+#                                 FUNCTION Get_Dataset_Type()
+def Get_Dataset_Type(in_item):
+    """
+    PARAMETERS:
+      in_item (str): Full path to an item.
+
+    RETURNS:
+      dataset_type (str): The dataset type of the item.  Common results include:
+        'FeatureClass'
+        'Table'
+        'GeometricNetwork'
+        'RasterDataset'
+
+    FUNCTION:
+      To get the dataset type of the 'in_item' and return a string describing
+      the type of dataset.  Used when the main() may want to treat the item
+      differently based on the dataset type.
+
+      For example:
+        A 'Table' may require an        'arcpy.CopyRows_management()' while,
+        A 'FeatureClass' may require an 'arcpy.CopyFeatures_management()'
+    """
+
+    print 'Starting Get_Dataset_Type()...'
+    print '  Getting Dataset Type of: "{}"'.format(in_item)
+
+    desc = arcpy.Describe(in_item)
+    dataset_type = desc.datasetType
+
+    print '    "{}"'.format(dataset_type)
+    print 'Finished Get_Dataset_Type\n'
+
+    return dataset_type
 
 #-------------------------------------------------------------------------------
 #-------------------------------------------------------------------------------
