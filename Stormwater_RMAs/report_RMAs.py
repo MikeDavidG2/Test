@@ -45,12 +45,14 @@ if (manually_entered_dates == True):
 
 roadbuffer  = 40    ###  <-- Change the road buffer distance (number of FEET) here!
 distcutoff  = 5280  ###  <-- Change the cutoff distance (number of FEET) here!
-cfgFile     = "M:\\scripts\\configFiles\\accounts.txt"
-##stmwtrPeeps = ["alex.romo@sdcounty.ca.gov","randy.yakos@sdcounty.ca.gov","gary.ross@sdcounty.ca.gov"]
+##cfgFile     = r"D:\sde_maintenance\scripts\configFiles\accounts.txt"
+##stmwtrPeeps = ["alex.romo@sdcounty.ca.gov","randy.yakos@sdcounty.ca.gov","gary.ross@sdcounty.ca.gov", 'michael.grue@sdcounty.ca.gov']
 ##scriptAdmin = ["randy.yakos@sdcounty.ca.gov","gary.ross@sdcounty.ca.gov", 'michael.grue@sdcounty.ca.gov']
-# TODO: remove the below two variables when done testing and uncomment the two above
-stmwtrPeeps = ['michael.grue@sdcounty.ca.gov']
+# TODO: Before going to PROD, delete below 3 variables and and uncomment out 3 above
+cfgFile     = r"M:\scripts\configFiles\accounts.txt"
+stmwtrPeeps = ["michael.grue@sdcounty.ca.gov"]
 scriptAdmin = ['michael.grue@sdcounty.ca.gov']
+
 fromEmail   = "dplugis@gmail.com"
 ###  <-------------------------------------------------------------------  and here ###
 #######################################################################################
@@ -59,15 +61,19 @@ fromEmail   = "dplugis@gmail.com"
 # Set variables that shouldn't change much
 todaystr    = str(time.strftime("%Y%m%d", time.localtime()))
 trackURL    = "http://services1.arcgis.com/1vIhDJwtG5eNmiqX/arcgis/rest/services/Track_line/FeatureServer/0/query"
-##wkgFolder   = r'P:\stormwater\scripts\data'
-# TODO: remove the below variable when done testing and uncomment the above
-wkgFolder   = r"U:\grue\Scripts\GitHub\Test\Stormwater_RMAs\data"
+wkgFolder   = r'D:\Projects\stormwater\scripts\data'
+# TODO: Before going to PROD, delete below 1 variable and and uncomment out 1 above
+wkgFolder   = r'P:\stormwater\scripts\data'
 wkgGDB      = "RMAsummaryWKG.gdb"
 wkgPath     = wkgFolder + "\\" + wkgGDB
 indataFC    = "Track_line"
 outTrackFC  = "outTracksRMA"
+rmaZones    = "D:\\Projects\\stormwater\\data_ago\\agol_stormdata.gdb\\RMA_HSA_JUR1"
+warehouse   = "D:\\sde_maintenance\\scripts\\Database Connections\\Atlantic Warehouse (sangis user).sde\\"
+# TODO: Before going to PROD, delete below 2 variables and and uncomment out 2 above
 rmaZones    = "P:\\stormwater\\data_ago\\agol_stormdata.gdb\\RMA_HSA_JUR1"
 warehouse   = "M:\\scripts\\Database Connections\\Atlantic Warehouse (sangis user).sde\\"
+
 cities      = warehouse + "SDE.SANGIS.JUR_MUNICIPAL"
 parcels     = warehouse + "SDE.SANGIS.PARCELS_ALL"
 cmroads     = warehouse + "SDE.SANGIS.ROAD_SEGMENTS"
@@ -99,7 +105,6 @@ if (manually_entered_dates == False):
 logFileNameRMA = str(wkgFolder) + "\\..\\log\\reportRMAs_" + str(time.strftime("%Y%m%d%H%M", time.localtime())) + ".txt"
 logFileRMA = open(logFileNameRMA,"w")
 old_outputRMA = sys.stdout
-print 'Setting all print statements to write to a file found at:\n  {}'.format(logFileNameRMA)
 sys.stdout = logFileRMA
 
 # START processing
