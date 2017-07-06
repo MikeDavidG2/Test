@@ -226,15 +226,29 @@ def main():
             # visit http://meyerweb.com/eric/tools/dencoder to test URL encoding
             where_encoded = urllib.quote(where)
 
+            # Set the URL for the track feature service and the query
             query = "?where={}&outFields={}&returnGeometry=true&f=json&token={}".format(where_encoded,AGOfields,token)
-            #-----------------------------------------------------------------------
             fsURL = trackURL + query
-            fs = arcpy.FeatureSet()
             print '  FS URL:\n    {}'.format(str(fsURL))
-            fs.load(fsURL)
-            arcpy.CreateFileGDB_management(wkgFolder,wkgGDB) #E:\\Projects\\stormwater\\scripts\\data\\RMAuserWKG.gdb
-            arcpy.CopyFeatures_management(fs,wkgPath + "\\" + indataFC)
-            print "Successfully retrieved data.\n"
+
+            #---------------------------------------------------------------------------
+            #                 Try to load data into Feature Set object
+            # This try/except is because the fs.load(fsURL) will fail whenever no data
+            # is returned by the query; something that will happen when there are no
+            # records between 'datestart' and 'dateend_2_days_str'
+            fs = arcpy.FeatureSet()
+            try:
+                fs.load(fsURL)
+                print 'CreateFileGDB'
+                arcpy.CreateFileGDB_management(wkgFolder,wkgGDB) #E:\\Projects\\stormwater\\scripts\\data\\RMAuserWKG.gdb
+                print 'CopyFeatures'
+                arcpy.CopyFeatures_management(fs,wkgPath + "\\" + indataFC)
+                print "Successfully retrieved data.\n"
+            except:
+                print '  Warning.  "fs.load(fsURL)" yielded no data.'
+                print '  Could simply mean there was no data between {} and {}.'.format(datestart, dateend_2_days_str)
+                print '  Or could be another problem with getting data.'
+                errorSTATUS = 99
 
     except Exception as e:
         errorSTATUS = 1
