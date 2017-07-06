@@ -14,7 +14,8 @@ def Copy_Features(in_FC, out_FC):
       None
 
     FUNCTION:
-      To copy the features from one feature class to another feature class.
+      To copy the features from one feature class to another existing
+      feature class.
     """
 
     print 'Starting Copy_Features()...'
