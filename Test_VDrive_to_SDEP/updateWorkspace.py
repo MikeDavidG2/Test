@@ -15,11 +15,13 @@ dateToday = str(time.strftime("%m/%d/%Y", time.localtime()))
 
 try:
     #---------------------------------------------------------------------------
-    # START MG 07/07/17: Added to allow 'Tables' (not just Feature Classes) to update Workspace
+    # START MG 07/07/17: Add to allow 'Tables' (not just Feature Classes) to update Workspace
+    # Get a list of Tables (if any) to trigger the rest of the script even
+    #   if there are tables, but no feature classes.
     # TODO: Create a DEV and PROD version of the below paths (i.e. fgdb = r'D:\sde\sde_load.gdb')
 
-    fgdb = r'U:\grue\Projects\VDrive_to_SDEP_flow\FALSE_sde_load.gdb'
-    arcpy.env.workspace = fgdb
+    table_update_path = r'U:\grue\Projects\VDrive_to_SDEP_flow\FALSE_sde_load.gdb'
+    arcpy.env.workspace = table_update_path
     table_list = arcpy.ListTables()
 
     # END MG 07/07/17
@@ -63,7 +65,85 @@ try:
 ##            print "ERROR disconnecting users"
 ##            print arcpy.GetMessages()
 
+        #-----------------------------------------------------------------------
+        #-----------------------------------------------------------------------
+        # START MG 07/07/17:  Add to handle any tables in 'sde_load.gdb'
+        # TODO: Create a DEV and PROD version of the below paths (i.e. <variable> = '<value>')
+        # TODO: Add row in LUEG_UPDATES table on SDW for each table to add
 
+        if (table_list != []):
+
+            lueg_updates_table = tableName  # Change variable name for readability in MG 07/07/17 section
+
+            for table in table_list:
+                print '--------------------------------------------------------'
+                print 'Processing table: {}'.format(table)
+
+                load_table = os.path.join(table_update_path, table)
+                workspace_table = os.path.join(pathName, table)
+
+                # If table exists in Workspace, delete it
+                if arcpy.Exists(workspace_table):
+                    print '  Deleting "{}" in "{}"'.format(table, pathName)
+                    arcpy.Delete_management(workspace_table)
+                    print '    ...Deleted'
+
+
+                # Copy table from 'sde_load.gdb' to Workspace
+                print '  Copying "{}" to "{}"'.format(table, workspace_table)
+                arcpy.Copy_management(load_table, workspace_table)
+                print '    ...Copied'
+
+
+                # Date stamp the table in the Workspace's LUEG_UPDATES table
+                where_clause = '"LAYER_NAME" = \'{}\''.format(table)
+                with arcpy.da.UpdateCursor(lueg_updates_table, ['LAYER_NAME', 'UPDATE_DATE'], where_clause) as cursor:
+                    num_rows = 0
+                    for row in cursor:
+                        row[1] = dateToday
+                        print '  Updating LUEG_UPDATES where ({}) so UPDATE_DATE equals "{}"'.format(where_clause, row[1])
+                        cursor.updateRow(row)
+                        print '    ...Updated'
+                        num_rows = num_rows + 1
+
+                    # Warn user if no row in LUEG_UPDATES satisfied the where_clause
+                    if num_rows != 1:
+                        print '*** WARNING! UPDATE_DATE "{}" wasn\'t updated in LUEG_UPDATES, please confirm table in LUEG_UPDATES ***'.format(table)
+
+
+                # Register table as versioned if needed
+                try:
+                    desc = arcpy.Describe(workspace_table)
+                    if not desc.isVersioned:
+                        print '  Registering Table "{}" as versioned...'.format(workspace_table)
+                        arcpy.RegisterAsVersioned_management(workspace_table,"NO_EDITS_TO_BASE")
+                        print '    ...Registered'
+
+                except:
+                    print '*** ERROR! In versioning table "{}"'.format(table)
+                    eMailLogic = 1
+
+
+                # Grant editing privileges
+                try:
+                    print '  Changing privileges of table "{}"'.format(workspace_table)
+                    arcpy.ChangePrivileges_management(workspace_table,"SDE_EDITOR","GRANT","GRANT")
+                    print '    ...Privileges changed'
+
+                except:
+                    print '*** ERROR! In granding permissions for table "{}"'.format(table)
+                    eMailLogic = 1
+
+
+                # Delete Table from 'sde_load.gdb'
+                print "  Deleting table from loading gdb..."
+##                arcpy.Delete_management(load_table)  # TODO: Uncomment out before finish testing and test uncommented.  Delete after testing.
+                print '    ...Deleted'
+                print '--------------------------------------------------------'
+
+        # END MG 07/07/17
+        #-----------------------------------------------------------------------
+        #-----------------------------------------------------------------------
         with arcpy.da.SearchCursor(tableName,["LAYER_NAME","FEATURE_DATASET"]) as rowcursor:
             fcfdList = list(rowcursor)
         del rowcursor
