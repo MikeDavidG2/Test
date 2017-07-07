@@ -21,7 +21,7 @@ def Copy_Features(in_FC, out_FC):
     print 'Starting Copy_Features()...'
 
     print '  Copying Features from: "{}"'.format(in_FC)
-    print '                 To: "{}"'.format(out_FC)
+    print '                     To: "{}"'.format(out_FC)
 
     arcpy.CopyFeatures_management(in_FC, out_FC)
 
