@@ -22,12 +22,12 @@ UPDATES:
 # Editors:     Gary Ross, Mike Grue
 #-------------------------------------------------------------------------------
 
-# MG 07/07/17: I had to make an entry in LUEG_UPDATES table in FALSE_SDW for the SITES_DATA FC to be imported.  TODO: Add the record to the live LUEG_UPDATES table on SDW
+# TODO: Delete the commented out variables added with 'MG 07/07/17' after script has been running successfully in prod for a while.
 
 import sys, string, os, time, math, arcpy
 from datetime import date
 
-arcpy.env.overwriteOutput = True  #  MG 07/07/17: Set variable to DEV settings.  TODO: Delete after testing
+##arcpy.env.overwriteOutput = True  #  MG 07/07/17: Set variable to DEV settings.  TODO: Delete after testing
 
 timestart = str(time.strftime("%m/%d/%Y %H:%M:%S", time.localtime()))
 dateToday = str(time.strftime("%m/%d/%Y", time.localtime()))
@@ -39,7 +39,7 @@ try:
     #   if there are tables, but no feature classes.
 
     table_update_path = r'D:\sde\sde_load.gdb'
-    table_update_path = r'U:\grue\Projects\VDrive_to_SDEP_flow\FALSE_sde_load.gdb'  # MG 07/07/17: Set variable to DEV settings.  TODO: Delete after testing
+##    table_update_path = r'U:\grue\Projects\VDrive_to_SDEP_flow\FALSE_sde_load.gdb'  # MG 07/07/17: Set variable to DEV settings.  TODO: Delete after testing
     arcpy.env.workspace = table_update_path
     table_list = arcpy.ListTables()
 
@@ -47,20 +47,20 @@ try:
     #---------------------------------------------------------------------------
 
     fgdb = r"D:\sde\sde_load.gdb\workspace"
-    fgdb = r'U:\grue\Projects\VDrive_to_SDEP_flow\FALSE_sde_load.gdb\workspace'  # MG 07/07/17: Set variable to DEV settings.  TODO: Delete after testing
+##    fgdb = r'U:\grue\Projects\VDrive_to_SDEP_flow\FALSE_sde_load.gdb\workspace'  # MG 07/07/17: Set variable to DEV settings.  TODO: Delete after testing
     arcpy.env.workspace = fgdb
     fcList = arcpy.ListFeatureClasses()
 
     eMailLogic = 0 # Added line 12/10/2014 - Email logic
 
-    if ((fcList != []) or (table_list != [])) : # There are datasets to move  # MG 07/07/17: add 'table_list' check.  TODO: show Gary
+    if ((fcList != []) or (table_list != [])) : # There are datasets to move. MG 07/07/17: added 'table_list' check.  TODO: show Gary this section and any 'MG 07/07/17' changes
 
         # Create log file
         oldOutput = sys.stdout
         logFileName = str("D:\\sde_maintenance\\log\\updateWorkspace_" + str(time.strftime("%Y%m%d%H%M", time.localtime())) + ".txt")
-        logFileName = str(r"U:\grue\Projects\VDrive_to_SDEP_flow\log\updateWorkspace_" + str(time.strftime("%Y%m%d%H%M", time.localtime())) + ".txt")  # MG 07/07/17: Set variable to DEV settings.  TODO: Delete after testing
+##        logFileName = str(r"U:\grue\Projects\VDrive_to_SDEP_flow\log\updateWorkspace_" + str(time.strftime("%Y%m%d%H%M", time.localtime())) + ".txt")  # MG 07/07/17: Set variable to DEV settings.  TODO: Delete after testing
         logFile = open(logFileName,"w")
-        sys.stdout = logFile  # MG 07/07/17: DEV settings.  TODO: Uncomment out after testing
+        sys.stdout = logFile  ## MG 07/07/17: DEV settings.  TODO: Uncomment out after testing, then delete this comment
         print "START TIME " + str(timestart)
 
         print ""
@@ -68,27 +68,25 @@ try:
         dataList = arcpy.ListFeatureClasses()
 
         pathName  = "Database Connections\\Atlantic Workspace (pds user).sde"
-        pathName  = r'U:\grue\Projects\VDrive_to_SDEP_flow\FALSE_SDW.gdb'  # MG 07/07/17: Set variable to DEV settings.  TODO: Delete after testing
+##        pathName  = r'U:\grue\Projects\VDrive_to_SDEP_flow\FALSE_SDW.gdb'  # MG 07/07/17: Set variable to DEV settings.  TODO: Delete after testing
         tableName = pathName + "\\SDW.PDS.LUEG_UPDATES"
-        tableName = pathName + "\\LUEG_UPDATES"  # MG 07/07/17: Set variable to DEV settings.  TODO: Delete after testing
+##        tableName = pathName + "\\LUEG_UPDATES"  # MG 07/07/17: Set variable to DEV settings.  TODO: Delete after testing
         adminSDE  = "Database Connections\\Atlantic Workspace (sa user).sde"
 
-#         MG 07/07/17: DEV settings.  TODO: Uncomment out after testing
-##        # Disconnect users from the database (added 3/12/13)
-##        try:
-##            usrList = arcpy.ListUsers(adminSDE)
-##            for user in usrList:
-##                if user.Name[1:5] == "BLUE":
-##                    arcpy.DisconnectUser(adminSDE,user.ID)
-##        except:
-##            print "ERROR disconnecting users"
-##            print arcpy.GetMessages()
+##        MG 07/07/17: DEV settings.  TODO: Uncomment out after testing
+        # Disconnect users from the database (added 3/12/13)
+        try:
+            usrList = arcpy.ListUsers(adminSDE)
+            for user in usrList:
+                if user.Name[1:5] == "BLUE":
+                    arcpy.DisconnectUser(adminSDE,user.ID)
+        except:
+            print "ERROR disconnecting users"
+            print arcpy.GetMessages()
 
         #-----------------------------------------------------------------------
         #-----------------------------------------------------------------------
-        # START MG 07/07/17:  Add to handle any tables in 'sde_load.gdb'
-        # TODO: Create a DEV and PROD version of the below paths (i.e. <variable> = '<value>')
-        # TODO: Add row in LUEG_UPDATES table on SDW for each table to add
+        # START MG 07/07/17:  Added to import any tables in 'sde_load.gdb'
 
         if (table_list != []):
             print 'Processing {} tables'.format(str(len(table_list)))
@@ -136,7 +134,7 @@ try:
                     desc = arcpy.Describe(workspace_table)
                     if not desc.isVersioned:
                         print '  Registering Table "{}" as versioned'.format(workspace_table)
-                        arcpy.RegisterAsVersioned_management(workspace_table,"NO_EDITS_TO_BASE")  # TODO: Uncomment out before finish testing and test uncommented.  Delete after testing.
+                        arcpy.RegisterAsVersioned_management(workspace_table,"NO_EDITS_TO_BASE")  ## TODO: Uncomment out before finish testing and test uncommented.  Delete this comment after testing.
                         print '    ...Registered'
 
                 except:
@@ -147,7 +145,7 @@ try:
                 # Grant editing privileges
                 try:
                     print '  Changing privileges of table "{}"'.format(workspace_table)
-                    arcpy.ChangePrivileges_management(workspace_table,"SDE_EDITOR","GRANT","GRANT")  # TODO: Uncomment out before finish testing and test uncommented.  Delete after testing.
+                    arcpy.ChangePrivileges_management(workspace_table,"SDE_EDITOR","GRANT","GRANT")  ## TODO: Uncomment out before finish testing and test uncommented.  Delete this comment after testing.
                     print '    ...Privileges changed'
 
                 except:
@@ -157,7 +155,7 @@ try:
 
                 # Delete Table from 'sde_load.gdb'
                 print "  Deleting table from loading gdb"
-                arcpy.Delete_management(load_table)  # TODO: Uncomment out before finish testing and test uncommented.  Delete after testing.
+                arcpy.Delete_management(load_table)  ## TODO: Uncomment out before finish testing and test uncommented.  Delete this comment after testing.
                 print '    ...Deleted'
                 print '--------------------------------------------------------'
 
@@ -166,6 +164,7 @@ try:
         # END MG 07/07/17
         #-----------------------------------------------------------------------
         #-----------------------------------------------------------------------
+
         with arcpy.da.SearchCursor(tableName,["LAYER_NAME","FEATURE_DATASET"]) as rowcursor:
             fcfdList = list(rowcursor)
         del rowcursor
@@ -173,14 +172,14 @@ try:
         fdsToRegister = list([])
 
         if dataList != []:
-            print 'Processing {} Feature Classes'.format(str(len(dataList)))  # MG 07/07/17: Add print statement
+            print 'Processing {} Feature Classes'.format(str(len(dataList)))  # MG 07/07/17: Added print statement
             for fc in dataList:
 
                 fdsName = "none"
                 for fcfdPair in fcfdList:
                     if fcfdPair[0] == fc:
                         fdsName = pathName + "\\SDW.PDS." + str(fcfdPair[1])
-                        fdsName = pathName + "\\" + str(fcfdPair[1])  # MG 07/07/17: Set variable to DEV settings.  TODO: Delete after testing
+##                        fdsName = pathName + "\\" + str(fcfdPair[1])  # MG 07/07/17: Set variable to DEV settings.  TODO: Delete this comment after testing
 
                 if fdsName == "none":
                     print "\n***WARNING***: " + fc + " not found in FCs table --> !!!DATA NOT COPIED!!!"
@@ -238,7 +237,7 @@ try:
                             arcpy.ValidateTopology_management(topoName, "FULL_EXTENT")
 
                         print "  Deleting feature class from loading gdb..."
-                        arcpy.Delete_management(str(fc))  # MG 07/07/17: DEV settings.  TODO: Uncomment out before finish testing and test uncommented.  Delete after testing.
+                        arcpy.Delete_management(str(fc))  ## MG 07/07/17: DEV settings.  TODO: Uncomment out before finish testing and test uncommented.  Delete this comment after testing.
 
                         print "  Timestamping dataset..."
                         theCount = 0
@@ -254,26 +253,26 @@ try:
                         del theCount
                         print ""
 
-#         MG 07/07/17: DEV settings.  TODO: Uncomment out after testing
-##        if dataList != []:
-##            for fd in fdsToRegister:
-##                print "pathName",pathName
-##                print "fd",fd
-##                fdsName = pathName + "\\SDW.PDS." + str(fd)
-##
-##                # Register feature dataset
-##                try:
-##                    desc = arcpy.Describe(fdsName)
-##                    if not desc.isVersioned:
-##                        arcpy.RegisterAsVersioned_management(fdsName,"NO_EDITS_TO_BASE")
-##                        print "Feature dataset " + str(fd) + " registered as versioned..."
-##                except:
-##                    print "error in versioning"
-##                    eMailLogic = 1
-##
-##                # Change privileges
-##                arcpy.ChangePrivileges_management(fdsName,"SDE_EDITOR","GRANT","GRANT")
-##                print "Feature dataset " + str(fd) + " privileges changed..."
+##         MG 07/07/17: DEV settings.  TODO: Uncomment out after testing
+        if dataList != []:
+            for fd in fdsToRegister:
+                print "pathName",pathName
+                print "fd",fd
+                fdsName = pathName + "\\SDW.PDS." + str(fd)
+
+                # Register feature dataset
+                try:
+                    desc = arcpy.Describe(fdsName)
+                    if not desc.isVersioned:
+                        arcpy.RegisterAsVersioned_management(fdsName,"NO_EDITS_TO_BASE")
+                        print "Feature dataset " + str(fd) + " registered as versioned..."
+                except:
+                    print "error in versioning"
+                    eMailLogic = 1
+
+                # Change privileges
+                arcpy.ChangePrivileges_management(fdsName,"SDE_EDITOR","GRANT","GRANT")
+                print "Feature dataset " + str(fd) + " privileges changed..."
 
         print ""
         print "Data load to WORKSPACE SDE complete..."
@@ -281,97 +280,97 @@ try:
         logFile.close()
         sys.stdout = oldOutput
 
-# MG 07/07/17: DEV settings.  TODO: remove below 'except' statement after testing
-except Exception as e:
-    print '***  ERROR!!!  ***'
-    print str(e)
+### MG 07/07/17: DEV settings.  TODO: remove below 'except' statement after testing
+##except Exception as e:
+##    print '***  ERROR!!!  ***'
+##    print str(e)
 
-#         MG 07/07/17: DEV settings.  TODO: Uncomment out after testing
-##    if eMailLogic == 0:
-##        import smtplib, ConfigParser
-##        from email.mime.text import MIMEText
-##
-##        config = ConfigParser.ConfigParser()
-##        config.read(r"D:\sde_maintenance\scripts\configFiles\accounts.txt")
-##        email_usr = config.get("email","usr")
-##        email_pwd = config.get("email","pwd")
-##
-##        fp = open(logFileName,"rb")
-##        msg = MIMEText(fp.read())
-##        fp.close()
-##
-##        fromaddr = "dplugis@gmail.com"
-##        toaddr = ["gary.ross@sdcounty.ca.gov",]
-##
-##        msg['Subject'] = "WORKSPACE has new datasets loaded"
-##        msg['From'] = "Python Script"
-##        msg['To'] = "SDE Administrator"
-##
-##        s = smtplib.SMTP('smtp.gmail.com', 587)
-##        s.ehlo()
-##        s.starttls()
-##        s.ehlo()
-##        s.login(email_usr,email_pwd)
-##        s.sendmail(fromaddr,toaddr,msg.as_string())
-##        s.quit()
-##    else:
-##        import smtplib, ConfigParser
-##        from email.mime.text import MIMEText
-##
-##        config = ConfigParser.ConfigParser()
-##        config.read(r"D:\sde_maintenance\scripts\configFiles\accounts.txt")
-##        email_usr = config.get("email","usr")
-##        email_pwd = config.get("email","pwd")
-##
-##        fp = open(logFileName,"rb")
-##        msg = MIMEText(fp.read())
-##        fp.close()
-##
-##        fromaddr = "dplugis@gmail.com"
-##        toaddr = ["gary.ross@sdcounty.ca.gov",]
-##
-##        msg['Subject'] = "ERROR when loading WORKSPACE"
-##        msg['From'] = "Python Script"
-##        msg['To'] = "SDE Administrator"
-##
-##        s = smtplib.SMTP('smtp.gmail.com', 587)
-##        s.ehlo()
-##        s.starttls()
-##        s.ehlo()
-##        s.login(email_usr,email_pwd)
-##        s.sendmail(fromaddr,toaddr,msg.as_string())
-##        s.quit()
-##
-##except:
-##    print "ERROR OCCURRED"
-##    print "D:\\sde_maintenance\\scripts\\updateWorkspace.py"
-##    print arcpy.GetMessages()
-##    logFile.close()
-##    sys.stdout = oldOutput
-##
-##    import smtplib, ConfigParser
-##    from email.mime.text import MIMEText
-##
-##    config = ConfigParser.ConfigParser()
-##    config.read(r"D:\sde_maintenance\scripts\configFiles\accounts.txt")
-##    email_usr = config.get("email","usr")
-##    email_pwd = config.get("email","pwd")
-##
-##    fp = open(logFileName,"rb")
-##    msg = MIMEText(fp.read())
-##    fp.close()
-##
-##    fromaddr = "dplugis@gmail.com"
-##    toaddr = ["gary.ross@sdcounty.ca.gov",]
-##
-##    msg['Subject'] = "ERROR when loading WORKSPACE"
-##    msg['From'] = "Python Script"
-##    msg['To'] = "SDE Administrator"
-##
-##    s = smtplib.SMTP('smtp.gmail.com', 587)
-##    s.ehlo()
-##    s.starttls()
-##    s.ehlo()
-##    s.login(email_usr,email_pwd)
-##    s.sendmail(fromaddr,toaddr,msg.as_string())
-##    s.quit()
+##         MG 07/07/17: DEV settings.  TODO: Uncomment out after testing
+    if eMailLogic == 0:
+        import smtplib, ConfigParser
+        from email.mime.text import MIMEText
+
+        config = ConfigParser.ConfigParser()
+        config.read(r"D:\sde_maintenance\scripts\configFiles\accounts.txt")
+        email_usr = config.get("email","usr")
+        email_pwd = config.get("email","pwd")
+
+        fp = open(logFileName,"rb")
+        msg = MIMEText(fp.read())
+        fp.close()
+
+        fromaddr = "dplugis@gmail.com"
+        toaddr = ["gary.ross@sdcounty.ca.gov",]
+
+        msg['Subject'] = "WORKSPACE has new datasets loaded"
+        msg['From'] = "Python Script"
+        msg['To'] = "SDE Administrator"
+
+        s = smtplib.SMTP('smtp.gmail.com', 587)
+        s.ehlo()
+        s.starttls()
+        s.ehlo()
+        s.login(email_usr,email_pwd)
+        s.sendmail(fromaddr,toaddr,msg.as_string())
+        s.quit()
+    else:
+        import smtplib, ConfigParser
+        from email.mime.text import MIMEText
+
+        config = ConfigParser.ConfigParser()
+        config.read(r"D:\sde_maintenance\scripts\configFiles\accounts.txt")
+        email_usr = config.get("email","usr")
+        email_pwd = config.get("email","pwd")
+
+        fp = open(logFileName,"rb")
+        msg = MIMEText(fp.read())
+        fp.close()
+
+        fromaddr = "dplugis@gmail.com"
+        toaddr = ["gary.ross@sdcounty.ca.gov",]
+
+        msg['Subject'] = "ERROR when loading WORKSPACE"
+        msg['From'] = "Python Script"
+        msg['To'] = "SDE Administrator"
+
+        s = smtplib.SMTP('smtp.gmail.com', 587)
+        s.ehlo()
+        s.starttls()
+        s.ehlo()
+        s.login(email_usr,email_pwd)
+        s.sendmail(fromaddr,toaddr,msg.as_string())
+        s.quit()
+
+except:
+    print "ERROR OCCURRED"
+    print "D:\\sde_maintenance\\scripts\\updateWorkspace.py"
+    print arcpy.GetMessages()
+    logFile.close()
+    sys.stdout = oldOutput
+
+    import smtplib, ConfigParser
+    from email.mime.text import MIMEText
+
+    config = ConfigParser.ConfigParser()
+    config.read(r"D:\sde_maintenance\scripts\configFiles\accounts.txt")
+    email_usr = config.get("email","usr")
+    email_pwd = config.get("email","pwd")
+
+    fp = open(logFileName,"rb")
+    msg = MIMEText(fp.read())
+    fp.close()
+
+    fromaddr = "dplugis@gmail.com"
+    toaddr = ["gary.ross@sdcounty.ca.gov",]
+
+    msg['Subject'] = "ERROR when loading WORKSPACE"
+    msg['From'] = "Python Script"
+    msg['To'] = "SDE Administrator"
+
+    s = smtplib.SMTP('smtp.gmail.com', 587)
+    s.ehlo()
+    s.starttls()
+    s.ehlo()
+    s.login(email_usr,email_pwd)
+    s.sendmail(fromaddr,toaddr,msg.as_string())
+    s.quit()
