@@ -15,7 +15,8 @@ UPDATES:
     Workspace.
     NOTES: Any table in loading FGDB will be loaded into Workspace, however
     any NEW table added to Workspace should be manually added to LUEG_UPDATES
-    table in Workspace.
+    table in Workspace.  All Tables should have field FEATURE_DATASET = 'None'
+    and COUNTY_FDS = 'None'
 """
 #
 # Author:      Gary Ross
