@@ -1,7 +1,26 @@
-# Loads data from local file geodatabase into Workspace
-# Run on directly on server Southern
-# Update December 2014 to account for new feature datasets in SDE
-# Update February 2017 10.4.1 and new server
+#-------------------------------------------------------------------------------
+# Name:        updateWorkspace.py
+# Purpose:
+"""
+Loads data from local file geodatabase into Workspace
+NOTE: Run script directly on server Southern
+
+UPDATES:
+  December 2014:
+    To account for new feature datasets in SDE
+  February 2017:
+    Upgraded ArcGIS to 10.4.1 and new server
+  July 2017:
+    Allow tables in the loading FGDB (sde_load.gdb) to load into
+    Workspace.
+    NOTES: Any table in loading FGDB will be loaded into Workspace, however
+    any NEW table added to Workspace should be manually added to LUEG_UPDATES
+    table in Workspace.
+"""
+#
+# Author:      Gary Ross
+# Editors:     Gary Ross, Mike Grue
+#-------------------------------------------------------------------------------
 
 # MG 07/07/17: I had to make an entry in LUEG_UPDATES table in FALSE_SDW for the SITES_DATA FC to be imported.  TODO: Add the record to the live LUEG_UPDATES table on SDW
 
@@ -18,9 +37,9 @@ try:
     # START MG 07/07/17: Add to allow 'Tables' (not just Feature Classes) to update Workspace
     # Get a list of Tables (if any) to trigger the rest of the script even
     #   if there are tables, but no feature classes.
-    # TODO: Create a DEV and PROD version of the below paths (i.e. fgdb = r'D:\sde\sde_load.gdb')
 
-    table_update_path = r'U:\grue\Projects\VDrive_to_SDEP_flow\FALSE_sde_load.gdb'
+    table_update_path = r'D:\sde\sde_load.gdb'
+    table_update_path = r'U:\grue\Projects\VDrive_to_SDEP_flow\FALSE_sde_load.gdb'  # MG 07/07/17: Set variable to DEV settings.  TODO: Delete after testing
     arcpy.env.workspace = table_update_path
     table_list = arcpy.ListTables()
 
@@ -41,7 +60,7 @@ try:
         logFileName = str("D:\\sde_maintenance\\log\\updateWorkspace_" + str(time.strftime("%Y%m%d%H%M", time.localtime())) + ".txt")
         logFileName = str(r"U:\grue\Projects\VDrive_to_SDEP_flow\log\updateWorkspace_" + str(time.strftime("%Y%m%d%H%M", time.localtime())) + ".txt")  # MG 07/07/17: Set variable to DEV settings.  TODO: Delete after testing
         logFile = open(logFileName,"w")
-##        sys.stdout = logFile  # MG 07/07/17: DEV settings.  TODO: Uncomment out after testing
+        sys.stdout = logFile  # MG 07/07/17: DEV settings.  TODO: Uncomment out after testing
         print "START TIME " + str(timestart)
 
         print ""
@@ -52,7 +71,7 @@ try:
         pathName  = r'U:\grue\Projects\VDrive_to_SDEP_flow\FALSE_SDW.gdb'  # MG 07/07/17: Set variable to DEV settings.  TODO: Delete after testing
         tableName = pathName + "\\SDW.PDS.LUEG_UPDATES"
         tableName = pathName + "\\LUEG_UPDATES"  # MG 07/07/17: Set variable to DEV settings.  TODO: Delete after testing
-##        adminSDE  = "Database Connections\\Atlantic Workspace (sa user).sde"  # MG 07/07/17: Set variable to DEV settings.  TODO: Uncomment out after testing
+        adminSDE  = "Database Connections\\Atlantic Workspace (sa user).sde"
 
 #         MG 07/07/17: DEV settings.  TODO: Uncomment out after testing
 ##        # Disconnect users from the database (added 3/12/13)
@@ -72,11 +91,12 @@ try:
         # TODO: Add row in LUEG_UPDATES table on SDW for each table to add
 
         if (table_list != []):
+            print 'Processing {} tables'.format(str(len(table_list)))
+            print '--------------------------------------------------------'
 
             lueg_updates_table = tableName  # Change variable name for readability in MG 07/07/17 section
 
             for table in table_list:
-                print '--------------------------------------------------------'
                 print 'Processing table: {}'.format(table)
 
                 load_table = os.path.join(table_update_path, table)
@@ -115,8 +135,8 @@ try:
                 try:
                     desc = arcpy.Describe(workspace_table)
                     if not desc.isVersioned:
-                        print '  Registering Table "{}" as versioned...'.format(workspace_table)
-                        arcpy.RegisterAsVersioned_management(workspace_table,"NO_EDITS_TO_BASE")
+                        print '  Registering Table "{}" as versioned'.format(workspace_table)
+                        arcpy.RegisterAsVersioned_management(workspace_table,"NO_EDITS_TO_BASE")  # TODO: Uncomment out before finish testing and test uncommented.  Delete after testing.
                         print '    ...Registered'
 
                 except:
@@ -127,19 +147,21 @@ try:
                 # Grant editing privileges
                 try:
                     print '  Changing privileges of table "{}"'.format(workspace_table)
-                    arcpy.ChangePrivileges_management(workspace_table,"SDE_EDITOR","GRANT","GRANT")
+                    arcpy.ChangePrivileges_management(workspace_table,"SDE_EDITOR","GRANT","GRANT")  # TODO: Uncomment out before finish testing and test uncommented.  Delete after testing.
                     print '    ...Privileges changed'
 
                 except:
-                    print '*** ERROR! In granding permissions for table "{}"'.format(table)
+                    print '*** ERROR! In granting permissions for table "{}"'.format(table)
                     eMailLogic = 1
 
 
                 # Delete Table from 'sde_load.gdb'
-                print "  Deleting table from loading gdb..."
-##                arcpy.Delete_management(load_table)  # TODO: Uncomment out before finish testing and test uncommented.  Delete after testing.
+                print "  Deleting table from loading gdb"
+                arcpy.Delete_management(load_table)  # TODO: Uncomment out before finish testing and test uncommented.  Delete after testing.
                 print '    ...Deleted'
                 print '--------------------------------------------------------'
+
+            print '++++++++++++++++++++++++++++++++++++++++++++++++++++++++'
 
         # END MG 07/07/17
         #-----------------------------------------------------------------------
@@ -148,11 +170,10 @@ try:
             fcfdList = list(rowcursor)
         del rowcursor
 
-
         fdsToRegister = list([])
 
-
         if dataList != []:
+            print 'Processing {} Feature Classes'.format(str(len(dataList)))  # MG 07/07/17: Add print statement
             for fc in dataList:
 
                 fdsName = "none"
@@ -216,8 +237,8 @@ try:
                             print "  Validating topology..."
                             arcpy.ValidateTopology_management(topoName, "FULL_EXTENT")
 
-##                        print "  Deleting feature class from loading gdb..."
-##                        arcpy.Delete_management(str(fc))  # MG 07/07/17: DEV settings.  TODO: Uncomment out before finish testing and test uncommented.  Delete after testing.
+                        print "  Deleting feature class from loading gdb..."
+                        arcpy.Delete_management(str(fc))  # MG 07/07/17: DEV settings.  TODO: Uncomment out before finish testing and test uncommented.  Delete after testing.
 
                         print "  Timestamping dataset..."
                         theCount = 0
