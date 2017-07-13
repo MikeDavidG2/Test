@@ -31,18 +31,18 @@ try:
     startDate = date.fromordinal(date.toordinal(date.today()) - updateWindow)
     endDate = date.today()
     theQ = "\"UPDATE_DATE\" >= '" + str(startDate) + "' AND \"UPDATE_DATE\" <= '" + str(endDate) + "' AND \"PUBLIC_ACCESS\" = 'Y'"
-    theQ = "\"UPDATE_DATE\" >= date '" + str(startDate) + "' AND \"UPDATE_DATE\" <= date '" + str(endDate) + "' AND \"PUBLIC_ACCESS\" = 'Y'"  # MG 07/12/17: Set variable to DEV settings.  TODO: Why did I need to do this?  How is it working on SOUTHERN?
+##    theQ = "\"UPDATE_DATE\" >= date '" + str(startDate) + "' AND \"UPDATE_DATE\" <= date '" + str(endDate) + "' AND \"PUBLIC_ACCESS\" = 'Y'"  # MG 07/12/17: Set variable to DEV settings.  TODO: Why did I need to do this?  How is it working on SOUTHERN?
 
     # set source tables for dataset updates
     outputSDE  = "Database Connections\\Atlantic Warehouse (sangis user).sde"
-    outputSDE  = r'U:\grue\Projects\VDrive_to_SDEP_flow\FALSE_SDE.gdb'  # MG 07/12/17: Set variable to DEV settings.  TODO: Delete after testing
+##    outputSDE  = r'U:\grue\Projects\VDrive_to_SDEP_flow\FALSE_SDE.gdb'  # MG 07/12/17: Set variable to DEV settings.  TODO: Delete after testing
 ##    outputGDB  = "D:\\sde_maintenance\\pds_out.gdb"  # MG 07/12/17: I believe that this variable isn't needed and can be deleted.  TODO: Ask Gary
     outTable   = outputSDE + "\\SDE.SANGIS.LUEG_UPDATES"
-    outTable   = outputSDE + '\\LUEG_UPDATES'  # MG 07/12/17: Set variable to DEV settings.  TODO: Delete after testing
+##    outTable   = outputSDE + '\\LUEG_UPDATES'  # MG 07/12/17: Set variable to DEV settings.  TODO: Delete after testing
     inputSDE   = "Database Connections\\Atlantic Workspace (pds user).sde"
-    inputSDE   = r'U:\grue\Projects\VDrive_to_SDEP_flow\FALSE_SDW.gdb'
+##    inputSDE   = r'U:\grue\Projects\VDrive_to_SDEP_flow\FALSE_SDW.gdb'  # MG 07/12/17: Set variable to DEV settings.  TODO: Delete after testing
     inputTable = inputSDE + "\\SDW.PDS.LUEG_UPDATES"
-    inputTable = inputSDE + '\\LUEG_UPDATES'  # MG 07/12/17: Set variable to DEV settings.  TODO: Delete after testing
+##    inputTable = inputSDE + '\\LUEG_UPDATES'  # MG 07/12/17: Set variable to DEV settings.  TODO: Delete after testing
     adminSDE   = "Database Connections\\Atlantic Warehouse (sa user).sde"
 
 # MG 07/12/17: I believe that the commented out below isn't used and can be deleted.  TODO: Ask Gary
@@ -65,7 +65,7 @@ try:
         # create log file
         oldOutput = sys.stdout
         logFileName = "D:\\sde_maintenance\\log\\updateWarehouseFromWorkspace_" + str(time.strftime("%Y%m%d%H%M", time.localtime())) + ".txt"
-        logFileName = r"U:\grue\Projects\VDrive_to_SDEP_flow\log\updateWarehouseFromWorkspace_" + str(time.strftime("%Y%m%d%H%M", time.localtime())) + ".txt"  # MG 07/12/17: Set variable to DEV settings.  TODO: Delete after testing
+##        logFileName = r"U:\grue\Projects\VDrive_to_SDEP_flow\log\updateWarehouseFromWorkspace_" + str(time.strftime("%Y%m%d%H%M", time.localtime())) + ".txt"  # MG 07/12/17: Set variable to DEV settings.  TODO: Delete after testing
         logFile = open(logFileName,"w")
         sys.stdout = logFile
 
@@ -91,7 +91,7 @@ try:
             try:
                 # Set path for the output
                 outLayer = outputSDE + "\\SDE.SANGIS.{}".format(r.LAYER_NAME)
-                outLayer = outputSDE + "\\SDE.SANGIS.{}".format(r.LAYER_NAME)  # MG 07/12/17: Set variable to DEV settings.  TODO: Delete after testing
+##                outLayer = outputSDE + "\\{}".format(r.LAYER_NAME)  # MG 07/12/17: Set variable to DEV settings.  TODO: Delete after testing
                 #---------------------------------------------------------------
                 #---------------------------------------------------------------
                 # START MG 07/12/17:  Added below to account for Tables that are
@@ -100,7 +100,7 @@ try:
                 #   to the input path
                 if r.FEATURE_DATASET != 'None':
                     inputDS = inputSDE + "\\SDW.PDS.{}".format(r.FEATURE_DATASET)
-                    inputDS = inputSDE + '\\{}'.format(r.FEATURE_DATASET)  # MG 07/12/17: Set variable to DEV settings.  TODO: Delete after testing
+##                    inputDS = inputSDE + '\\{}'.format(r.FEATURE_DATASET)  # MG 07/12/17: Set variable to DEV settings.  TODO: Delete after testing
                 # If FEATURE_DATASET == 'None' then the SDE path should  be added
                 #   to the LAYER_NAME w/o a Dataset between the SDE and the Table
                 #   (See inLayer below for the concatenation)
@@ -112,7 +112,7 @@ try:
 
                 arcpy.env.workspace = inputDS
                 inLayer  = inputDS + "\\SDW.PDS.{}".format(r.LAYER_NAME)
-                inLayer  = inputDS + '\\{}'.format(r.LAYER_NAME)  # MG 07/12/17: Set variable to DEV settings.  TODO: Delete after testing
+##                inLayer  = inputDS + '\\{}'.format(r.LAYER_NAME)  # MG 07/12/17: Set variable to DEV settings.  TODO: Delete after testing
 
                 # Delete old version if it exists
                 if arcpy.Exists(outLayer):
@@ -138,7 +138,7 @@ try:
                 #---------------------------------------------------------------
                 #---------------------------------------------------------------
 
-                # Change privileges
+                # Change privileges  # MG 07/12/17:  Added try/except statement
                 print "Granting privileges to {}".format(r.LAYER_NAME)
                 try:
                     arcpy.ChangePrivileges_management(outLayer,"SDE_VIEWER","GRANT","AS_IS")
@@ -201,31 +201,31 @@ except Exception as e:  # MG 07/12/17: Added the 'Exception as e' to print excep
     logFile.close()
     sys.stdout = oldOutput
 
-# MG 07/07/17: DEV settings.  TODO: Uncomment out after testing
-##    # email
-##    import smtplib, ConfigParser
-##    from email.mime.text import MIMEText
-##
-##    config = ConfigParser.ConfigParser()
-##    config.read(r"D:\sde_maintenance\scripts\configFiles\accounts.txt")
-##    email_usr = config.get("email","usr")
-##    email_pwd = config.get("email","pwd")
-##
-##    fp = open(logFileName,"rb")
-##    msg = MIMEText(fp.read())
-##    fp.close()
-##
-##    fromaddr = "dplugis@gmail.com"
-##    toaddr = ["gary.ross@sdcounty.ca.gov",]
-##
-##    msg['Subject'] = "ERROR when updating WAREHOUSE with WORKSPACE"
-##    msg['From'] = "Python Script"
-##    msg['To'] = "SDE Administrator"
-##
-##    s = smtplib.SMTP('smtp.gmail.com', 587)
-##    s.ehlo()
-##    s.starttls()
-##    s.ehlo()
-##    s.login(email_usr,email_pwd)
-##    s.sendmail(fromaddr,toaddr,msg.as_string())
-##    s.quit()
+### MG 07/07/17: DEV settings.  TODO: Uncomment out after testing
+    # email
+    import smtplib, ConfigParser
+    from email.mime.text import MIMEText
+
+    config = ConfigParser.ConfigParser()
+    config.read(r"D:\sde_maintenance\scripts\configFiles\accounts.txt")
+    email_usr = config.get("email","usr")
+    email_pwd = config.get("email","pwd")
+
+    fp = open(logFileName,"rb")
+    msg = MIMEText(fp.read())
+    fp.close()
+
+    fromaddr = "dplugis@gmail.com"
+    toaddr = ["gary.ross@sdcounty.ca.gov",]
+
+    msg['Subject'] = "ERROR when updating WAREHOUSE with WORKSPACE"
+    msg['From'] = "Python Script"
+    msg['To'] = "SDE Administrator"
+
+    s = smtplib.SMTP('smtp.gmail.com', 587)
+    s.ehlo()
+    s.starttls()
+    s.ehlo()
+    s.login(email_usr,email_pwd)
+    s.sendmail(fromaddr,toaddr,msg.as_string())
+    s.quit()
