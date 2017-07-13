@@ -1,9 +1,32 @@
-################################################
-###  blueSDEcopyTOcosd.py                    ###
-###  Copy, zip and ftp FCs that have been    ###
-###    edited and need to be copied to the   ###
-###    County.  Ignores LEAMS FCs (ROAD_*).  ###
-################################################
+#-------------------------------------------------------------------------------
+# Name:        blueSDEcopyTOcosd.py
+# Purpose:
+"""
+Updates the SanGIS FTP site with zipped FGDBs of each FC or Table from
+SDW (Workspace) that has been recently updated.  There is a companion script
+that pulls the zipped FGDBs from the FTP site and updates SDEP2 on the County
+network.
+
+The Datasets that are sent to the FTP site are controlled by the
+LUEG_UPDATES table in SDW (Workspace).  Datasets that are sent to the FTP site
+must have been updated within the 'dcutoff', and must satisfy the 'whereClause'
+
+NOTE: Run directly on SOUTHERN server
+
+UPDATES:
+  July 2017:
+    Significant editing by MG to allow recently updated Tables in SDW to be sent
+    to the FTP site.
+
+    Also edited to remove many permanently commented out lines of code,
+    reorganized print statements and altered the flow of the script for
+    readability.
+"""
+#
+# Author:      Karen Chadwick
+# Editors:     Karen Chadwick, Gary Ross, Mike Grue
+#-------------------------------------------------------------------------------
+
 import arcpy
 import ConfigParser
 import datetime
@@ -20,12 +43,14 @@ from email.mime.text import MIMEText
 # TODO: Tell Gary that many of the print statements have been rewritten for clarity
 # TODO: Remove the comments that mention any edited print statements.
 
-old_output = sys.stdout
+# Set Environment flag
+arcpy.env.overwriteOutput = True
+
+# Reporting info
 timestart = str(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()))
 times = time.time()
 
-arcpy.env.overwriteOutput = True
-
+# Set variables
 path            = r"D:\sde_maintenance\blue_copyTOcosd"
 path            = r"U:\grue\Projects\VDrive_to_SDEP_flow\FALSE_blue_copyTOcosd"  # MG 07/13/17: Set variable to DEV settings.  TODO: Delete after testing
 sdeWorkspace    = r"Database Connections\Atlantic Workspace (pds user).sde"
@@ -40,6 +65,13 @@ ftpfolder       = "ftp/LUEG/transfer_to_cosd"
 #ftpfldrwhse     = "ftp/LUEG/transfer_to_blue"  # MG 07/13/17: I don't believe this variable is being used anymore.  Can probably delete.  TODO: ask Gary
 cfgfile         = r"D:\sde_maintenance\scripts\configFiles\ftp.txt"
 cfgfile         = r"M:\scripts\configFiles\ftp.txt"  # MG 07/13/17: Set variable to DEV settings.  TODO: Delete after testing
+eMailSDEC       = 0
+fcstosend       = 0
+delerror        = 0
+dcutoff         = 14    #  <-- Change the number of days cutoff here!
+delete_files    = True  # 'True' and the FGDB (zipped and unzipped) will be deleted
+
+# List of Feature Classes that shouldn't be sent to FTP
 fc2ignore       = [
     "ROAD_CHANNELIZERS",
     "ROAD_CHANNELS",
@@ -60,17 +92,20 @@ fc2ignore       = [
     "ROAD_STRIPING",
     "ROAD_STRUCTURES",
     "ROAD_TRAFFIC_SIGNALS"]
-eMailSDEC       = 0
-fcstosend       = 0
-delerror        = 0
-dcutoff         = 14    #  <-- Change the number of days cutoff here!
 
+# Create a log file and send print statements to it
 logFileName = os.path.join("D:\sde_maintenance","log","blueSDEcopyTOcounty" + str(time.strftime("%Y%m%d%H%M", time.localtime())) + ".txt")
 logFileName = os.path.join('U:\grue\Projects\VDrive_to_SDEP_flow\log',"blueSDEcopyTOcounty" + str(time.strftime("%Y%m%d%H%M", time.localtime())) + ".txt")  # MG 07/13/17: Set variable to DEV settings.  TODO: Delete after testing
 logFile     = open(logFileName,"w")
+old_output = sys.stdout
 ##sys.stdout  = logFile  # MG 07/13/17: Set variable to DEV settings.  TODO: Delete before done testing and then test again
 
-# Define zipping processes
+#-------------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
+#                             DEFINE FUNCTIONS
+#-------------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
+#                          FUNCTION: zipFGDB()
 def zipFGDB(fgdb):
     infolder = fgdb
     outfile = fgdb + ".zip"
@@ -87,6 +122,8 @@ def zipFGDB(fgdb):
             zip.close()
             print "Unable to compress zip file contents"
 
+#-------------------------------------------------------------------------------
+#                           FUNCTION: zipws()
 def zipws(path, zip, keep):
     path = os.path.normpath(path)
     for (dirpath, dirnames, filenames) in os.walk(path):
@@ -102,21 +139,25 @@ def zipws(path, zip, keep):
                     print "Error adding " + str(file)
     return None
 
-
+#-------------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
+#                               RUN SCRIPT
+#-------------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
+print "                   BLUESDECOPYTOCOUNTY.PY "
+print 'Now: {}\n'.format(str(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())))
 arcpy.env.workspace = path
 
-print "****************** BLUESDECOPYTOCOUNTY.PY *************************"
-
-### Check for FCs to be copied across
+# Check for Datasets to be copied from SDW (Workspace) to FTP site
 try:
-    # Get the FC info
-    print str(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())) + " | Checking for FCs to copy..."
+    # Get the dataset info
     blueFDlist = list([])
     blueFClist = list([])
     blueDATElist = list([])
     cntyFDlist = list([])
     ftplist = []
     whereClause = '"EDIT_LOCATION" = ' + "'BLUE'" + ' AND "COUNTY_FDS" IS NOT NULL'
+    print 'Getting dataset info from table: "{}"\n  Where: {}\n'.format(tablePath, whereClause)
     with arcpy.da.SearchCursor(tablePath,["FEATURE_DATASET","LAYER_NAME","UPDATE_DATE","COUNTY_FDS"],whereClause) as rowcursor:
         for row in rowcursor:
             blueFDlist.extend([str(row[0])])
@@ -124,8 +165,6 @@ try:
             blueDATElist.extend([str(row[2])])
             cntyFDlist.extend([str(row[3])])
     del rowcursor
-##    # Check for relevant dates  MG 07/13/17: I moved the 'datenow' variable to below where it is used.
-##    datenow = datetime.date.today()
 
 # MG 07/13/17: I moved the below commented out section to the Copy/ftp the LUEG_UPDATES (workspace) table section below.  This comment and the commented out section below can be deleted if below works
 ##    # Create a GDB for the copy table, if it doesn't exist already
@@ -146,7 +185,7 @@ try:
 ##        arcpy.management.AddField(table_workspace,"FEATURE_CLASS","TEXT","","",50)
 
 # MG 07/13/17: I dedented the below section (to the 'except') after commenting out the above section.  This comment can be deleted if it works
-    for key, fc in enumerate(blueFClist):
+    for key, fcname in enumerate(blueFClist):
 
         # Get the number of days since the last update (deltadays)
         temp = blueDATElist[key].split(" ")  # i.e. splits '2017-03-27 00:00:00'
@@ -158,46 +197,65 @@ try:
         deltadays = int(deltadate.days)
 
         # If the num of days since last update (deltadays) is less than the cutoff,
-        #   copy the FC then zip and FTP
+        #   copy the Dataset then zip and FTP
         if deltadays <= dcutoff:
-            # Copy the FC
-            print "\n" + str(blueFClist[key]) + " - date = " + str(dateblue) + " (" + str(deltadays) + " day/s)"
-            fcname = str(fc)
-            gdbname = fcname + ".gdb"
-            gdbpath = os.path.join(path,gdbname)
-            print '  Out GDB: {}'.format(gdbpath)  # MG 07/13/17:  Changed print statement
-            infcpath = os.path.join(sdeWorkspace,"SDW.PDS." + blueFDlist[key],"SDW.PDS." + fcname)
-            infcpath = os.path.join(sdeWorkspace, blueFDlist[key], fcname)  # MG 07/13/17: Set variable to DEV settings.  TODO: Delete after testing
-            print '  In Feature Class: "{}"'.format(infcpath)  # MG 07/13/17:  Changed print statement
-            # Make sure the FC exists in the listed location
+            # Copy the Dataset
+            print '------------------------------------------------------------'
+            print 'Dataset: "{}" was updated "{}" day/s ago on "{}".  Will send to FTP.'.format(fcname, str(deltadays), str(dateblue))
+
+            #-------------------------------------------------------------------
+            #-------------------------------------------------------------------
+            # START MG 07/13/17: Allow Tables in LUEG_UPDATES table to be copied to FTP
+            if blueFDlist[key] != 'None':  # Add the FEATURE_DATASET (blueFDlist[key]) between 'sdeWorkspace' and 'fcname'
+                infcpath = os.path.join(sdeWorkspace,"SDW.PDS." + blueFDlist[key],"SDW.PDS." + fcname)
+                infcpath = os.path.join(sdeWorkspace, blueFDlist[key], fcname)  # MG 07/13/17: Set variable to DEV settings.  TODO: Delete after testing
+
+            if blueFDlist[key] == 'None':  # if FEATURE_DATASET == 'None', do not insert a FD in the path
+                infcpath = os.path.join(sdeWorkspace, "SDW.PDS." + fcname)
+                infcpath = os.path.join(sdeWorkspace, fcname)  # MG 07/13/17: Set variable to DEV settings.  TODO: Delete after testing
+
+            ##print '  In Dataset: "{}"'.format(infcpath)  # Uncomment for testing.
+            # END MG 07/13/17
+            #-------------------------------------------------------------------
+            #-------------------------------------------------------------------
+
+            # Make sure the Dataset exists in the listed location
             if not arcpy.Exists(infcpath):
-                print '***!!!ERROR!!!*** FC: "{}" not found in FD: "{}"'.format(fcname, blueFDlist[key])  # MG 07/13/17: Changed print statement
+                print '\n***!!!ERROR!!!*** Dataset: "{}" not found in FD: "{}"'.format(fcname, blueFDlist[key])  # MG 07/13/17: Changed print statement
                 eMailSDEC = 1
             else:
-                print '  Feature Class exists'  # MG 07/13/17:  Changed print statement
-                if fcname not in fc2ignore:
-                    print "  Feature Class not in ignore list"  # MG 07/13/17:  Changed print statement
-                    fcstosend += 1
+                if fcname in fc2ignore:  # Ignore items in 'fc2ignore' list
+                    print '"{}" in fc2ignore list.  Not sending to FTP'.format(fcname)
+
+                else:
+                    gdbname = fcname + ".gdb"
+                    gdbpath = os.path.join(path,gdbname)
                     outfcpath = os.path.join(gdbpath,fcname)
-                    print '  Out Feature Class: {}'.format(outfcpath)  # MG 07/13/17:  Changed print statement
+
+                    print '  Creating FGDB: "{}\{}"'.format(path, gdbname)
                     arcpy.management.CreateFileGDB(path,gdbname)
-                    print "Copying {}".format(fcname)
-                    arcpy.management.CopyFeatures(infcpath,outfcpath)
-                    # Zip the FC then delete FC
-                    zipname = str(gdbname) + ".zip"
+
+                    # MG 07/13/17: Add try/except. Try to copy FC to FC, if that fails, try to copy Table to Table
+                    try:
+                        arcpy.management.CopyFeatures(infcpath,outfcpath)
+                        print '  Copied "{}":\n    From: "{}"\n      To: "{}"\n      As: A FEATURE CLASS'.format(fcname, infcpath, outfcpath)
+                    except:
+                        arcpy.CopyRows_management(infcpath, outfcpath)
+                        print '  Copied "{}":\n    From: "{}"\n      To: "{}"\n      As: A TABLE'.format(fcname, infcpath, outfcpath)
+
+                    # Delete old zip file if needed
                     zippath = str(gdbpath) + ".zip"
                     if arcpy.Exists(zippath):
-                        print "   zipfile needs deleting"
+                        print '  Deleting old zipfile at: "{}"'.format(zippath)
                         os.unlink(zippath) # Delete_management fails (zipfile) --> use unlink
-                        print "   delete sucessful"
-                    print "Zipping GDB ..."
-                    zipFGDB(gdbpath)
-                    if arcpy.Exists(zippath):
-                        if arcpy.Exists(gdbpath):
-                            arcpy.management.Delete(gdbpath)
 
+                    # Zip the FGDB
+                    print '  Zipping FGDB to: "{}.zip"'.format(gdbpath)
+                    zipFGDB(gdbpath)
+
+                    # Send the zipped FGDB to the FTP site
+                    if arcpy.Exists(zippath):
                     # MG 07/13/17: Commented out.  TODO: I wasn't able to use the config info to get access to the FTP site, ask Gary why.  Uncomment out when done testing.
-                    # FTP the FC
 ##                        config = ConfigParser.ConfigParser()
 ##                        config.read(cfgfile)
 ##                        usr = config.get("sangis","usr")
@@ -207,64 +265,71 @@ try:
 ##                        ftp = ftplib.FTP(adr)
 ##                        ftp.login(usr,pwd)
 ##                        ftp.cwd(ftpfolder)
-##                        print "FTPing feature class ..."
+##                        print '  FTPing dataset'
+##                        zipname = str(gdbname) + ".zip"
 ##                        try: ftp.delete(zipname)
 ##                        except: d = 0 ### no action if file not on ftp site
 ##                        with open(zippath,"rb") as openFile:
 ##                            ftp.storbinary("STOR " + str(zipname),openFile)
 ##                        ftp.quit()
 ##                        ftplist.append(str(fcname))
+
+                        # Delete the unzipped FGDB
+                        if arcpy.Exists(gdbpath) and delete_files:
+                            print '  Deleting the unzipped FGDB at: {}'.format(gdbpath)
+                            arcpy.management.Delete(gdbpath)
+
+                        # Delete the zipped FGDB
+                        if arcpy.Exists(zippath) and delete_files:
+                            print '  Deleting the   zipped FGDB at: {}'.format(zippath)
+                            os.unlink(zippath)
+
+                fcstosend += 1
+
+            print ''
+
 except:
     eMailSDEC = 1
-    print "********* FAILED TO CHECK ALL FCs *********"
+    print "********* FAILED TO CHECK ALL Datasets *********"
     print arcpy.GetMessages()
 
 # Copy/ftp the LUEG_UPDATES (workspace) table
-print '\n----------------------------------------------------------------------'
+print '------------------------------------------------------------------------'
+print '------------------------------------------------------------------------'
 print 'Copying / FTPing the LUEG_UPDATES (workspace) table'
+
+# Copy the workspace LUEG_UPDATES table
+# Send it even if there are no Datasets to ftp (the table may be used by multiple scripts on CoSD)
 try:
-    # Copy the workspace LUEG_UPDATES table
-    # Send it even if there are no FCs to ftp (the table may be used by multiple scripts on CoSD)
-
-    #---------------------------------------------------------------------------
-    #---------------------------------------------------------------------------
-    # START MG 07/13/17: reorganizing of the below section that used to be earlier
-    #   in the script.  TODO: Show Gary, and remove the relevant comments if he approves
-
-    # Create a GDB for the copy table, if it doesn't exist already
     table_workspace_gdb = table_workspace + ".gdb"
     table_workspace_gdb_path = os.path.join(path,table_workspace_gdb)
 
+    # Delete Old FGDB if it exists
     if arcpy.Exists(table_workspace_gdb_path):
         print 'Deleting Old FGDB: "{}"'.format(table_workspace_gdb_path)
         arcpy.management.Delete(table_workspace_gdb_path)
-        print '  ...Deleted'
 
+    # Create a FGDB to contain the table
     print 'Creating FGDB: "{}\{}"\n'.format(path, table_workspace_gdb)
     arcpy.management.CreateFileGDB(path,table_workspace_gdb)
 
+    # Copy the LUEG_UPDATE table from SDW (workspace) to the working folder (path)
     copytblpath = os.path.join(table_workspace_gdb_path,table_workspace)
     print 'Copying: "{}"\n     To: "{}"'.format(tablePath, copytblpath)
     arcpy.CopyRows_management(tablePath, copytblpath)
-    print '       ...Copied'
 
-    # END MG 07/13/17
-    #---------------------------------------------------------------------------
-    #---------------------------------------------------------------------------
-
-    # Determine whether any FCs were prepared for ftp
+    # Determine whether any Datasets were prepared for ftp
     if fcstosend == 0:
-        print "*** WARNING: No FCs prepared for ftp; date search window = " + str(dcutoff) + " days"
+        print "*** WARNING: No Datasets prepared for ftp; date search window = " + str(dcutoff) + " days"
         print "FTPing data table anyway..."
 
     # Zip/ftp the copy table
     zippath = table_workspace_gdb_path + ".zip"
 
     if arcpy.Exists(zippath):
-        print 'Deleting Old: "{}"'.format(zippath)
         try:
+            print 'Deleting Old: "{}"'.format(zippath)
             os.unlink(zippath) # Delete_management fails --> use unlink
-            print '  ...Deleted'
         except:
             print "*** WARNING: delete not sucessful! ***"
             delerror = 1
@@ -275,12 +340,7 @@ try:
     else:
         print "\nWARNING: skipping workspace table gdb zip --> sending old table ...!!!..."
     if arcpy.Exists(zippath):
-        if arcpy.Exists(table_workspace_gdb_path):
-            print 'Deleting: "{}"'.format(table_workspace_gdb_path)
-            arcpy.management.Delete(table_workspace_gdb_path)
-            print '  ...Deleted'
-
-        # TODO: Uncomment out before done testing, then try testing before going to PROD
+        # MG TODO: Uncomment out before done testing, then try testing before going to PROD, and delete this comment
 ##        config = ConfigParser.ConfigParser()
 ##        config.read(cfgfile)
 ##        usr = config.get("sangis","usr")
@@ -297,8 +357,21 @@ try:
 ##        openFile = open(zippath,"rb")
 ##        ftp.storbinary("STOR " + str(zipname),openFile)
 ##        ftp.quit()
+
+        # Delete the unzipped FGDB
+        if arcpy.Exists(table_workspace_gdb_path) and delete_files:
+            print '  Deleting the unzipped FGDB at: "{}"'.format(table_workspace_gdb_path)
+            arcpy.management.Delete(table_workspace_gdb_path)
+
+        # MG TODO: Ask Gary if the below delete should be kept.  The orig script didn't delete this zipped FGDB, but I'm not sure why not...
+        # Delete the zipped FGDB
+        if arcpy.Exists(zippath) and delete_files:
+            print '  Deleting the   zipped FGDB at: "{}"'.format(zippath)
+            os.unlink(zippath)
+
     else:
-        print "\nERROR: when sending workspace table ..."
+        print "\nERROR: zip file does not exist at: '{}'".format(zippath)
+
 except:
     eMailSDEC = 1
     print "********* FAILED TO COPY/FTP THE WORKSPACE TABLE *********\n"
@@ -360,40 +433,46 @@ except:
 ##    eMailSDEC = 1
 ##    print "********* FAILED TO COPY/FTP THE WAREHOUSE TABLE *********\n"
 
-### Clean up zipfiles
+# Clean up zipfiles
 
-# TODO: Test this section out once I've uncommented out the FTPing sections above
-try:
-    # Delete FC zipfiles
-    for fc in ftplist:
-        zipname = fc + ".gdb.zip"
-        zippath = path + zipname
-        if arcpy.Exists(zippath):
-            print "  cleaning up: deleting zipfile " + str(zipname)
-            os.unlink(zippath) # Delete_management fails (zipfile) --> use unlink
-            print "    zipfile deleted..."
-    # Delete the workspace table zipfile
-    tblzipname = str(table_workspace_gdb) + ".zip"
-    tblzippath = str(table_workspace_gdb_path) + ".zip"
-    # Table zipfile won't delete --> leave in folder
-    print "  IGNORING workspace table zipfile: " + str(tblzipname)
+# MG commented out:  The below section handles deleting the zipped FGDB.  However, I have handled that above (right after a zip file is sent to the FTP).  Recommend removing.  TODO: Ask Gary
+##try:
+##    # Delete Dataset zipfiles
+##    for fc in ftplist:
+##        zipname = fc + ".gdb.zip"
+##        zippath = path + zipname
+##        if arcpy.Exists(zippath):
+##            print "  cleaning up: deleting zipfile " + str(zipname)
+##            os.unlink(zippath) # Delete_management fails (zipfile) --> use unlink
+##            print "    zipfile deleted..."
+##    # Delete the workspace table zipfile
+##    tblzipname = str(table_workspace_gdb) + ".zip"
+##    tblzippath = str(table_workspace_gdb_path) + ".zip"
+##    # Table zipfile won't delete --> leave in folder
+##    print "  IGNORING workspace table zipfile: " + str(tblzipname)
+
+# MG: The below commented out section was already commented out when I started editing.  Recommend removing.  TODO: Ask Gary
 ##    # Delete the warehouse table zipfile #KC added section 7/24/2015
 ##    tblzipwhsn = table_warehouse_gdb + ".zip"
 ##    tblzwhspth = table_warehouse_gdb_path + ".zip"
 ##    # Table zipfile won't delete --> leave in folder
 ##    print "  IGNORING warehouse table zipfile: " + str(tblzipwhsn)
-    # Clean up any ancillary files (.cpg, .dbf, .dbf.xml)
-    dirFiles = os.listdir(path)
-    for dirFile in dirFiles:
-        if os.path.isfile(dirFile) and str(table_workspace) in str(dirFile) and str(dirFile) != str(tblzipname):
-            dirFilePath = path + str(dirFile)
-            print "  cleaning up: deleting file " + str(dirFile)
-            os.unlink(dirFilePath)
-except:
-    eMailSDEC = 1
-    print "********* FAILED TO DELETE ZIPFILES *********"
 
-### END processing - do clerical messaging
+# MG commented out: Unsure if this is a reminant, doesn't look to be doing anything now.  Recommend removing.  TODO: Ask Gary
+##    # Clean up any ancillary files (.cpg, .dbf, .dbf.xml)
+##    dirFiles = os.listdir(path)
+##    for dirFile in dirFiles:
+##        if os.path.isfile(dirFile) and str(table_workspace) in str(dirFile) and str(dirFile) != str(tblzipname):
+##            dirFilePath = path + str(dirFile)
+##            print "  cleaning up: deleting file " + str(dirFile)
+##            os.unlink(dirFilePath)
+
+# MG commented out:  Not needed if the whole 'try' is commented out (to be deleted).  TODO: Ask Gary
+##except:
+##    eMailSDEC = 1
+##    print "********* FAILED TO DELETE ZIPFILES *********"
+
+# END processing - do clerical messaging
 timeendSDEC = str(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()))
 timeeSDEC = time.time()
 # Calculate time duration
