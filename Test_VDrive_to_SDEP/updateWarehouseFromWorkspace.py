@@ -26,23 +26,23 @@ arcpy.env.overwriteOutput = True  #  MG 07/07/17: Set variable to DEV settings. 
 timestart = str(time.strftime("%m/%d/%Y %H:%M:%S", time.localtime()))
 
 try:
-    # figure out the date range to search for updates
+    # Get the Query used to find recently updated datasets
     updateWindow = 7 # Number of days in past to look for updates
     startDate = date.fromordinal(date.toordinal(date.today()) - updateWindow)
     endDate = date.today()
     theQ = "\"UPDATE_DATE\" >= '" + str(startDate) + "' AND \"UPDATE_DATE\" <= '" + str(endDate) + "' AND \"PUBLIC_ACCESS\" = 'Y'"
-##    theQ = "\"UPDATE_DATE\" >= date '" + str(startDate) + "' AND \"UPDATE_DATE\" <= date '" + str(endDate) + "' AND \"PUBLIC_ACCESS\" = 'Y'"  # MG 07/12/17: Set variable to DEV settings.  TODO: Why did I need to do this?  How is it working on SOUTHERN?
+    theQ = "\"UPDATE_DATE\" >= date '" + str(startDate) + "' AND \"UPDATE_DATE\" <= date '" + str(endDate) + "' AND \"PUBLIC_ACCESS\" = 'Y'"  # MG 07/12/17: Set variable to DEV settings.  TODO: Why did I need to do this?  How is it working on SOUTHERN?
 
-    # set source tables for dataset updates
+    # Set paths
     outputSDE  = "Database Connections\\Atlantic Warehouse (sangis user).sde"
-##    outputSDE  = r'U:\grue\Projects\VDrive_to_SDEP_flow\FALSE_SDE.gdb'  # MG 07/12/17: Set variable to DEV settings.  TODO: Delete after testing
+    outputSDE  = r'U:\grue\Projects\VDrive_to_SDEP_flow\FALSE_SDE.gdb'  # MG 07/12/17: Set variable to DEV settings.  TODO: Delete after testing
 ##    outputGDB  = "D:\\sde_maintenance\\pds_out.gdb"  # MG 07/12/17: I believe that this variable isn't needed and can be deleted.  TODO: Ask Gary
     outTable   = outputSDE + "\\SDE.SANGIS.LUEG_UPDATES"
-##    outTable   = outputSDE + '\\LUEG_UPDATES'  # MG 07/12/17: Set variable to DEV settings.  TODO: Delete after testing
+    outTable   = outputSDE + '\\LUEG_UPDATES'  # MG 07/12/17: Set variable to DEV settings.  TODO: Delete after testing
     inputSDE   = "Database Connections\\Atlantic Workspace (pds user).sde"
-##    inputSDE   = r'U:\grue\Projects\VDrive_to_SDEP_flow\FALSE_SDW.gdb'  # MG 07/12/17: Set variable to DEV settings.  TODO: Delete after testing
+    inputSDE   = r'U:\grue\Projects\VDrive_to_SDEP_flow\FALSE_SDW.gdb'  # MG 07/12/17: Set variable to DEV settings.  TODO: Delete after testing
     inputTable = inputSDE + "\\SDW.PDS.LUEG_UPDATES"
-##    inputTable = inputSDE + '\\LUEG_UPDATES'  # MG 07/12/17: Set variable to DEV settings.  TODO: Delete after testing
+    inputTable = inputSDE + '\\LUEG_UPDATES'  # MG 07/12/17: Set variable to DEV settings.  TODO: Delete after testing
     adminSDE   = "Database Connections\\Atlantic Warehouse (sa user).sde"
 
 # MG 07/12/17: I believe that the commented out below isn't used and can be deleted.  TODO: Ask Gary
@@ -50,7 +50,7 @@ try:
 ##    if arcpy.Exists(outputGDB):
 ##        arcpy.Delete_management(outputGDB)
 
-    # check to see if there have been any updates
+    # Check to see if there have been any updates
     s1 = arcpy.SearchCursor(str(inputTable), str(theQ))
     s1row = s1.next()
     layerCount = 0
@@ -65,9 +65,9 @@ try:
         # create log file
         oldOutput = sys.stdout
         logFileName = "D:\\sde_maintenance\\log\\updateWarehouseFromWorkspace_" + str(time.strftime("%Y%m%d%H%M", time.localtime())) + ".txt"
-##        logFileName = r"U:\grue\Projects\VDrive_to_SDEP_flow\log\updateWarehouseFromWorkspace_" + str(time.strftime("%Y%m%d%H%M", time.localtime())) + ".txt"  # MG 07/12/17: Set variable to DEV settings.  TODO: Delete after testing
+        logFileName = r"U:\grue\Projects\VDrive_to_SDEP_flow\log\updateWarehouseFromWorkspace_" + str(time.strftime("%Y%m%d%H%M", time.localtime())) + ".txt"  # MG 07/12/17: Set variable to DEV settings.  TODO: Delete after testing
         logFile = open(logFileName,"w")
-        sys.stdout = logFile
+##        sys.stdout = logFile
 
         print "START TIME: " + str(timestart)
         print "Copying datasets updated between " + str(startDate) + " and " + str(endDate)
@@ -91,32 +91,35 @@ try:
             try:
                 # Set path for the output
                 outLayer = outputSDE + "\\SDE.SANGIS.{}".format(r.LAYER_NAME)
-##                outLayer = outputSDE + "\\{}".format(r.LAYER_NAME)  # MG 07/12/17: Set variable to DEV settings.  TODO: Delete after testing
+                outLayer = outputSDE + "\\{}".format(r.LAYER_NAME)  # MG 07/12/17: Set variable to DEV settings.  TODO: Delete after testing
                 #---------------------------------------------------------------
                 #---------------------------------------------------------------
                 # START MG 07/12/17:  Added below to account for Tables that are
                 #   in SDW that should be copied over to SDE
+
                 # If FEATURE_DATASET doesn't equal 'None' add the FEATURE_DATASET
                 #   to the input path
                 if r.FEATURE_DATASET != 'None':
                     inputDS = inputSDE + "\\SDW.PDS.{}".format(r.FEATURE_DATASET)
-##                    inputDS = inputSDE + '\\{}'.format(r.FEATURE_DATASET)  # MG 07/12/17: Set variable to DEV settings.  TODO: Delete after testing
+                    inputDS = inputSDE + '\\{}'.format(r.FEATURE_DATASET)  # MG 07/12/17: Set variable to DEV settings.  TODO: Delete after testing
+
                 # If FEATURE_DATASET == 'None' then the SDE path should  be added
                 #   to the LAYER_NAME w/o a Dataset between the SDE and the Table
                 #   (See inLayer below for the concatenation)
                 else:
                     inputDS = inputSDE
+
                 # END MG 07/12/17
                 #---------------------------------------------------------------
                 #---------------------------------------------------------------
 
                 arcpy.env.workspace = inputDS
                 inLayer  = inputDS + "\\SDW.PDS.{}".format(r.LAYER_NAME)
-##                inLayer  = inputDS + '\\{}'.format(r.LAYER_NAME)  # MG 07/12/17: Set variable to DEV settings.  TODO: Delete after testing
+                inLayer  = inputDS + '\\{}'.format(r.LAYER_NAME)  # MG 07/12/17: Set variable to DEV settings.  TODO: Delete after testing
 
                 # Delete old version if it exists
                 if arcpy.Exists(outLayer):
-                    print 'Deleting {} from Warehouse'.format(r.LAYER_NAME)
+                    print '\nDeleting "{}" from Warehouse'.format(r.LAYER_NAME)
                     arcpy.Delete_management(outLayer)
 
                 # Copy dataset from Workspace to Warehouse for distribution
@@ -125,35 +128,48 @@ try:
                 # START MG 07/12/17:  Added below to account for Tables that are
                 #   in SDW that should be copied over to SDE
 
+                # Get the dataset type to decide how to copy the dataset
+                #   (i.e. as a Feature Class or as a Table)
+                desc = arcpy.Describe(inLayer)
+                dataset_type = desc.datasetType
                 output_dataset = os.path.join(outputSDE, r.LAYER_NAME)
-                print 'Copying "{}"\n  From: {}\n  To:   {}'.format(r.LAYER_NAME, inLayer, output_dataset)
 
-                # Try to copy FC to FC, if that fails, try to copy Table to Table
-                try:
-                    arcpy.FeatureClassToFeatureClass_conversion(inLayer, output_dataset)
-                except:
+                # Copy the dataset depending on what data type it is
+                if dataset_type == 'FeatureClass':
+                    print 'Copying "{}"\n  From: {}\n  To:   {}\\{}\n  As:   A {}'.format(r.LAYER_NAME, inLayer, outputSDE, r.LAYER_NAME, dataset_type)
+                    arcpy.FeatureClassToFeatureClass_conversion(inLayer, outputSDE, r.LAYER_NAME)
+
+                if dataset_type == 'Table':
+                    print 'Copying "{}"\n  From: {}\n  To:   {}\n  As:   A {}'.format(r.LAYER_NAME, inLayer, output_dataset, dataset_type)
                     arcpy.CopyRows_management(inLayer, output_dataset)
+
+                else:
+                    '*** WARNING! Datasets with types of "{}" cannot currently be copied'.format(dataset_type)
 
                 # END MG 07/12/17
                 #---------------------------------------------------------------
                 #---------------------------------------------------------------
 
-                # Change privileges  # MG 07/12/17:  Added try/except statement
-                print "Granting privileges to {}".format(r.LAYER_NAME)
+                # Change privileges
+                print "Granting privileges to '{}'".format(output_dataset)
                 try:
                     arcpy.ChangePrivileges_management(outLayer,"SDE_VIEWER","GRANT","AS_IS")
                 except:
                     print '*** ERROR with Granting Privileges ***'
 
-                print ""
+                print "--------------------------------------------------------"
+
             except:
                 print "*********************** ERROR WITH " + str(r.LAYER_NAME) + " *****************"
                 print arcpy.GetMessages()
+                print ''
             r = c.next()
         del c, r
 
+        #-----------------------------------------------------------------------
         # Update the dates in WAREHOUSE's LUEG_UPDATES table
         #   with the dates in WORKSPACE's LUEG_UPDATES table
+        # TODO: Do we want to update this table with the LUEG_UPDATES table, is this needed?  Is there a better way to insert a new dataset and update the existing datasets with new dates?
         c1 = arcpy.SearchCursor(inputTable)
         r1 = c1.next()
         while r1:
@@ -194,38 +210,38 @@ try:
 
     logFile.close()
     sys.stdout = oldOutput
-except Exception as e:  # MG 07/12/17: Added the 'Exception as e' to print exception to screen
+except Exception as e:
     print "ERROR in D:\\sde_maintenance\\scripts\\updateWarehouseFromWorkspace.py at " + str(time.strftime("%m/%d/%Y %H:%M:%S", time.localtime()))
     print arcpy.GetMessages()
-    print str(e)  # MG 07/12/17: Added the print statement
+    print str(e)
     logFile.close()
     sys.stdout = oldOutput
 
-### MG 07/07/17: DEV settings.  TODO: Uncomment out after testing
-    # email
-    import smtplib, ConfigParser
-    from email.mime.text import MIMEText
-
-    config = ConfigParser.ConfigParser()
-    config.read(r"D:\sde_maintenance\scripts\configFiles\accounts.txt")
-    email_usr = config.get("email","usr")
-    email_pwd = config.get("email","pwd")
-
-    fp = open(logFileName,"rb")
-    msg = MIMEText(fp.read())
-    fp.close()
-
-    fromaddr = "dplugis@gmail.com"
-    toaddr = ["gary.ross@sdcounty.ca.gov",]
-
-    msg['Subject'] = "ERROR when updating WAREHOUSE with WORKSPACE"
-    msg['From'] = "Python Script"
-    msg['To'] = "SDE Administrator"
-
-    s = smtplib.SMTP('smtp.gmail.com', 587)
-    s.ehlo()
-    s.starttls()
-    s.ehlo()
-    s.login(email_usr,email_pwd)
-    s.sendmail(fromaddr,toaddr,msg.as_string())
-    s.quit()
+# MG 07/07/17: DEV settings.  TODO: Uncomment out after testing
+##    # email
+##    import smtplib, ConfigParser
+##    from email.mime.text import MIMEText
+##
+##    config = ConfigParser.ConfigParser()
+##    config.read(r"D:\sde_maintenance\scripts\configFiles\accounts.txt")
+##    email_usr = config.get("email","usr")
+##    email_pwd = config.get("email","pwd")
+##
+##    fp = open(logFileName,"rb")
+##    msg = MIMEText(fp.read())
+##    fp.close()
+##
+##    fromaddr = "dplugis@gmail.com"
+##    toaddr = ["gary.ross@sdcounty.ca.gov",]
+##
+##    msg['Subject'] = "ERROR when updating WAREHOUSE with WORKSPACE"
+##    msg['From'] = "Python Script"
+##    msg['To'] = "SDE Administrator"
+##
+##    s = smtplib.SMTP('smtp.gmail.com', 587)
+##    s.ehlo()
+##    s.starttls()
+##    s.ehlo()
+##    s.login(email_usr,email_pwd)
+##    s.sendmail(fromaddr,toaddr,msg.as_string())
+##    s.quit()
