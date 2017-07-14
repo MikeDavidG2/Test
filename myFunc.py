@@ -187,7 +187,7 @@ def Get_Count_Selected(lyr):
 def Get_Dataset_Type(in_item):
     """
     PARAMETERS:
-      in_item (str): Full path to an item.
+      in_item (str): Full path to an item to get its dataset type.
 
     RETURNS:
       dataset_type (str): The dataset type of the item.  Common results include:
