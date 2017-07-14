@@ -98,7 +98,7 @@ logFileName = os.path.join("D:\sde_maintenance","log","blueSDEcopyTOcounty" + st
 logFileName = os.path.join('U:\grue\Projects\VDrive_to_SDEP_flow\log',"blueSDEcopyTOcounty" + str(time.strftime("%Y%m%d%H%M", time.localtime())) + ".txt")  # MG 07/13/17: Set variable to DEV settings.  TODO: Delete after testing
 logFile     = open(logFileName,"w")
 old_output = sys.stdout
-##sys.stdout  = logFile  # MG 07/13/17: Set variable to DEV settings.  TODO: Delete before done testing and then test again
+sys.stdout  = logFile  # MG 07/13/17: Commented out to DEV settings.  TODO: Uncomment out before done testing and then test again
 
 #-------------------------------------------------------------------------------
 #-------------------------------------------------------------------------------
