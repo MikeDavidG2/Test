@@ -17,6 +17,7 @@ UPDATES:
 # Author:      Gary Ross
 # Editors:     Gary Ross, Mike Grue
 #-------------------------------------------------------------------------------
+# TODO: remove the commented out settings from the DEV environment after script has been working in PROD for a while
 
 import sys, string, os, time, math, arcpy
 from datetime import datetime, date
@@ -67,11 +68,11 @@ try:
         logFileName = "D:\\sde_maintenance\\log\\updateWarehouseFromWorkspace_" + str(time.strftime("%Y%m%d%H%M", time.localtime())) + ".txt"
         logFileName = r"U:\grue\Projects\VDrive_to_SDEP_flow\log\updateWarehouseFromWorkspace_" + str(time.strftime("%Y%m%d%H%M", time.localtime())) + ".txt"  # MG 07/12/17: Set variable to DEV settings.  TODO: Delete after testing
         logFile = open(logFileName,"w")
-##        sys.stdout = logFile
+        sys.stdout = logFile  # MG 07/12/17: Set variable to DEV settings.  TODO: uncomment out after done testing
 
         print "START TIME: " + str(timestart)
         print "Copying datasets updated between " + str(startDate) + " and " + str(endDate)
-        print '----------------------------------------------------------------'  # MG 07/12/17:  Added print statement
+        print '----------------------------------------------------------------'
 
         # Disconnect users from the database (added 3/12/13)
         try:
@@ -169,7 +170,6 @@ try:
         #-----------------------------------------------------------------------
         # Update the dates in WAREHOUSE's LUEG_UPDATES table
         #   with the dates in WORKSPACE's LUEG_UPDATES table
-        # TODO: Do we want to update this table with the LUEG_UPDATES table, is this needed?  Is there a better way to insert a new dataset and update the existing datasets with new dates?
         c1 = arcpy.SearchCursor(inputTable)
         r1 = c1.next()
         while r1:
@@ -232,7 +232,7 @@ except Exception as e:
 ##    fp.close()
 ##
 ##    fromaddr = "dplugis@gmail.com"
-##    toaddr = ["gary.ross@sdcounty.ca.gov",]
+##    toaddr = ["gary.ross@sdcounty.ca.gov", 'michael.grue@sdcounty.ca.gov']
 ##
 ##    msg['Subject'] = "ERROR when updating WAREHOUSE with WORKSPACE"
 ##    msg['From'] = "Python Script"

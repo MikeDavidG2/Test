@@ -343,7 +343,7 @@ except Exception as e:
 ##        fp.close()
 ##
 ##        fromaddr = "dplugis@gmail.com"
-##        toaddr = ["gary.ross@sdcounty.ca.gov",]
+##        toaddr = ["gary.ross@sdcounty.ca.gov", 'michael.grue@sdcounty.ca.gov']
 ##
 ##        msg['Subject'] = "WORKSPACE has new datasets loaded"
 ##        msg['From'] = "Python Script"
@@ -370,7 +370,7 @@ except Exception as e:
 ##        fp.close()
 ##
 ##        fromaddr = "dplugis@gmail.com"
-##        toaddr = ["gary.ross@sdcounty.ca.gov",]
+##        toaddr = ["gary.ross@sdcounty.ca.gov", 'michael.grue@sdcounty.ca.gov']
 ##
 ##        msg['Subject'] = "ERROR when loading WORKSPACE"
 ##        msg['From'] = "Python Script"
@@ -404,7 +404,7 @@ except Exception as e:
 ##    fp.close()
 ##
 ##    fromaddr = "dplugis@gmail.com"
-##    toaddr = ["gary.ross@sdcounty.ca.gov",]
+##    toaddr = ["gary.ross@sdcounty.ca.gov", 'michael.grue@sdcounty.ca.gov']
 ##
 ##    msg['Subject'] = "ERROR when loading WORKSPACE"
 ##    msg['From'] = "Python Script"
