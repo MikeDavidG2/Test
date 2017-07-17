@@ -69,7 +69,7 @@ eMailSDEC       = 0
 fcstosend       = 0
 delerror        = 0
 dcutoff         = 14    #  <-- Change the number of days cutoff here!
-delete_files    = True  # 'True' and the FGDB (zipped and unzipped) will be deleted
+delete_files    = False  # 'True' and the FGDB (zipped and unzipped) will be deleted
 
 # List of Feature Classes that shouldn't be sent to FTP
 fc2ignore       = [
