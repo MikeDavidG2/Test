@@ -98,7 +98,7 @@ logFileName = os.path.join("D:\sde_maintenance","log","blueSDEcopyTOcounty" + st
 logFileName = os.path.join('U:\grue\Projects\VDrive_to_SDEP_flow\log',"blueSDEcopyTOcounty" + str(time.strftime("%Y%m%d%H%M", time.localtime())) + ".txt")  # MG 07/13/17: Set variable to DEV settings.  TODO: Delete after testing
 logFile     = open(logFileName,"w")
 old_output = sys.stdout
-sys.stdout  = logFile  # MG 07/13/17: Commented out to DEV settings.  TODO: Uncomment out before done testing and then test again
+##sys.stdout  = logFile  # MG 07/13/17: Commented out to DEV settings.  TODO: Uncomment out before done testing and then test again
 
 #-------------------------------------------------------------------------------
 #-------------------------------------------------------------------------------
@@ -210,7 +210,7 @@ try:
                 infcpath = os.path.join(sdeWorkspace,"SDW.PDS." + blueFDlist[key],"SDW.PDS." + fcname)
                 infcpath = os.path.join(sdeWorkspace, blueFDlist[key], fcname)  # MG 07/13/17: Set variable to DEV settings.  TODO: Delete after testing
 
-            if blueFDlist[key] == 'None':  # if FEATURE_DATASET == 'None', do not insert a FD in the path
+            if blueFDlist[key] == 'None':  # if FEATURE_DATASET == 'None', it is probably a Table.  Do not insert a FD in the path
                 infcpath = os.path.join(sdeWorkspace, "SDW.PDS." + fcname)
                 infcpath = os.path.join(sdeWorkspace, fcname)  # MG 07/13/17: Set variable to DEV settings.  TODO: Delete after testing
 
@@ -228,20 +228,34 @@ try:
                     print '"{}" in fc2ignore list.  Not sending to FTP'.format(fcname)
 
                 else:
+                    # Set paths
                     gdbname = fcname + ".gdb"
                     gdbpath = os.path.join(path,gdbname)
                     outfcpath = os.path.join(gdbpath,fcname)
 
+
+                    # Create empty FGDB
                     print '  Creating FGDB: "{}\{}"'.format(path, gdbname)
                     arcpy.management.CreateFileGDB(path,gdbname)
 
-                    # MG 07/13/17: Add try/except. Try to copy FC to FC, if that fails, try to copy Table to Table
-                    try:
+
+                    # Get the dataset type to decide how to copy the dataset
+                    #   (i.e. as a Feature Class or as a Table)
+                    desc = arcpy.Describe(infcpath)
+                    dataset_type = desc.datasetType
+
+                    # Copy the dataset depending on what data type it is
+                    if dataset_type == 'FeatureClass':
                         arcpy.management.CopyFeatures(infcpath,outfcpath)
-                        print '  Copied "{}":\n    From: "{}"\n      To: "{}"\n      As: A FEATURE CLASS'.format(fcname, infcpath, outfcpath)
-                    except:
+                        print '  Copied "{}":\n    From: "{}"\n      To: "{}"\n      As: A {}'.format(fcname, infcpath, outfcpath, dataset_type)
+
+                    if dataset_type == 'Table':
                         arcpy.CopyRows_management(infcpath, outfcpath)
-                        print '  Copied "{}":\n    From: "{}"\n      To: "{}"\n      As: A TABLE'.format(fcname, infcpath, outfcpath)
+                        print '  Copied "{}":\n    From: "{}"\n      To: "{}"\n      As: A {}'.format(fcname, infcpath, outfcpath, dataset_type)
+
+                    else:
+                        '*** WARNING! Datasets with types of "{}" cannot currently be copied'.format(dataset_type)
+
 
                     # Delete old zip file if needed
                     zippath = str(gdbpath) + ".zip"
@@ -358,13 +372,14 @@ try:
 ##        ftp.storbinary("STOR " + str(zipname),openFile)
 ##        ftp.quit()
 
-        # Delete the unzipped FGDB
+        # Clean up the files...
+        #   Delete the unzipped FGDB
         if arcpy.Exists(table_workspace_gdb_path) and delete_files:
             print '  Deleting the unzipped FGDB at: "{}"'.format(table_workspace_gdb_path)
             arcpy.management.Delete(table_workspace_gdb_path)
 
         # MG TODO: Ask Gary if the below delete should be kept.  The orig script didn't delete this zipped FGDB, but I'm not sure why not...
-        # Delete the zipped FGDB
+        #   Delete the zipped FGDB
         if arcpy.Exists(zippath) and delete_files:
             print '  Deleting the   zipped FGDB at: "{}"'.format(zippath)
             os.unlink(zippath)
