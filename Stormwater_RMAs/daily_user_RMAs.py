@@ -83,8 +83,8 @@ def main():
     distcutoff    = 5280  #  Max Shape_Length for split tracks (in FEET)
     parcel_buffer = '40 Feet'
     cfgFile     = "M:\\scripts\\configFiles\\accounts.txt"
-    ##stmwtrPeeps = ["alex.romo@sdcounty.ca.gov","randy.yakos@sdcounty.ca.gov","gary.ross@sdcounty.ca.gov"]
-    ##scriptAdmin = ["randy.yakos@sdcounty.ca.gov","gary.ross@sdcounty.ca.gov"]
+    ##stmwtrPeeps = ["alex.romo@sdcounty.ca.gov","randy.yakos@sdcounty.ca.gov","gary.ross@sdcounty.ca.gov", 'michael.grue@sdcounty.ca.gov']
+    ##scriptAdmin = ["randy.yakos@sdcounty.ca.gov","gary.ross@sdcounty.ca.gov", 'michael.grue@sdcounty.ca.gov']
     # TODO before going to prod: remove the below variables and uncomment the above. MG: 6/26/17
     stmwtrPeeps = ['michael.grue@sdcounty.ca.gov']
     scriptAdmin = ['michael.grue@sdcounty.ca.gov']
@@ -102,7 +102,6 @@ def main():
     wkgGDB      = "RMAuserWKG.gdb"
     wkgPath     = wkgFolder + "\\" + wkgGDB
     indataFC    = "A_TrackLine_OrigData"
-    ##outTrackFC  = "outUserTracksRMA"
     rmaZones    = r"P:\stormwater\data_ago\agol_stormdata.gdb\RMA_HSA_JUR1"
     gtURL       = "https://www.arcgis.com/sharing/rest/generateToken"
     dsslvFields = ['NAME', 'DATE', 'EDITOR', 'EDITDATE', 'HUNAME', 'HANAME', 'HSANAME', 'HBNUM']
