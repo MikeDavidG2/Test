@@ -82,12 +82,9 @@ def main():
     road_buffer   = '40 Feet'
     distcutoff    = 5280  #  Max Shape_Length for split tracks (in FEET)
     parcel_buffer = '40 Feet'
-    cfgFile     = "M:\\scripts\\configFiles\\accounts.txt"
-    ##stmwtrPeeps = ["alex.romo@sdcounty.ca.gov","randy.yakos@sdcounty.ca.gov","gary.ross@sdcounty.ca.gov", 'michael.grue@sdcounty.ca.gov']
-    ##scriptAdmin = ["randy.yakos@sdcounty.ca.gov","gary.ross@sdcounty.ca.gov", 'michael.grue@sdcounty.ca.gov']
-    # TODO before going to prod: remove the below variables and uncomment the above. MG: 6/26/17
-    stmwtrPeeps = ['michael.grue@sdcounty.ca.gov']
-    scriptAdmin = ['michael.grue@sdcounty.ca.gov']
+    cfgFile     = r"D:\sde_maintenance\scripts\configFiles\accounts.txt"
+    stmwtrPeeps = ["alex.romo@sdcounty.ca.gov","randy.yakos@sdcounty.ca.gov","gary.ross@sdcounty.ca.gov", 'michael.grue@sdcounty.ca.gov']
+    scriptAdmin = ["randy.yakos@sdcounty.ca.gov","gary.ross@sdcounty.ca.gov", 'michael.grue@sdcounty.ca.gov']
     fromEmail   = "dplugis@gmail.com"
 
     ###  <-------------------------------------------------------------------  and here ###
@@ -96,17 +93,15 @@ def main():
 
     # Set variables that shouldn't change much
     trackURL    = "http://services1.arcgis.com/1vIhDJwtG5eNmiqX/arcgis/rest/services/Track_line/FeatureServer/0/query"
-    ##wkgFolder   = "P:\\stormwater\\scripts\\data"
-    # TODO: before going to prod script: remove below variable and uncomment the above. MG: 6/26/17
-    wkgFolder   = r'U:\grue\Scripts\GitHub\Test\Stormwater_RMAs\data' # MG 06/26/17: changed working folder for testing purposes
+    wkgFolder   = r"D:\Projects\stormwater\scripts\data"
     wkgGDB      = "RMAuserWKG.gdb"
     wkgPath     = wkgFolder + "\\" + wkgGDB
     indataFC    = "A_TrackLine_OrigData"
-    rmaZones    = r"P:\stormwater\data_ago\agol_stormdata.gdb\RMA_HSA_JUR1"
+    rmaZones    = r"D:\Projects\stormwater\data_ago\agol_stormdata.gdb\RMA_HSA_JUR1"
     gtURL       = "https://www.arcgis.com/sharing/rest/generateToken"
     dsslvFields = ['NAME', 'DATE', 'EDITOR', 'EDITDATE', 'HUNAME', 'HANAME', 'HSANAME', 'HBNUM']
     AGOfields   = "NAME,DATE,GlobalID,EDITOR,EDITDATE"
-    warehouse   = "M:\\scripts\\Database Connections\\Atlantic Warehouse (sangis user).sde\\"
+    warehouse   = "D:\\sde_maintenance\\scripts\\Database Connections\\Atlantic Warehouse (sangis user).sde\\"
     cmroads_fc  = warehouse + "SDE.SANGIS.ROAD_SEGMENTS"
     parcels_fc  = warehouse + "SDE.SANGIS.PARCELS_ALL"
 
@@ -116,8 +111,6 @@ def main():
     logFileRMA = open(logFileNameRMA,"w")
     old_outputRMA = sys.stdout
     print 'Setting all print statements to write to a file found at:\n  {}'.format(logFileNameRMA)
-
-    # TODO before testing auto run: Uncomment out below
     sys.stdout = logFileRMA
 
     # START processing
