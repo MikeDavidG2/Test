@@ -121,6 +121,86 @@ def Delete_Rows(in_table):
 
 #-------------------------------------------------------------------------------
 #-------------------------------------------------------------------------------
+#                       FUNCTION Email()
+def Email(email_subject, email_recipients, log_file=None):
+    """
+    PARAMETERS:
+      email_subject (str): The subject line for the email
+
+      email_recipients (list): List (of strings) of email addresses
+
+      log_file {str}: Path to a log file to be included in the body of the
+        email. Optional.
+
+
+    RETURNS:
+      None
+
+
+    FUNCTION:
+      To send an email to the listed recipients.  May provide a log file to
+      include in the body of the email.
+
+      NOTE: set the 'email_config_file' variable if needed. The format of the
+        config file should be as below with <username> and <password> completed:
+          [email]
+          usr: <username>
+          pwd: <password>
+
+    """
+    import smtplib, ConfigParser
+    from email.mime.text import MIMEText
+    from email.mime.multipart import MIMEMultipart
+
+    #---------------------------------------------------------------------------
+    #                              Set variables
+    # Set config file to get username and password
+    email_config_file = r"M:\scripts\configFiles\accounts.txt"
+
+    #---------------------------------------------------------------------------
+    # Set log file into body of email if provided
+    if log_file != None:
+        # Get the log file to add to email body
+        fp = open(log_file,"rb")
+        msg = MIMEText(fp.read())
+        fp.close()
+    else:
+        msg = MIMEMultipart()
+
+    # Get username and pwd from the config file
+    try:
+        config = ConfigParser.ConfigParser()
+        config.read(email_config_file)
+        email_usr = config.get("email","usr")
+        email_pwd = config.get("email","pwd")
+    except:
+        print 'ERROR!  Could not read config file.  May not exist at location, or key may be incorrect.  Email not sent.'
+        return
+
+    # Set from and to addresses
+    fromaddr = "dplugis@gmail.com"
+    toaddr = email_recipients
+    email_recipients_str = ', '.join(email_recipients)  # Join each item in list with a ', '
+
+    # Set visible info in email
+    msg['Subject'] = email_subject
+    msg['From']    = "Python Script"
+    msg['To']      = email_recipients_str
+
+    # Email
+    s = smtplib.SMTP('smtp.gmail.com', 587)
+    s.ehlo()
+    s.starttls()
+    s.ehlo()
+    s.login(email_usr,email_pwd)
+    s.sendmail(fromaddr,toaddr,msg.as_string())
+    s.quit()
+
+    print 'Sent email with subject "{}"'.format(email_subject)
+    print 'To: {}'.format(email_recipients_str)
+
+#-------------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 #                       FUNCTION Excel_To_Table()
 def Excel_To_Table(input_excel_file, out_table, sheet):
     """
