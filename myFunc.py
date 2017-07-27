@@ -491,6 +491,36 @@ def Select_Object(path_to_obj, selection_type, where_clause):
 
 #-------------------------------------------------------------------------------
 #-------------------------------------------------------------------------------
+def Test_Exists(dataset):
+    """
+    PARAMETERS:
+      dataset (str): Full path to a dataset.  May be a FC, Table, etc.
+
+    RETURNS:
+      exists (bool): 'True' if the dataset exists, 'False' if not.
+
+    FUNCTION:
+      To test if a dataset exists or not.
+    """
+
+    print 'Starting Test_Exists()'
+
+    print '  Testing to see if exists: "{}"'.format(dataset)
+
+    # Test to see if 'dataset' exists or not
+    if arcpy.Exists(dataset):
+        exists = True
+    else:
+        exists = False
+
+    '  Dataset Exists = "{}"'.format(exists)
+
+    print 'Finished Test_Exists'
+
+    return exists
+
+#-------------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 #                          FUNCTION Test_Schema_Lock()
 def Test_Schema_Lock(dataset):
     """
