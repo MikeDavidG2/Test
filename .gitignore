@@ -6,6 +6,7 @@ Stormwater_RMAs/data
 Stormwater_RMAs/log
 Test_VDrive_to_SDEP/*.docx
 Test_VDrive_to_SDEP/*.xlsx
+*Thumbs.db
 ~*
 
 # Byte-compiled / optimized / DLL files
