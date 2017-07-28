@@ -513,9 +513,9 @@ def Test_Exists(dataset):
     else:
         exists = False
 
-    '  Dataset Exists = "{}"'.format(exists)
+    print '  Dataset Exists = "{}"'.format(exists)
 
-    print 'Finished Test_Exists'
+    print 'Finished Test_Exists\n'
 
     return exists
 
