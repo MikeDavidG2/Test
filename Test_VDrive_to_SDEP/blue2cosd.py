@@ -52,13 +52,13 @@ stopTimeStr  = "05:00:00" # time of day (next day) to stop copying
 
 # Set paths
 root          = "D:\\sde_cosd_and_blue"
-root          = r'U:\grue\Projects\VDrive_to_SDEP_flow\FALSE_root'  # MG 07/17/17: Set variable to DEV settings.  TODO: Delete after testing
+##root          = r'U:\grue\Projects\VDrive_to_SDEP_flow\FALSE_root'  # MG 07/17/17: Set variable to DEV settings.  TODO: Delete after testing
 sdePath       = os.path.join(root,"connection","Connection to Workspace (sangis user).sde")
-sdePath       = r'U:\grue\Projects\VDrive_to_SDEP_flow\FALSE_root\connection\FALSE_SDEP2.gdb'  # MG 07/17/17: Set variable to DEV settings.  TODO: Delete after testing
+##sdePath       = r'U:\grue\Projects\VDrive_to_SDEP_flow\FALSE_root\connection\FALSE_SDEP2.gdb'  # MG 07/17/17: Set variable to DEV settings.  TODO: Delete after testing
 ftpFolder     = "ftp/LUEG/transfer_to_cosd"
-ftpFolder     = r'U:\grue\Projects\VDrive_to_SDEP_flow\FALSE_FTP_folder'  # MG 07/17/17: Set variable to DEV settings.  TODO: Delete after testing
+##ftpFolder     = r'U:\grue\Projects\VDrive_to_SDEP_flow\FALSE_FTP_folder'  # MG 07/17/17: Set variable to DEV settings.  TODO: Delete after testing
 sdePre        = "SDEP2.SANGIS."
-sdePre        = ''  # MG 07/17/17: Set variable to DEV settings.  TODO: Delete after testing
+##sdePre        = ''  # MG 07/17/17: Set variable to DEV settings.  TODO: Delete after testing
 manifestTable = "manifest_blue2cosd"
 
 #-------------------------------------------------------------------------------
@@ -90,7 +90,7 @@ ignoreFields  = [
 old_output  = sys.stdout
 logFileName = os.path.join(logPath,"blue2cosd" + str(time.strftime("%Y%m%d%H%M", time.localtime())) + ".txt")
 logFile     = open(logFileName,"w")
-sys.stdout  = logFile   # MG 07/17/17: Set variable to DEV settings.  TODO: Uncomment out after testing and delete this comment.
+sys.stdout  = logFile
 
 # Format stop time for processing
 tomorrow = datetime.date.today() + datetime.timedelta(days=1)
@@ -113,58 +113,57 @@ delete_FGDB = False  # Set 'False' here AND at the beginning of each dataset.
 print '************************************************************************'
 print '                        Starting blue2cosd.py'
 print '************************************************************************'
-# MG 7/17/17:  No need to test this section of the script, FC's and Tables are downloaded and unzipped the exact same way.  TODO: Uncomment out below after done testing.
+
 # Download and delete all files from ftp
 print 'Downloading and deleting files from FTP'
 print '------------------------------------------------------------------------'
-##try:
-##    os.chdir(dataPath)
-##    print str(time.strftime("%H:%M:%S", time.localtime())),"| Connecting to ftp"
-##    config = ConfigParser.ConfigParser()
-##    config.read(configFile)
-##    usr = config.get("sangis","usr")
-##    pwd = config.get("sangis","pwd")
-##    adr = config.get("sangis","adr")
-##    ftp = ftplib.FTP(adr)
-##    ftp.login(usr,pwd)
-##    ftp.cwd(ftpFolder)
-##    filenames = ftp.nlst()
-##    number_of_files = int(len(filenames))
-##    if number_of_files < 2:
-##        print "WARNING: No files on FTP site\n"
-##        sys.stdout = old_output
-##        logFile.close()
-##        sys.exit(0)
-##    else:
-##        for filename in filenames:
-##            fc  = filename.strip(".gdb.zip")
-##            gdb = filename.strip(".zip")
-##            print str(time.strftime("%H:%M:%S", time.localtime())),"| Downloading and unzipping",fc
-##            zipPath = os.path.join(dataPath,filename)
-##            # download
-##            with open(zipPath,'wb') as openFile:
-##                ftp.retrbinary('RETR '+ filename,openFile.write)
-##            # delete existing gdb
-##            if arcpy.Exists(gdb):
-##                arcpy.management.Delete(gdb)
-##            # unzip
-##            with zipfile.ZipFile(zipPath,"r") as z:
-##                z.extractall(dataPath)
-##            # delete zip file from ftp (except manifest file)
-##            if not filename == manifestTable + ".gdb.zip":
-##                ftp.delete(filename)
-##            # delete zip file from staging area
-##            if arcpy.Exists(zipPath):
-##                print '  Deleting file from "{}"'.format(zipPath)
-##                os.unlink(zipPath)
-##                print '\n--------------------------------------------------------'
-##    ftp.quit()
-##except:
-##    errorFlag = True
-##    print "ERROR: Failed to download or unzip file from ftp site\n"
-##    print arcpy.GetMessages()
-##    print ""
-##
+try:
+    os.chdir(dataPath)
+    print str(time.strftime("%H:%M:%S", time.localtime())),"| Connecting to ftp"
+    config = ConfigParser.ConfigParser()
+    config.read(configFile)
+    usr = config.get("sangis","usr")
+    pwd = config.get("sangis","pwd")
+    adr = config.get("sangis","adr")
+    ftp = ftplib.FTP(adr)
+    ftp.login(usr,pwd)
+    ftp.cwd(ftpFolder)
+    filenames = ftp.nlst()
+    number_of_files = int(len(filenames))
+    if number_of_files < 2:
+        print "WARNING: No files on FTP site\n"
+        sys.stdout = old_output
+        logFile.close()
+        sys.exit(0)
+    else:
+        for filename in filenames:
+            fc  = filename.strip(".gdb.zip")
+            gdb = filename.strip(".zip")
+            print str(time.strftime("%H:%M:%S", time.localtime())),"| Downloading and unzipping",fc
+            zipPath = os.path.join(dataPath,filename)
+            # download
+            with open(zipPath,'wb') as openFile:
+                ftp.retrbinary('RETR '+ filename,openFile.write)
+            # delete existing gdb
+            if arcpy.Exists(gdb):
+                arcpy.management.Delete(gdb)
+            # unzip
+            with zipfile.ZipFile(zipPath,"r") as z:
+                z.extractall(dataPath)
+            # delete zip file from ftp (except manifest file)
+            if not filename == manifestTable + ".gdb.zip":
+                ftp.delete(filename)
+            # delete zip file from staging area
+            if arcpy.Exists(zipPath):
+                print '  Deleting file from "{}"'.format(zipPath)
+                os.unlink(zipPath)
+                print '\n--------------------------------------------------------'
+    ftp.quit()
+except:
+    errorFlag = True
+    print "ERROR: Failed to download or unzip file from ftp site\n"
+    print arcpy.GetMessages()
+    print ""
 
 # Get a list of each FGDB
 print '++++++++++++++++++++++++++++++++++++++++++++++++++++++++'
@@ -304,7 +303,7 @@ for workspace in workspaces:
 
                         if dataset_type == 'FeatureClass': # Register Feature Dataset As Versioned
                             print '  Registering as versioned FDS "{}"'.format(sdeFDS)
-##                            arcpy.management.RegisterAsVersioned(sdeFDS,"NO_EDITS_TO_BASE")  # MG 07/17/17: Set variable to DEV settings.  TODO: Uncomment out after testing
+                            arcpy.management.RegisterAsVersioned(sdeFDS,"NO_EDITS_TO_BASE")  # MG 07/17/17: Set variable to DEV settings.  TODO: delete comment
 
                         # Delete all records in Dataset
                         print '  Deleting rows in SDE at "{}"'.format(sdeFC)
@@ -324,7 +323,7 @@ for workspace in workspaces:
                     if delete_FGDB:
                         try:
                             print '  Deleting FGDB used to update SDE "{}"'.format(workspace)
-##                            arcpy.management.Delete(workspace)  # MG 07/17/17: Set variable to DEV settings.  TODO: Uncomment out after testing
+                            arcpy.management.Delete(workspace)  # MG 07/17/17: Set variable to DEV settings.  TODO: delete comment
                         except:
                             errorFlag = True
                             print '*** ERROR: Problem with deleting FGDB used to update SDE ***'
