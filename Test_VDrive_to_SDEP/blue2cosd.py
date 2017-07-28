@@ -1,15 +1,38 @@
-
+#-------------------------------------------------------------------------------
+# Name:        blue2cosd.py
+# Purpose:
+#
 """
-NOTE: For the purposes of this script a 'Dataset' can be any type of data
+To update SDEP2 with zipped FGDB's stored on an FTP site.
+
+NOTES: For the purposes of this script a 'Dataset' can be any type of data
 (Feature Class, Table, etc.).  A Feature Dataset (FDS) is the specific object in
 ArcCatalog that can contain Feature Classes of all the same Projection.
-"""
 
-################################################################################
-### blue2cosd.py
-### Copy files maintained on Blue Workspace SDE to County Workspace SDE
-### May 2017
-################################################################################
+PROCESS:
+  1. Downloads zipped FGDB's from an FTP site to a staging folder,
+     unzips, and deletes zipped FGDB's from the FTP site and in the staging
+     folder.
+  2. Gets a list of each unzipped FGDB in the staging folder.
+  3. Gets the FDS the dataset belongs to in the County SDEP2 from the
+     manifestTable.
+  4. Tests to confirm that the dataset exists in SDEP2.
+  5. Tests to confirm that the dataset in the FGDB has the all the fields in
+     the SDEP2 dataset.
+  6. Creates a backup of the existing dataset.
+  7. Registers the FDS as versioned (if a FC - because a backup was created).
+     Not needed if the dataset is a Table since a Table backup doesn't need to
+     be registered as versioned.
+  8. Deletes the rows in the SDEP2 dataset.
+  9. Appends rows from the FGDB to the SDEP2 dataset.
+  10. Deletes the FGDB used to update SDEP2 from the staging folder.
+
+UPDATES:
+  July 2017: Updated to allow Tables to update SDEP2 from the FTP site.
+"""
+# Author:      Gary Ross
+# Editors:     Gary Ross, Mike Grue
+#-------------------------------------------------------------------------------
 import arcpy
 import ConfigParser
 import datetime
@@ -22,21 +45,33 @@ import sys
 import time
 import zipfile
 
+#-------------------------------------------------------------------------------
+#                            User Set Variables
+#-------------------------------------------------------------------------------
 stopTimeStr  = "05:00:00" # time of day (next day) to stop copying
+
+# Set paths
 root          = "D:\\sde_cosd_and_blue"
 root          = r'U:\grue\Projects\VDrive_to_SDEP_flow\FALSE_root'  # MG 07/17/17: Set variable to DEV settings.  TODO: Delete after testing
 sdePath       = os.path.join(root,"connection","Connection to Workspace (sangis user).sde")
 sdePath       = r'U:\grue\Projects\VDrive_to_SDEP_flow\FALSE_root\connection\FALSE_SDEP2.gdb'  # MG 07/17/17: Set variable to DEV settings.  TODO: Delete after testing
-dataPath      = os.path.join(root,"data")
-logPath       = os.path.join(root,"log")
-configFile    = os.path.join(root,"connection","ftp.txt")
 ftpFolder     = "ftp/LUEG/transfer_to_cosd"
 ftpFolder     = r'U:\grue\Projects\VDrive_to_SDEP_flow\FALSE_FTP_folder'  # MG 07/17/17: Set variable to DEV settings.  TODO: Delete after testing
 sdePre        = "SDEP2.SANGIS."
 sdePre        = ''  # MG 07/17/17: Set variable to DEV settings.  TODO: Delete after testing
 manifestTable = "manifest_blue2cosd"
+
+#-------------------------------------------------------------------------------
+#                            Script Set Variables
+#-------------------------------------------------------------------------------
+# Set paths
+dataPath      = os.path.join(root,"data")
+logPath       = os.path.join(root,"log")
+configFile    = os.path.join(root,"connection","ftp.txt")
 errorFile     = os.path.join(logPath,"ERROR_" + str(time.strftime("%Y%m%d", time.localtime())) + "_blue2cosd.txt")
-errorFlag     = False
+arcpy.env.workspace = dataPath
+
+# Set fields to ignore when comparing datasets in FGDB and SDEP2
 ignoreFields  = [
     "Shape",
     "SHAPE",
@@ -51,19 +86,37 @@ ignoreFields  = [
     "SHAPE.STLength()",
     "Shape_STLength__"]
 
+# Set log file variables
 old_output  = sys.stdout
 logFileName = os.path.join(logPath,"blue2cosd" + str(time.strftime("%Y%m%d%H%M", time.localtime())) + ".txt")
 logFile     = open(logFileName,"w")
-##sys.stdout  = logFile   # MG 07/17/17: Set variable to DEV settings.  TODO: Uncomment out after testing and delete this comment.
-
-arcpy.env.workspace = dataPath
+sys.stdout  = logFile   # MG 07/17/17: Set variable to DEV settings.  TODO: Uncomment out after testing and delete this comment.
 
 # Format stop time for processing
 tomorrow = datetime.date.today() + datetime.timedelta(days=1)
 stopTime = datetime.datetime.strptime(str(tomorrow) + " " + str(stopTimeStr),"%Y-%m-%d %H:%M:%S")
 
-# MG 7/17/17:  No need to test this section of the script, FC's and Tables are downloaded and unzipped the exact same way.
-### Download and delete all files from ftp
+# Flags
+errorFlag = False  # Set 'False' here only.
+                   # Flipped to 'True' if there is any error.
+
+fieldError = False # Set 'False' here AND at the beginning of each dataset.
+                   # Flipped to 'True' if there is a field error for that dataset.
+
+delete_FGDB = False  # Set 'False' here AND at the beginning of each dataset.
+                     #   Flipped to 'True' for each dataset if it successfully
+                     #   updates SDEP2, will allow the FGDB in the Staging folder
+                     #   to be deleted.
+#-------------------------------------------------------------------------------
+#                            Start Running Script
+#-------------------------------------------------------------------------------
+print '************************************************************************'
+print '                        Starting blue2cosd.py'
+print '************************************************************************'
+# MG 7/17/17:  No need to test this section of the script, FC's and Tables are downloaded and unzipped the exact same way.  TODO: Uncomment out below after done testing.
+# Download and delete all files from ftp
+print 'Downloading and deleting files from FTP'
+print '------------------------------------------------------------------------'
 ##try:
 ##    os.chdir(dataPath)
 ##    print str(time.strftime("%H:%M:%S", time.localtime())),"| Connecting to ftp"
@@ -102,7 +155,9 @@ stopTime = datetime.datetime.strptime(str(tomorrow) + " " + str(stopTimeStr),"%Y
 ##                ftp.delete(filename)
 ##            # delete zip file from staging area
 ##            if arcpy.Exists(zipPath):
+##                print '  Deleting file from "{}"'.format(zipPath)
 ##                os.unlink(zipPath)
+##                print '\n--------------------------------------------------------'
 ##    ftp.quit()
 ##except:
 ##    errorFlag = True
@@ -111,14 +166,18 @@ stopTime = datetime.datetime.strptime(str(tomorrow) + " " + str(stopTimeStr),"%Y
 ##    print ""
 ##
 
-# Go through each FGDB
+# Get a list of each FGDB
+print '++++++++++++++++++++++++++++++++++++++++++++++++++++++++'
+print '--------------------------------------------------------'
 arcpy.env.workspace = dataPath
 workspaces = arcpy.ListWorkspaces("","FileGDB")
 
+# Go through each FGDB
 for workspace in workspaces:
     print '\n------------------------------------------------------------------'
     print '{}  |  Processing workspace: "{}"'.format(str(time.strftime("%H:%M:%S", time.localtime())), workspace)
 
+    delete_FGDB = False
     timenow = datetime.datetime.now()
     deltaTime = stopTime - timenow
     deltaDays = int(deltaTime.days)
@@ -243,11 +302,9 @@ for workspace in workspaces:
                         print '  Backing up "{}"\n    From: "{}"\n      To: "{}"'.format(fc, sdeFC, backup_path)
                         arcpy.management.Copy(sdeFC, backup_path)
 
-                        # Register Feature Dataset As Versioned
-                        print '  Registering as versioned FDS "{}"'.format(sdeFDS)
-##                        arcpy.management.RegisterAsVersioned(sdeFDS,"NO_EDITS_TO_BASE")  # MG 07/17/17: Set variable to DEV settings.  TODO: Uncomment out after testing
-
-                        # MG 07/17/17 TODO: Why is there no setting permissions step on this script?
+                        if dataset_type == 'FeatureClass': # Register Feature Dataset As Versioned
+                            print '  Registering as versioned FDS "{}"'.format(sdeFDS)
+##                            arcpy.management.RegisterAsVersioned(sdeFDS,"NO_EDITS_TO_BASE")  # MG 07/17/17: Set variable to DEV settings.  TODO: Uncomment out after testing
 
                         # Delete all records in Dataset
                         print '  Deleting rows in SDE at "{}"'.format(sdeFC)
@@ -257,19 +314,20 @@ for workspace in workspaces:
                         try:
                             print '  Appending data:\n    From: "{}"\n      To: "{}"'.format(gdbFC, sdeFC)
                             arcpy.Append_management(gdbFC, sdeFC, 'TEST')
+                            delete_FGDB = True
 
                         except:
-                            errorFlag = True
                             print '*** ERROR Appending data to "{}"'.format(fc)
+                            errorFlag = True
 
-                # Delete FGDB's used to update SDE
-                if not errorFlag and not fieldError:  # If no errors, delete FGDB
-                    try:
-                        print '  Deleting FGDB used to update SDE "{}"'.format(workspace)
-##                        arcpy.management.Delete(workspace)  # MG 07/17/17: Set variable to DEV settings.  TODO: Uncomment out after testing
-                    except:
-                        errorFlag = True
-                        print '*** ERROR: Problem with deleting FGDB used to update SDE ***'
+                    # If Append was successful delete FGDB used to update SDEP2
+                    if delete_FGDB:
+                        try:
+                            print '  Deleting FGDB used to update SDE "{}"'.format(workspace)
+##                            arcpy.management.Delete(workspace)  # MG 07/17/17: Set variable to DEV settings.  TODO: Uncomment out after testing
+                        except:
+                            errorFlag = True
+                            print '*** ERROR: Problem with deleting FGDB used to update SDE ***'
 
             except Exception as e:
                 errorFlag = True
