@@ -122,12 +122,21 @@ def Delete_Rows(in_table):
 #-------------------------------------------------------------------------------
 #-------------------------------------------------------------------------------
 #                       FUNCTION Email()
-def Email(email_subject, email_recipients, log_file=None):
+def Email(email_subject, email_recipients, email_login_info, log_file=None):
     """
     PARAMETERS:
       email_subject (str): The subject line for the email
 
       email_recipients (list): List (of strings) of email addresses
+
+      email_login_info (str): Path to a config file with username and password.
+        The format of the config file should be as below with
+        <username> and <password> completed:
+
+          [email]
+          usr: <username>
+          pwd: <password>
+
 
       log_file {str}: Path to a log file to be included in the body of the
         email. Optional.
@@ -140,24 +149,14 @@ def Email(email_subject, email_recipients, log_file=None):
     FUNCTION:
       To send an email to the listed recipients.  May provide a log file to
       include in the body of the email.
-
-      NOTE: set the 'email_config_file' variable if needed. The format of the
-        config file should be as below with <username> and <password> completed:
-          [email]
-          usr: <username>
-          pwd: <password>
-
     """
+
     import smtplib, ConfigParser
     from email.mime.text import MIMEText
     from email.mime.multipart import MIMEMultipart
 
-    #---------------------------------------------------------------------------
-    #                              Set variables
-    # Set config file to get username and password
-    email_config_file = r"M:\scripts\configFiles\accounts.txt"
+    print 'Starting Email()'
 
-    #---------------------------------------------------------------------------
     # Set log file into body of email if provided
     if log_file != None:
         # Get the log file to add to email body
@@ -170,7 +169,7 @@ def Email(email_subject, email_recipients, log_file=None):
     # Get username and pwd from the config file
     try:
         config = ConfigParser.ConfigParser()
-        config.read(email_config_file)
+        config.read(email_login_info)
         email_usr = config.get("email","usr")
         email_pwd = config.get("email","pwd")
     except:
@@ -448,6 +447,136 @@ def Join_2_Objects(target_obj, target_join_field, to_join_obj, to_join_field, jo
 
     # Return the layer/view of the joined object so it can be processed
     return 'target_obj'
+
+#-------------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
+#                    FUNCTION: New Loc and Loc Desc
+def New_Loc_LocDesc(wkg_data, DPW_WP_SITES):
+    """
+    NOTE: This function is from DPW_Science_and_Monitoring.py, but is no longer being
+    used in that function.
+
+    PARAMETERS:
+
+    RETURNS:
+
+    FUNCTION:
+    """
+
+    print '--------------------------------------------------------------------'
+    print 'Getting new Location Descriptions and Locations from:\n  {}\n'.format(wkg_data)
+
+    #---------------------------------------------------------------------------
+    #                      Get new Location Descriptions.
+
+    # Create list and add the first item
+    New_LocDescs = ['  The following are New Location Description suggested changes (Please edit associated feature class appropriately):']
+
+    # Create a Search cursor and add data to lists
+    cursor_fields = ['SampleEventID', 'Creator', 'StationID', 'site_loc_desc_new']
+    where = "site_loc_desc_cor = 'No'"
+    with arcpy.da.SearchCursor(wkg_data, cursor_fields, where) as cursor:
+
+        for row in cursor:
+            New_LocDesc = ('    For SampleEventID: "{}", Monitor: "{}" said the Location Description for StationID: "{}" was innacurate.  Suggested change: "{}"\n'.format(row[0], row[1], row[2], row[3]))
+            New_LocDescs.append(New_LocDesc)
+
+    del cursor
+
+    # If there is only the original New_LocDescs string, then there were no new
+    # suggested changes to make, replace the original string with below
+    if (len(New_LocDescs) == 1):
+        New_LocDescs = ['  There were no New Location Description suggested changes.\n']
+
+    for desc in New_LocDescs:
+        print desc
+
+    #---------------------------------------------------------------------------
+    #---------------------------------------------------------------------------
+    #                           Set new Locations
+
+    # Create needed lists
+    New_Locs = ['  The following are the sites that were relocated in the field (The changes will be automatically made to the DPW_WP_SITES):']
+    StationIDs, ShapeXs, ShapeYs, SampEvntIDs, Creators = ([] for i in range(5))
+
+    # Create Search cursor and add data to lists
+    cursor_fields = ['StationID', 'Shape@X', 'Shape@Y', 'SampleEventID', 'Creator']
+    where = "site_loc_map_cor = 'No'"
+    with arcpy.da.SearchCursor(wkg_data, cursor_fields, where) as cursor:
+
+        for row in cursor:
+            StationID    = row[0]
+            ShapeX       = row[1]
+            ShapeY       = row[2]
+            SampleEvntID = row[3]
+            Creator      = row[4]
+
+            StationIDs.append(StationID)
+            ShapeXs.append(ShapeX)
+            ShapeYs.append(ShapeY)
+            SampEvntIDs.append(SampleEvntID)
+            Creators.append(Creator)
+
+            ##print 'StationID: "{}" has an NEW X of: "{}" and a NEW Y of: "{}"'.format(StationID, ShapeX, ShapeY)
+
+            New_Loc = ('    For SampleEventID: "{}", Monitor: "{}" said the Location Description for StationID: "{}" was innacurate.  Site has been moved.\n'.format(SampleEvntID, Creator, StationID))
+            New_Locs.append(New_Loc)
+
+    del cursor
+
+   # If there is only the original New_Locs string, then there were no new
+   #  locations to move; no need to update the DPW_WP_SITES
+    if(len(New_Locs) == 1):
+        New_Locs = ['  There were no relocated sites.\n']
+
+    #---------------------------------------------------------------------------
+    # Create an Update cursor to update the Shape column in the DPW_WP_SITES
+    else:
+        list_counter = 0
+        cursor_fields = ['StationID', 'Shape@X', 'Shape@Y']
+        with arcpy.da.UpdateCursor(DPW_WP_SITES, cursor_fields) as cursor:
+            for row in cursor:
+
+                # Only loop as many times as there are StationIDs to update
+                if (list_counter < len(StationIDs)):
+
+                    # If StationID in DPW_WP_SITES equals the StationID in the
+                    #  StationIDs list, update the geom for that StationID in DPW_WP_SITES
+                    if row[0] == StationIDs[list_counter]:
+                        ##print '  Updating StationID: {} with new coordinates.'.format(StationIDs[list_counter])
+
+                        # Give Shape@X and Shape@Y their new values
+                        row[1] = ShapeXs[list_counter]
+                        row[2] = ShapeYs[list_counter]
+
+                        cursor.updateRow(row)
+
+                        list_counter += 1
+
+        del cursor
+
+        #-----------------------------------------------------------------------
+        # Calculate X and Y fields in DPW_WP_SITES now that the geometry has been updated
+
+        # Calculate the Long_X field
+        field = 'Long_X'
+        expression = "!Shape.Centroid.X!"
+        expression_type="PYTHON_9.3"
+        arcpy.CalculateField_management(DPW_WP_SITES, field, expression, expression_type)
+
+        # Calculate the Lat_Y field now that the geometry has been updated
+        field = 'Lat_Y'
+        expression = "!Shape.Centroid.Y!"
+        expression_type="PYTHON_9.3"
+        arcpy.CalculateField_management(DPW_WP_SITES, field, expression, expression_type)
+
+    for Loc in New_Locs:
+        print Loc
+
+
+    print '\nSuccessfully got new Location Descriptions and set New Locations.\n'
+
+    return New_LocDescs, New_Locs
 
 #-------------------------------------------------------------------------------
 #-------------------------------------------------------------------------------
