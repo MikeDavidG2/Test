@@ -1,10 +1,12 @@
 #My Files to Ignore
 Test_Geolocator/Addresses.gdb
 Test_Geolocator/Addresses.xlsx
-Stormwater_RMAs/*.mxd
+Stormwater_RMAs/MXDs
 Stormwater_RMAs/data
 Stormwater_RMAs/log
-Test_VDrive_to_SDEP/Questions_For_Gary.docx
+Test_VDrive_to_SDEP/*.docx
+Test_VDrive_to_SDEP/*.xlsx
+*Thumbs.db
 ~*
 
 # Byte-compiled / optimized / DLL files

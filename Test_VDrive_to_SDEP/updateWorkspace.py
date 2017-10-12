@@ -2,7 +2,8 @@
 # Name:        updateWorkspace.py
 # Purpose:
 """
-Loads data from local file geodatabase into Workspace
+Loads data from local file geodatabase ('table_update_path' and 'fc_update_path')
+into Workspace ('workspace_path')
 NOTE: Run script directly on server Southern
 
 UPDATES:
@@ -11,205 +12,242 @@ UPDATES:
   February 2017:
     Upgraded ArcGIS to 10.4.1 and new server
   July 2017:
-    Allow tables in the loading FGDB (sde_load.gdb) to load into
-    Workspace.
-    NOTES: Any table in loading FGDB will be loaded into Workspace, however
-    any NEW table added to Workspace should be manually added to LUEG_UPDATES
-    table in Workspace.  All Tables should have field FEATURE_DATASET = 'None'
-    and COUNTY_FDS = 'None'
+    Allow Tables in the loading FGDB (sde_load.gdb) to load into Workspace.
+    NOTES:
+      1. Any table in loading FGDB will be loaded into Workspace, and given
+    default attributes.
+      2. All Tables should have field FEATURE_DATASET = 'None'
+         and COUNTY_FDS = 'None'
 """
 #
 # Author:      Gary Ross
 # Editors:     Gary Ross, Mike Grue
 #-------------------------------------------------------------------------------
 
-# TODO: Delete the commented out variables added with 'MG 07/07/17' after script has been running successfully in prod for a while.
-
 import sys, string, os, time, math, arcpy
 from datetime import date
 
-##arcpy.env.overwriteOutput = True  #  MG 07/07/17: Set variable to DEV settings.  TODO: Delete after testing
+# Set paths to FGDB used to update
+table_update_path  = r'D:\sde\sde_load.gdb'
+fc_update_path     = table_update_path + '\\workspace'
 
+# Set paths to SDE Workspace to be updated
+workspace_path     = r'D:\sde_maintenance\scripts\Database Connections\Atlantic Workspace (pds user).sde'
+lueg_updates_table = workspace_path + "\\SDW.PDS.LUEG_UPDATES"
+
+# Misc Variables
+adminSDE           = "Database Connections\\Atlantic Workspace (sa user).sde"
+logFileName        = str("D:\\sde_maintenance\\log\\updateWorkspace_" + str(time.strftime("%Y%m%d%H%M", time.localtime())) + ".txt")
+lueg_admin_email   = ["gary.ross@sdcounty.ca.gov", 'michael.grue@sdcounty.ca.gov']
+no_errors          = True
+
+# Get time and date
 timestart = str(time.strftime("%m/%d/%Y %H:%M:%S", time.localtime()))
 dateToday = str(time.strftime("%m/%d/%Y", time.localtime()))
 
 try:
     #---------------------------------------------------------------------------
     # START MG 07/07/17: Add to allow 'Tables' (not just Feature Classes) to update Workspace
-    # Get a list of Tables (if any) to trigger the rest of the script even
-    #   if there are tables, but no feature classes.
-
-    table_update_path = r'D:\sde\sde_load.gdb'
-##    table_update_path = r'U:\grue\Projects\VDrive_to_SDEP_flow\FALSE_sde_load.gdb'  # MG 07/07/17: Set variable to DEV settings.  TODO: Delete after testing
+    # Get a list of Tables (if any) in the loading FGDB
     arcpy.env.workspace = table_update_path
     table_list = arcpy.ListTables()
 
-    # END MG 07/07/17
-    #---------------------------------------------------------------------------
-
-    fgdb = r"D:\sde\sde_load.gdb\workspace"
-##    fgdb = r'U:\grue\Projects\VDrive_to_SDEP_flow\FALSE_sde_load.gdb\workspace'  # MG 07/07/17: Set variable to DEV settings.  TODO: Delete after testing
-    arcpy.env.workspace = fgdb
+    # Get a list of Feature Classes (if any) in the loading FGDB
+    arcpy.env.workspace = fc_update_path
     fcList = arcpy.ListFeatureClasses()
 
-    eMailLogic = 0 # Added line 12/10/2014 - Email logic
-
-    if ((fcList != []) or (table_list != [])) : # There are datasets to move. MG 07/07/17: added 'table_list' check.  TODO: show Gary this section and any 'MG 07/07/17' changes
+    if ((fcList != []) or (table_list != [])) : # Test to see if there are datasets to move
 
         # Create log file
         oldOutput = sys.stdout
-        logFileName = str("D:\\sde_maintenance\\log\\updateWorkspace_" + str(time.strftime("%Y%m%d%H%M", time.localtime())) + ".txt")
-##        logFileName = str(r"U:\grue\Projects\VDrive_to_SDEP_flow\log\updateWorkspace_" + str(time.strftime("%Y%m%d%H%M", time.localtime())) + ".txt")  # MG 07/07/17: Set variable to DEV settings.  TODO: Delete after testing
         logFile = open(logFileName,"w")
-        sys.stdout = logFile  ## MG 07/07/17: DEV settings.  TODO: Uncomment out after testing, then delete this comment
+        sys.stdout = logFile
+
+        # Starting print statements
         print "START TIME " + str(timestart)
-
         print ""
+        print 'Table List:'
+        print table_list
+        print ''
+        print 'Feature Class List:'
+        print fcList
 
-        dataList = arcpy.ListFeatureClasses()
-
-        pathName  = "Database Connections\\Atlantic Workspace (pds user).sde"
-##        pathName  = r'U:\grue\Projects\VDrive_to_SDEP_flow\FALSE_SDW.gdb'  # MG 07/07/17: Set variable to DEV settings.  TODO: Delete after testing
-        tableName = pathName + "\\SDW.PDS.LUEG_UPDATES"
-##        tableName = pathName + "\\LUEG_UPDATES"  # MG 07/07/17: Set variable to DEV settings.  TODO: Delete after testing
-        adminSDE  = "Database Connections\\Atlantic Workspace (sa user).sde"
-
-##        MG 07/07/17: DEV settings.  TODO: Uncomment out after testing
         # Disconnect users from the database (added 3/12/13)
         try:
+            print 'Disconnecting Users'
             usrList = arcpy.ListUsers(adminSDE)
             for user in usrList:
                 if user.Name[1:5] == "BLUE":
                     arcpy.DisconnectUser(adminSDE,user.ID)
+            print 'Users disconnected\n'
+
         except:
             print "ERROR disconnecting users"
             print arcpy.GetMessages()
 
-        #-----------------------------------------------------------------------
-        #-----------------------------------------------------------------------
-        # START MG 07/07/17:  Added to import any tables in 'sde_load.gdb'
+        print '------------------------------------------------'
+        print '++++++++++++++++++++++++++++++++++++++++++++++++'
+        print '------------------------------------------------'
 
+
+        #-----------------------------------------------------------------------
+        #-----------------------------------------------------------------------
+        #                     Process TABLES below
         if (table_list != []):
-            print 'Processing {} tables'.format(str(len(table_list)))
-            print '--------------------------------------------------------'
-
-            lueg_updates_table = tableName  # Change variable name for readability in MG 07/07/17 section
+            print 'Processing {} tables\n'.format(str(len(table_list)))
 
             for table in table_list:
-                print 'Processing table: {}'.format(table)
-
-                load_table = os.path.join(table_update_path, table)
-                workspace_table = os.path.join(pathName, table)
-
-                # If table exists in Workspace, delete it
-                if arcpy.Exists(workspace_table):
-                    print '  Deleting "{}" in "{}"'.format(table, pathName)
-                    arcpy.Delete_management(workspace_table)
-                    print '    ...Deleted'
-
-
-                # Copy table from 'sde_load.gdb' to Workspace
-                print '  Copying "{}" to "{}"'.format(table, workspace_table)
-                arcpy.Copy_management(load_table, workspace_table)
-                print '    ...Copied'
-
-
-                # Date stamp the table in the Workspace's LUEG_UPDATES table
-                where_clause = '"LAYER_NAME" = \'{}\''.format(table)
-                with arcpy.da.UpdateCursor(lueg_updates_table, ['LAYER_NAME', 'UPDATE_DATE'], where_clause) as cursor:
-                    num_rows = 0
-                    for row in cursor:
-                        row[1] = dateToday
-                        print '  Updating LUEG_UPDATES where ({}) so UPDATE_DATE equals "{}"'.format(where_clause, row[1])
-                        cursor.updateRow(row)
-                        print '    ...Updated'
-                        num_rows = num_rows + 1
-
-                    # Warn user if no row in LUEG_UPDATES satisfied the where_clause
-                    if num_rows != 1:
-                        print '*** WARNING! UPDATE_DATE "{}" wasn\'t updated in LUEG_UPDATES, please confirm table in LUEG_UPDATES ***'.format(table)
-
-
-                # Register table as versioned if needed
                 try:
-                    desc = arcpy.Describe(workspace_table)
-                    if not desc.isVersioned:
-                        print '  Registering Table "{}" as versioned'.format(workspace_table)
-                        arcpy.RegisterAsVersioned_management(workspace_table,"NO_EDITS_TO_BASE")  ## TODO: Uncomment out before finish testing and test uncommented.  Delete this comment after testing.
-                        print '    ...Registered'
+                    print 'Processing: "{}"'.format(table)
 
-                except:
-                    print '*** ERROR! In versioning table "{}"'.format(table)
-                    eMailLogic = 1
+                    # Set paths
+                    load_table = os.path.join(table_update_path, table)
+                    workspace_table = os.path.join(workspace_path, table)
 
+                    # If table exists in Workspace, delete it
+                    if arcpy.Exists(workspace_table):
+                        print '  Deleting "{}" in "{}"'.format(table, workspace_path)
+                        arcpy.Delete_management(workspace_table)
 
-                # Grant editing privileges
-                try:
-                    print '  Changing privileges of table "{}"'.format(workspace_table)
-                    arcpy.ChangePrivileges_management(workspace_table,"SDE_EDITOR","GRANT","GRANT")  ## TODO: Uncomment out before finish testing and test uncommented.  Delete this comment after testing.
-                    print '    ...Privileges changed'
-
-                except:
-                    print '*** ERROR! In granting permissions for table "{}"'.format(table)
-                    eMailLogic = 1
+                    # Copy table from 'sde_load.gdb' to Workspace
+                    print '  Copying  "{}" to "{}"'.format(table, workspace_table)
+                    arcpy.Copy_management(load_table, workspace_table)
 
 
-                # Delete Table from 'sde_load.gdb'
-                print "  Deleting table from loading gdb"
-                arcpy.Delete_management(load_table)  ## TODO: Uncomment out before finish testing and test uncommented.  Delete this comment after testing.
-                print '    ...Deleted'
-                print '--------------------------------------------------------'
+                    # Test to see if the copied Table already exists in LUEG_UPDATES
+                    where_clause = '"LAYER_NAME" = \'{}\''.format(table)
+                    with arcpy.da.SearchCursor(lueg_updates_table, ['LAYER_NAME'], where_clause) as searchCursor:
+                        num_rows = 0
+                        for row in searchCursor:
+                            num_rows = num_rows + 1
 
-            print '++++++++++++++++++++++++++++++++++++++++++++++++++++++++'
+                    if num_rows == 0:  # Then the table does NOT exist, add it to LUEG_UPDATES w/ values
+                        try:
+                            print '  Creating record w/attributes in "{}"'.format(lueg_updates_table)
+                            iCursor = arcpy.InsertCursor(lueg_updates_table)
+                            new_row = iCursor.newRow()
+                            new_row.LAYER_NAME      = table
+                            new_row.UPDATE_DATE     = dateToday
+                            new_row.PUBLIC_ACCESS   = 'Y'
+                            new_row.TOPOLOGY_CODE   = 'N'
+                            new_row.FEATURE_DATASET = 'None'
+                            new_row.COUNTY_FDS      = 'None'
+                            new_row.EDIT_LOCATION   = 'BLUE'
+                            iCursor.insertRow(new_row)
+                            del iCursor, new_row
 
-        # END MG 07/07/17
+                        except Exception as e:
+                            print '*** ERROR creating record in LUEG_UPDATES table ***'
+                            print str(e)
+                            no_errors = False
+
+                    elif num_rows == 1:  # Then the table EXISTS, only update the date
+                        try:
+                            print '  Updating date in for Table in   "{}"'.format(lueg_updates_table)
+                            uCursor = arcpy.UpdateCursor(lueg_updates_table, where_clause)
+                            row = uCursor.next()
+                            while row:
+                                row.UPDATE_DATE = dateToday
+                                uCursor.updateRow(row)
+                                row = uCursor.next()
+                            del uCursor, row
+
+                        except Exception as e:
+                            print '*** ERROR updating record in LUEG_UPDATES table ***'
+                            print str(e)
+                            no_errors = False
+
+                    elif num_rows > 1:
+                        print '*** WARNING! there is more than 1 record for "{}" in LUEG_UPDATES.\
+                        Please delete duplicate AND ensure correct UPDATE_DATE'.format(table)
+                        no_errors = False
+
+                    # Register table as versioned if needed
+                    try:
+                        desc = arcpy.Describe(workspace_table)
+                        if not desc.isVersioned:
+                            print '  Registering as versioned Table  "{}"'.format(workspace_table)
+                            arcpy.RegisterAsVersioned_management(workspace_table,"NO_EDITS_TO_BASE")
+
+                    except Exception as e:
+                        print '*** ERROR! In versioning table "{}"'.format(table)
+                        print str(e)
+                        no_errors = False
+
+
+                    # Grant editing privileges
+                    try:
+                        print '  Changing privileges of table    "{}"'.format(workspace_table)
+                        arcpy.ChangePrivileges_management(workspace_table,"SDE_EDITOR","GRANT","GRANT")
+
+                    except Exception as e:
+                        print '*** ERROR! In granting permissions for table "{}"'.format(table)
+                        print str(e)
+                        no_errors = False
+
+
+                    # Delete Table from 'sde_load.gdb' if everything is successful
+                    if no_errors == True:
+                        print '  Deleting table from             "{}"'.format(load_table)
+                        arcpy.Delete_management(load_table)
+
+                    print '------------------------------------------------'
+
+                except Exception as e:
+                    print '*** ERROR! With Table "{}" ***'.format(table)
+                    print str(e)
+
+            print '++++++++++++++++++++++++++++++++++++++++++++++++'
+
         #-----------------------------------------------------------------------
         #-----------------------------------------------------------------------
+        #                      Process FEATURE CLASSES below
+        if fcList != []:
+            print '------------------------------------------------'
+            print 'Processing {} Feature Classes\n'.format(str(len(fcList)))
 
-        with arcpy.da.SearchCursor(tableName,["LAYER_NAME","FEATURE_DATASET"]) as rowcursor:
-            fcfdList = list(rowcursor)
-        del rowcursor
+            # Get a list of LAYER_NAME and FEATURE_DATASET from the LUEG_UPDATES table
+            where_clause = '"FEATURE_DATASET" <> \'None\''  # Only search non-table records
+            with arcpy.da.SearchCursor(lueg_updates_table,["LAYER_NAME","FEATURE_DATASET"], where_clause) as rowcursor:
+                fcfdList = list(rowcursor)
+            del rowcursor
 
-        fdsToRegister = list([])
+            fdsToRegister = []
 
-        if dataList != []:
-            print 'Processing {} Feature Classes'.format(str(len(dataList)))  # MG 07/07/17: Added print statement
-            for fc in dataList:
+            for fc in fcList:
+                try:
+                    fdsName = "###"
+                    for fcfdPair in fcfdList:
+                        if fcfdPair[0] == fc:  # Then  the FDS name is set to = SDW path + FDS Name
+                            fdsName = workspace_path + "\\SDW.PDS." + str(fcfdPair[1])
 
-                fdsName = "none"
-                for fcfdPair in fcfdList:
-                    if fcfdPair[0] == fc:
-                        fdsName = pathName + "\\SDW.PDS." + str(fcfdPair[1])
-##                        fdsName = pathName + "\\" + str(fcfdPair[1])  # MG 07/07/17: Set variable to DEV settings.  TODO: Delete this comment after testing
-
-                if fdsName == "none":
-                    print "\n***WARNING***: " + fc + " not found in FCs table --> !!!DATA NOT COPIED!!!"
-                    eMailLogic = 1
-                else:
-                    if not arcpy.Exists(fdsName):
+                    # Catch errors (if any)
+                    if fdsName == "###":  # Then the FDS name wasn't found for this FC in LUEG_UPDATES table
+                        print "\n***WARNING***: " + fc + " not found in LUEG_UPDATES table --> !!!DATA NOT COPIED!!!"
+                        no_errors = False
+                    if not arcpy.Exists(fdsName):  # Then the FDS in LUEG_UPDATES isn't in SDW (Workspace)
                         print "\n***ERROR***: feature dataset " + str(fcfdPair[1]) + " doesn't exist --> !!!DATA NOT COPIED!!!"
-                        eMailLogic = 1
-                    else:
-                        fdsToRegister.extend([str(fcfdPair[1])])
-                        print "fdsName",fdsName
-                        print "fc",fc
+                        no_errors = False
+
+                    if no_errors == True:  # Then no errors caught, continue
+                        print 'Processing "{}"'.format(fc)
                         layerName = fdsName + "\\SDW.PDS." + str(fc)
                         topoName  = fdsName + "\\SDW.PDS.topology_" + str(fc)
 
-                        if arcpy.Exists(topoName):
-                            arcpy.Delete_management(topoName)
+                        # Delete existing dataset in SDW
                         if arcpy.Exists(layerName):
+                            print '  Deleting existing         "{}"'.format(layerName)
                             arcpy.Delete_management(layerName)
                         if arcpy.Exists(topoName):
+                            print '  Deleting existing         "{}"'.format(topoName)
                             arcpy.Delete_management(topoName)
 
-                        # Copy dataset from file gdb to LUEG/PDS SDE
-                        print "Copying " + str(fc) + " to WORKSPACE SDE..."
-                        arcpy.Copy_management(fc,fdsName + "\\" + fc)
-                        print fc + " copied to " + fdsName + "\\" + fc
+                        # Copy dataset from FGDB to LUEG/PDS SDE
+                        print '  Copying "{}" to "{}"'.format(fc, fdsName)
+                        arcpy.FeatureClassToGeodatabase_conversion(fc,fdsName)
 
                         # Check for topology requirements
-                        c = arcpy.SearchCursor(tableName, "\"LAYER_NAME\" = '" + str(fc) + "'")
+                        c = arcpy.SearchCursor(lueg_updates_table, "\"LAYER_NAME\" = '" + str(fc) + "'")
                         topoCode = "N"
                         r = c.next()
                         while r:
@@ -237,57 +275,82 @@ try:
                             print "  Validating topology..."
                             arcpy.ValidateTopology_management(topoName, "FULL_EXTENT")
 
-                        print "  Deleting feature class from loading gdb..."
-                        arcpy.Delete_management(str(fc))  ## MG 07/07/17: DEV settings.  TODO: Uncomment out before finish testing and test uncommented.  Delete this comment after testing.
-
-                        print "  Timestamping dataset..."
-                        theCount = 0
-                        c1 = arcpy.UpdateCursor(tableName ,"\"LAYER_NAME\" = '" + str(fc) + "'")
+                       # Updating date for FC in LUEG_UPDATES table
+                        print "  Updating date for Feature Class in '{}'".format(lueg_updates_table)
+                        c1 = arcpy.UpdateCursor(lueg_updates_table ,"\"LAYER_NAME\" = '" + str(fc) + "'")
                         r1 = c1.next()
                         while r1:
-                            theCount = theCount + 1
                             r1.UPDATE_DATE = dateToday
                             c1.updateRow(r1)
                             r1 = c1.next()
                         del c1, r1
 
-                        del theCount
+                        # Delete FC from loading gdb
+                        print '  Deleting feature class from "{}"'.format(fc)
+                        arcpy.Delete_management(fc)
+
+                        # Get the name of the Feature Dataset (w/o the path)
+                        # And add it to the a list so we can register and change
+                        # Privileges at the Feature Dataset level
+                        fdsToRegister.extend([os.path.basename(fdsName)])
+
                         print ""
+                        print '------------------------------------------------'
 
-##         MG 07/07/17: DEV settings.  TODO: Uncomment out after testing
-        if dataList != []:
-            for fd in fdsToRegister:
-                print "pathName",pathName
-                print "fd",fd
-                fdsName = pathName + "\\SDW.PDS." + str(fd)
+                except Exception as e:
+                    print '*** ERROR! With Feature Class "{}" ***'.format(fc)
+                    print str(e)
 
-                # Register feature dataset
+            #-------------------------------------------------------------------
+            # Register and change privileges for any Feature Classes imported'
+            unique_fdsToRegister = set(fdsToRegister)  # Set() gets a unique list-no duplicates returned
+            print '++++++++++++++++++++++++++++++++++++++++++++++++'
+            print '------------------------------------------------'
+            print 'Registering Versioning and Change Priviliges for {} Feature Datasets:'.format(str(len(unique_fdsToRegister)))
+            print ', '.join(unique_fdsToRegister)
+
+            for fd in unique_fdsToRegister:
                 try:
-                    desc = arcpy.Describe(fdsName)
-                    if not desc.isVersioned:
-                        arcpy.RegisterAsVersioned_management(fdsName,"NO_EDITS_TO_BASE")
-                        print "Feature dataset " + str(fd) + " registered as versioned..."
-                except:
-                    print "error in versioning"
-                    eMailLogic = 1
+                    fdsName = workspace_path + "\\" + str(fd)
+                    print '\nProcessing FD: "{}"'.format(fdsName)
 
-                # Change privileges
-                arcpy.ChangePrivileges_management(fdsName,"SDE_EDITOR","GRANT","GRANT")
-                print "Feature dataset " + str(fd) + " privileges changed..."
+                    # Register feature dataset
+                    try:
+                        desc = arcpy.Describe(fdsName)
+                        if not desc.isVersioned:
+                            print '  Registering as versioned'
+                            arcpy.RegisterAsVersioned_management(fdsName,"NO_EDITS_TO_BASE")
+                    except Exception as e:
+                        print "*** Error in versioning ***"
+                        print str(e)
+                        no_errors = False
+
+                    # Change privileges
+                    try:
+                        print '  Changing privileges'
+                        arcpy.ChangePrivileges_management(fdsName,"SDE_EDITOR","GRANT","GRANT")
+                    except Exception as e:
+                        print '*** Error in changing privileges ***'
+                        print str(e)
+                        no_errors = False
+
+                    print '------------------------------------------------'
+
+                except Exception as e:
+                    print '*** ERROR! With Feature Dataset "{}" ***'.format(fd)
+                    print str(e)
 
         print ""
         print "Data load to WORKSPACE SDE complete..."
+        if no_errors == True:
+            print 'SUCCESSFULLY Completed'
+        else:
+            print 'ERRORS with script'
         print "END TIME " + str(time.strftime("%m/%d/%Y %H:%M:%S", time.localtime()))
         logFile.close()
         sys.stdout = oldOutput
 
-### MG 07/07/17: DEV settings.  TODO: remove below 'except' statement after testing
-##except Exception as e:
-##    print '***  ERROR!!!  ***'
-##    print str(e)
-
-##         MG 07/07/17: DEV settings.  TODO: Uncomment out after testing
-    if eMailLogic == 0:
+    if no_errors == True:
         import smtplib, ConfigParser
         from email.mime.text import MIMEText
 
@@ -301,7 +364,7 @@ try:
         fp.close()
 
         fromaddr = "dplugis@gmail.com"
-        toaddr = ["gary.ross@sdcounty.ca.gov",]
+        toaddr = lueg_admin_email
 
         msg['Subject'] = "WORKSPACE has new datasets loaded"
         msg['From'] = "Python Script"
@@ -314,7 +377,7 @@ try:
         s.login(email_usr,email_pwd)
         s.sendmail(fromaddr,toaddr,msg.as_string())
         s.quit()
-    else:
+    else:  # Then no_errors False and there was an ERROR
         import smtplib, ConfigParser
         from email.mime.text import MIMEText
 
@@ -328,7 +391,7 @@ try:
         fp.close()
 
         fromaddr = "dplugis@gmail.com"
-        toaddr = ["gary.ross@sdcounty.ca.gov",]
+        toaddr = lueg_admin_email
 
         msg['Subject'] = "ERROR when loading WORKSPACE"
         msg['From'] = "Python Script"
@@ -342,9 +405,10 @@ try:
         s.sendmail(fromaddr,toaddr,msg.as_string())
         s.quit()
 
-except:
+except Exception as e:
     print "ERROR OCCURRED"
     print "D:\\sde_maintenance\\scripts\\updateWorkspace.py"
+    print str(e)
     print arcpy.GetMessages()
     logFile.close()
     sys.stdout = oldOutput
@@ -362,7 +426,7 @@ except:
     fp.close()
 
     fromaddr = "dplugis@gmail.com"
-    toaddr = ["gary.ross@sdcounty.ca.gov",]
+    toaddr = lueg_admin_email
 
     msg['Subject'] = "ERROR when loading WORKSPACE"
     msg['From'] = "Python Script"
