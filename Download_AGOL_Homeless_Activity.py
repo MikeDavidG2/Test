@@ -37,22 +37,22 @@ def main():
     # Full path to a text file that has the username and password of an account
     #  that has access to at least VIEW the FS in AGOL, as well as an email
     #  account that has access to send emails.
-    cfgFile     = r"<path to config file>"
+    cfgFile     = r"U:\yakos\hep_A\PROD\Scripts\accounts.txt"
 
     # Set the log file variables
-    log_file = r'<path to a log file, include the name of the log file after the last />'
+    log_file = r'U:\yakos\hep_A\PROD\Logs\Download_AGOL_Homeless_Activity'
 
     # FS_name is the name of the Feature Service (FS) with the layer you want
     #  to download (d/l).  For example: "Homeless_Activity_Sites"
-    FS_name        = '<name of FS goes here>'
+    FS_name        = 'Homeless_Activity_Sites'
 
     # Index of the layer in the FS you want to d/l.  Frequently 0.
     index_of_layer = 0
 
     # Set variables of where you want the data to go, and what the d/l FC name should be.
-    wkg_folder     = r'<path to a folder>'
-    wkg_FGDB       = '<name of EXISTING FGDB in that folder>'
-    FC_name        = '<name you want to give the FC that will be created>'
+    wkg_folder     = r'U:\yakos\hep_A\PROD\Data'
+    wkg_FGDB       = 'Mike_Testing.gdb'
+    FC_name        = 'Homeless_Activity_Sites'
 
     # Set the Email variables
     email_admin_ls = ['michael.grue@sdcounty.ca.gov']
@@ -78,7 +78,7 @@ def main():
     # Turn all 'print' statements into a log-writing object
     if success == True:
         try:
-            orig_stdout = Write_Print_To_Log(log_file)
+            orig_stdout, log_file_date = Write_Print_To_Log(log_file)
         except Exception as e:
             success = False
             print '*** ERROR with Write_Print_To_Log() ***'
@@ -113,7 +113,7 @@ def main():
     else:
         email_subject = 'ERROR running {}'.format(name_of_script)
 
-    Email_W_LogFile(email_subject, email_admin_ls, cfgFile, log_file)
+    Email_W_LogFile(email_subject, email_admin_ls, cfgFile, log_file_date)
 
 #-------------------------------------------------------------------------------
 #+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -171,7 +171,7 @@ def Write_Print_To_Log(log_file):
     print '             START <name_of_script_here>.py'
     print '++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n'
 
-    return orig_stdout
+    return orig_stdout, log_file_date
 
 #-------------------------------------------------------------------------------
 #-------------------------------------------------------------------------------
