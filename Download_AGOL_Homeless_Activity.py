@@ -42,11 +42,11 @@ def main():
     # Set the log file variables
     log_file = r'<path to a log file, include the name of the log file after the last />'
 
-    # FS_name is the name of the Feature Service (FS) you want to download (d/l).
-    #   For example: "Homeless_Activity_Sites"
+    # FS_name is the name of the Feature Service (FS) with the layer you want
+    #  to download (d/l).  For example: "Homeless_Activity_Sites"
     FS_name        = '<name of FS goes here>'
 
-    # Index of the layer in the FS you want to d/l.  Usually 0.
+    # Index of the layer in the FS you want to d/l.  Frequently 0.
     index_of_layer = 0
 
     # Set variables of where you want the data to go, and what the d/l FC name should be.
