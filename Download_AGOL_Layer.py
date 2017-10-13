@@ -19,8 +19,7 @@ Users Set:
 # Licence:     <your licence>
 #-------------------------------------------------------------------------------
 
-# TODO: Test this script and debug
-# TODO: When I'm done writing/testing this script, this should be used to replace my current Download_AGOL_Data.py.
+# TODO: This script should be edited to be used to replace my current Download_AGOL_Data.py.
 # TODO: Update the script Purpose above to be more accurate.
 
 import arcpy, sys
@@ -40,11 +39,11 @@ def main():
     cfgFile     = r"U:\yakos\hep_A\PROD\Scripts\accounts.txt"
 
     # Set the log file variables
-    log_file = r'U:\yakos\hep_A\PROD\Logs\Download_AGOL_Homeless_Activity'
+    log_file = r'U:\yakos\hep_A\PROD\Scripts\Logs\Download_AGOL_Homeless_Activity'
 
     # FS_name is the name of the Feature Service (FS) with the layer you want
     #  to download (d/l).  For example: "Homeless_Activity_Sites"
-    FS_name        = 'Homeless_Activity_Sites'
+    FS_name        = 'Homeless_Activity_Sites_FIELD_EDIT'
 
     # Index of the layer in the FS you want to d/l.  Frequently 0.
     index_of_layer = 0
@@ -160,7 +159,7 @@ def Write_Print_To_Log(log_file):
     write_to_log = open(log_file_date, 'w')
 
     # Make the 'print' statement write to the log file
-    print '  Setting "print" command to write to a log file found at:\n  {}'.format(log_file_date)
+    print 'Setting "print" command to write to a log file found at:\n  {}'.format(log_file_date)
     sys.stdout = write_to_log
 
     # Header for log file
