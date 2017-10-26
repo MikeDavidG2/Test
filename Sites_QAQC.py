@@ -17,8 +17,11 @@ def main():
         cfgFile = r"U:\yakos\hep_A\PROD\Scripts\Source_Code\config_file.ini"
         name_of_script = 'Sites_QAQC.py'
 
-        # TODO Add a field to hold the most recent date a site has been cleaned
-
+        # TODO: Add a field to hold the most recent date a site has been cleaned
+        # TODO: Add a check for any duplicate Site Numbers in the Sites database
+        # TODO: This script needs to have better try/excepts that don't default to 'No visits for that site' if the try fails.  This may not always be accurate...
+        # TODO: Get this script into the Processing data script
+        # TODO: Comment these processes better (Functions?)
 
         mismatched_site_status = []
         mismatched_cleanup_rec = []
@@ -51,7 +54,7 @@ def main():
                         print '     Date of Last Visit: {}'.format(date_of_visit)
                         del v_row
                     except:
-                        print '   No visits for that site'
+                        print '  No visits for that site'
 
                 if site_stat_col != site_stat_visit:
                     print '***  Site Status not the same! ***'
@@ -76,21 +79,40 @@ def main():
                         print '             Date of Last Visit: {}'.format(date_of_visit)
                         del v_row
                     except:
-                        print '   No visits for that site'
+                        print '  No visits for that site'
 
                 if cleanup_rec_col != cleanup_rec_visit:
                     print '***  Cleanup Recommended not the same! ***'
                     mismatched_cleanup_rec.append('Site: "<b>{}</b>" has a Cleanup Recommended of: "<b>{}</b>" in Collector and: "<b>{}</b>" in Survey123'.format(site_num_col, cleanup_rec_col, cleanup_rec_visit))
                 del visits_search_cur
-
+                print ''
                 #---------------------------------------------------------------
                 #         Get most recent date each site has been cleaned
-                # TODO: Get this section written
 
                 # For each site get the most recent visit (that had 'Site Cleaning' as the Reason_For_Visit)
                 #   and get the Date_Of_Visit (for that visit)
                 #   This date will be
+                where_clause = "Site_Number = {} and Reason_For_Visit = 'Site Cleaning'".format(site_num_col)  # We only want to look at visits with the same site number we are analyzing
+                visits_sql_clause = (None, 'ORDER BY Date_Of_Visit DESC')  # We want to order by the user defined date (most recent first)
+                with arcpy.da.SearchCursor(visits_CURRENT, ['Site_Number', 'Date_Of_Visit', 'Reason_For_Visit'], where_clause, '', '', visits_sql_clause) as visits_search_cur:
+                    try:
+                        v_row = next(visits_search_cur)  # We only want the first record in the visits_search_cur since this is the most recent visit
+                        date_of_visit     = v_row[1]
+                        print '  Last Cleaning Date: {}'.format(date_of_visit)
 
+                        # Calc the field 'Last_Cleaning_Date' in the "Sites" data
+                        where_clause = "Site_Number = {}".format(site_num_col)
+                        with arcpy.da.UpdateCursor(sites_CURRENT, ['Site_Number', 'Last_Cleaning_Date'], where_clause) as sites_updt_cur:
+                            s_edit_row = next(sites_updt_cur)
+                            s_edit_row[1] = date_of_visit
+                            sites_updt_cur.updateRow(s_edit_row)
+                            print '    Input above date into Last_Cleaning_Date in Sites database'
+                            del sites_updt_cur
+                        del v_row
+                    except:
+                        print '  No "Last Cleaning Date" for that site'
+
+                del visits_search_cur
                 print '\n------------------------------------------------------'
 
         del sites_search_cur
@@ -125,6 +147,8 @@ def main():
             {}""".format(mismatched_cleanup_rec_str)
 
             Email_W_Body(subj, body, email_admin_ls, cfgFile)
+
+
     except Exception as e:
         print 'ERROR!!!'
         print str(e)
