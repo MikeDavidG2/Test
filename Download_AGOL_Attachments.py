@@ -12,6 +12,9 @@ To download the attachments in a Feature Service
 #-------------------------------------------------------------------------------
 
 # TODO: Update the script Purpose above to be more accurate.
+# TODO: In the sent email, make sure to explain the formatting of the JPEG name
+# TODO: Have this script create a folder to contain this weeks downloads
+# TODO: Have this script be able to query only the last 7 days worth of entries
 
 import arcpy, sys, datetime, os, ConfigParser, urllib, urllib2, json
 arcpy.env.overwriteOutput = True
@@ -38,6 +41,11 @@ def main():
     else:  # If script run directly
         path_prefix = 'U:'
 
+    # Set the variables for when this program should run.  This script is called
+    #   by a batch file that is run every day, but we don't want it run daily.
+    days_to_run = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+##    days_to_run = ['Saturday']
+
     #---------------------------------------------------------------------------
     # Full path to a text file that has the username and password of an account
     #  that has access to at least VIEW the FS in AGOL, as well as an email
@@ -54,8 +62,8 @@ def main():
     log_file = r'{}\yakos\hep_A\PROD\Environment_B\Scripts_B\Logs\{}'.format(path_prefix, name_of_script)
 
     # Set the data paths
-    ##attachments_folder       = r'{}\yakos\hep_A\PROD\Environment_B\Attachments_B'.format(path_prefix)
-    attachments_folder = r'C:\Users\mgrue\Desktop\Delete_Me'
+    attachments_folder       = r'{}\yakos\hep_A\PROD\Environment_B\Attachments_B'.format(path_prefix)
+##    attachments_folder = r'C:\Users\mgrue\Desktop\Delete_Me'
 
     # Get list of Feature Service Names and find the FS that has the attachments
     FS_names     = config.get('Download_Info', 'FS_names')
@@ -75,6 +83,16 @@ def main():
     #+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
     #---------------------------------------------------------------------------
     #                          Start Calling Functions
+
+    # See if this program should be run
+    now = datetime.datetime.now()
+    day_of_week = now.strftime('%A')
+
+    if day_of_week not in days_to_run:
+        print 'This script is not programmed to run today.  It runs on:'
+        for day in days_to_run:
+            print '  {}'.format(day)
+        sys.exit(0)
 
     # Turn all 'print' statements into a log-writing object
 ##    if success == True:
@@ -98,14 +116,8 @@ def main():
     if success == True:
         # Set the full FS URL. "1vIhDJwtG5eNmiqX" is the CoSD portal server so it shouldn't change much.
         FS_url  = r'https://services1.arcgis.com/1vIhDJwtG5eNmiqX/arcgis/rest/services/{}/FeatureServer'.format(FS_names_ls[FS_index_in_ls])
-
-        FS_index_in_AGOL = config.get('Download_Info', 'FS_indexes')
-        FS_index_in_AGOL_ls = FS_index_in_AGOL.split(', ')
-        my_index = FS_index_in_AGOL_ls[FS_index_in_ls]
-
-        ##gaURL = FS_url + '/' + my_index + '/?CreateReplica'  # Get Attachments URL # TODO: May not need the my_index variable afterall
         gaURL = FS_url + '/CreateReplica?'  # Get Attachments URL
-        print gaURL
+        ##print gaURL  # For testing purposes
 
         Get_Attachments(token, gaURL, attachments_folder)
 
@@ -118,7 +130,9 @@ def main():
 
     # End of script reporting
     print 'Success = {}'.format(success)
-    sys.stdout = orig_stdout
+##    sys.stdout = orig_stdout
+
+    breakpoint
 
     # Email recipients
     if success == True:
@@ -313,60 +327,28 @@ def Get_Attachments(token, gaURL, gaFolder):
     PARAMETERS:
         token (str):
             The string token obtained in FUNCTION Get_Token().
-        gaURL (str):
-            The variable set in FUNCTION main() where we can request to create a
-            replica FGDB in json format.
+        gaURL (str):  URL
         wkgFolder (str):
             The variable set in FUNCTION main() which is a path to our working
             folder.
         dt_to_append (str):
             The date and time string returned by FUNCTION Get_DateAndTime().
 
-    VARS:
-        replicaUrl (str):
-            URL of the replica FGDB in json format.
-        JsonFileName (str):
-            Name of the temporary json file.
-        gaFolder (str):
-            A folder in the wkgFolder that holds the attachments.
-        gaRelId (str):
-            The parentGlobalId of the attachment.  This = the origId for the
-            related feature.
-        origId (str):
-            The GlobalId of the feature.  This = the parentGlobalId of the
-            related attachment.
-        origName1 (str):
-            The StationID of the related feature to the attachment.
-        origName2 (str):
-            The SampleEventID of the related feature to the attachment.
-        attachName (str):
-            The string concatenation of origName1 and origName2 to be used to
-            name the attachment.
-        dupList (list of str):
-            List of letters ('A', 'B', etc.) used to append to the end of an
-            image to prevent multiple images with the same StationID and
-            SampleEventID overwriting each other.
-        attachmentUrl:
-            The URL of each specific attachment.  Need a token to actually
-            access and download the image at this URL.
-
     RETURNS:
-        gaFolder (str):
-            So that the email can send that information.
+        gaFolder (str): Path to the folder to contain the downloaded images
 
     FUNCTION:
       Gets the attachments (images) that are related to the database features and
-      stores them as .jpg in a local file inside the wkgFolder.
+      stores them as .jpg in a local file inside the gaFolder.
     """
 
     print '--------------------------------------------------------------------'
     print 'Getting Attachments...'
 
+    import time
     # Flag to set if Attachments were downloaded.  Set to 'True' if downloaded
     attachment_dl = False
 
-    test = gaURL + '&' + 'token=' + token
-    print test
     #---------------------------------------------------------------------------
     #                       Get the attachments url (ga)
     # Set the values in a dictionary
@@ -383,19 +365,15 @@ def Get_Attachments(token, gaURL, gaFolder):
 
     # Get the Replica URL
     gaData = urllib.urlencode(gaValues)
-    print gaData
     gaRequest = urllib2.Request(gaURL, gaData)
-    print gaRequest
     gaResponse = urllib2.urlopen(gaRequest)
-    print gaResponse
     gaJson = json.load(gaResponse)
-    print gaJson
     replicaUrl = gaJson['URL']
     ##print '  Replica URL: %s' % str(replicaUrl)  # For testing purposes
 
     # Set the token into the URL so it can be accessed
     replicaUrl_token = replicaUrl + '?&token=' + token + '&f=json'
-    print '  Replica URL Token: %s' % str(replicaUrl_token)  # For testing purposes
+    ##print '  Replica URL Token: %s' % str(replicaUrl_token)  # For testing purposes
 
     #---------------------------------------------------------------------------
     #                         Save the JSON file
@@ -427,65 +405,40 @@ def Get_Attachments(token, gaURL, gaFolder):
     # Save the attachments
     # Loop through each 'attachment' and get its parentGlobalId so we can name
     #  it based on its corresponding feature
-    print '  Attempting to save attachments:'
-
-    breakpoint
+    print '  Attempting to save attachments to: {}'.format(gaFolder)
 
     for attachment in data['layers'][0]['attachments']:
-        gaRelId = attachment['parentGlobalId']
+        parent_ID = attachment['parentGlobalId']
+        pic_name = attachment['name']
 
         # Now loop through all of the 'features' and break once the corresponding
-        #  GlobalId's match so we can save based on the 'StationID'
-        #  and 'SampleEventID'
+        #  GlobalId's match
         for feature in data['layers'][0]['features']:
-            origId = feature['attributes']['globalid']
-            StationID = feature['attributes']['StationID']
-            SampleEventID = str(feature['attributes']['SampleEventID'])
-            if origId == gaRelId:
+            global_ID     = feature['attributes']['globalid']
+            site_number   = feature['attributes']['Site_Number']
+            date_of_visit = feature['attributes']['Date_Of_Visit']
+            if global_ID == parent_ID:
                 break
 
-        # Test to see if the StationID is one of the features downloaded in
-        # FUNCTION Get_Data. Download if so, ignore if not
-        if SampleEventID in SmpEvntIDs_dl:
-            attachName = '%s__%s' % (StationID, SampleEventID)
-            # 'i' and 'dupList' are used in the event that there are
-            #  multiple photos with the same StationID and SampleEventID.  If they
-            #  do have the same attributes as an already saved attachment, the letter
-            #  suffix at the end of the attachment name will increment to the next
-            #  letter.  Ex: if there are two SDR-100__9876, the first will always be
-            #  named 'SDR-1007__9876_A.jpg', the second will be 'SDR-1007__9876_B'
-            i = 0
-            dupList = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
-            attachPath = gaFolder + '\\' + attachName + '_' + dupList[i] + '.jpg'
+        # Format the attach_name
+        remove_jpg_from_name = pic_name.split('.')[0]  # Strip the '.jpg' from the name
+        pic_letter = remove_jpg_from_name.split('-')[0]  # Get the letter of the picture (this letter matches to the Visits database)
+        pic_date   = time.strftime('%Y%m%d', time.localtime(date_of_visit/1000))  # Format the date to equal the date of the visit
+        pic_time   = remove_jpg_from_name[-6:]  # This may be the time (HHMMSS), or it could be just a unique ID depending on the device taking the pic
 
-            # Test to see if the attachPath currently exists
-            while os.path.exists(attachPath):
-                # The path does exist, so go through the dupList until a 'new' path is found
-                i += 1
-                attachPath = gaFolder + '\\' + attachName + '_' + dupList[i] + '.jpg'
+        attach_name = 'Site_{}_{}-{}_{}.jpg'.format(site_number, pic_date, pic_time, pic_letter)
 
-                # Test the new path to see if it exists.  If it doesn't exist, break out
-                # of the while loop to save the image to that new path
-                if not os.path.exists(attachPath):
-                    break
 
-            # Only download the attachment if the picture is from A - G
-            # 'H' is a catch if there are more than 7 photos with the same Station ID
-            # and Sample Event ID, shouldn't be more than 7 so an 'H' pic is passed.
-            if (dupList[i] != 'H'):
-                # Get the token to download the attachment
-                gaValues = {'token' : token }
-                gaData = urllib.urlencode(gaValues)
+        # Get the token to download the attachment
+        gaValues = {'token' : token }
+        gaData = urllib.urlencode(gaValues)
 
-                # Get the attachment and save as attachPath
-                print '    Saving %s' % attachName
-                attachment_dl = True
-
-                attachmentUrl = attachment['url']
-                urllib.urlretrieve(url=attachmentUrl, filename=attachPath,data=gaData)
-
-            else:
-                print '  WARNING.  There were more than 7 pictures with the same Station ID and Sample Event ID. Picture not saved.'
+        # Get the attachment and save as attachPath
+        attachmentUrl = attachment['url']
+        attach_path = os.path.join(gaFolder, attach_name)
+        print '    Saving {}'.format(attach_name)
+        urllib.urlretrieve(url=attachmentUrl, filename=attach_path,data=gaData)
+        attachment_dl = True
 
     if (attachment_dl == False):
         print '    No attachments saved this run.  OK if no attachments submitted since last run.'
@@ -494,7 +447,7 @@ def Get_Attachments(token, gaURL, gaFolder):
 
     # Delete the JSON file since it is no longer needed.
     print '  Deleting JSON file'
-    os.remove(jsonFilePath)
+##    os.remove(jsonFilePath)
 
     print 'Successfully got attachments.\n'
 
