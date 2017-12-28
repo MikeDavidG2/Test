@@ -1,56 +1,44 @@
 #-------------------------------------------------------------------------------
 # Purpose:
 """
-To download the attachments in a Feature Service
+TODO: fill in
 """
 #
 # Author:      mgrue
 #
-# Created:     10/13/2017
+# Created:     10/11/2017
 # Copyright:   (c) mgrue 2017
 # Licence:     <your licence>
 #-------------------------------------------------------------------------------
 
-# TODO: Update the script Purpose above to be more accurate.
-# TODO: In the sent email, make sure to explain the formatting of the JPEG name
-# TODO: Have this script create a folder to contain this weeks downloads
-# TODO: Have this script be able to query only the last 7 days worth of entries
-
-import arcpy, sys, datetime, os, ConfigParser, urllib, urllib2, json
+import arcpy, sys, datetime, os, ConfigParser
 arcpy.env.overwriteOutput = True
 
 def main():
 
     #---------------------------------------------------------------------------
     #                     Set Variables that will change
-    #---------------------------------------------------------------------------
-
-    # Name of this script
-    name_of_script = 'Download_AGOL_Attachments'
 
     # Set the path prefix depending on if this script is called manually by a
     #  user, or called by a scheduled task on ATLANTIC server.
     called_by = arcpy.GetParameterAsText(0)
 
     if called_by == 'MANUAL':
-        path_prefix = 'U:'
+        path_prefix = 'P:'
 
     elif called_by == 'SCHEDULED':
-        path_prefix = 'D:\users'
+        path_prefix = 'D:\projects'
 
-    else:  # If script run directly
-        path_prefix = 'U:'
+    else:  # If script run directly and no called_by parameter specified
+        path_prefix = 'P:'
 
-    # Set the variables for when this program should run.  This script is called
-    #   by a batch file that is run every day, but we don't want it run daily.
-    days_to_run = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-##    days_to_run = ['Saturday']
+    # Name of this script
+    name_of_script = 'Test_AGOL_Update_Features.py'
 
-    #---------------------------------------------------------------------------
     # Full path to a text file that has the username and password of an account
     #  that has access to at least VIEW the FS in AGOL, as well as an email
     #  account that has access to send emails.
-    cfgFile     = r"{}\yakos\hep_A\PROD\Environment_B\Scripts_B\Source_Code\config_file.ini".format(path_prefix)
+    cfgFile     = r'{}\Damage_Assessment_GIS\Fire_Damage_Assessment\DEV\Scripts\Config_Files\config_file.ini'.format(path_prefix)
     if os.path.isfile(cfgFile):
         config = ConfigParser.ConfigParser()
         config.read(cfgFile)
@@ -58,20 +46,12 @@ def main():
         print("INI file not found. \nMake sure a valid '.ini' file exists at {}.".format(cfgFile))
         sys.exit()
 
-    # Set the log file variables
-    log_file = r'{}\yakos\hep_A\PROD\Environment_B\Scripts_B\Logs\{}'.format(path_prefix, name_of_script)
-
-    # Set the data paths
-    attachments_folder       = r'{}\yakos\hep_A\PROD\Environment_B\Attachments_B'.format(path_prefix)
-##    attachments_folder = r'C:\Users\mgrue\Desktop\Delete_Me'
-
-    # Get list of Feature Service Names and find the FS that has the attachments
-    FS_names     = config.get('Download_Info', 'FS_names')
-    FS_names_ls  = FS_names.split(', ')
-    FS_index_in_ls = 2  # This index is the position of the FS with the attachments in the FS_names_ls list
+    # Set the log file folder path
+    log_file = r'{}\Damage_Assessment_GIS\Fire_Damage_Assessment\DEV\Scripts\Logs\{}'.format(path_prefix, name_of_script.split('.')[0])
 
     # Set the Email variables
-    email_admin_ls = ['michael.grue@sdcounty.ca.gov']#, 'randy.yakos@sdcounty.ca.gov', 'gary.ross@sdcounty.ca.gov']
+    ##email_admin_ls = ['michael.grue@sdcounty.ca.gov', 'randy.yakos@sdcounty.ca.gov', 'gary.ross@sdcounty.ca.gov']
+    email_admin_ls = ['michael.grue@sdcounty.ca.gov']
 
     #---------------------------------------------------------------------------
     #                Set Variables that will probably not change
@@ -84,24 +64,14 @@ def main():
     #---------------------------------------------------------------------------
     #                          Start Calling Functions
 
-    # See if this program should be run
-    now = datetime.datetime.now()
-    day_of_week = now.strftime('%A')
-
-    if day_of_week not in days_to_run:
-        print 'This script is not programmed to run today.  It runs on:'
-        for day in days_to_run:
-            print '  {}'.format(day)
-        sys.exit(0)
-
     # Turn all 'print' statements into a log-writing object
-##    if success == True:
-##        try:
-##            orig_stdout, log_file_date = Write_Print_To_Log(log_file, name_of_script)
-##        except Exception as e:
-##            success = False
-##            print '*** ERROR with Write_Print_To_Log() ***'
-##            print str(e)
+    if success == True:
+        try:
+            orig_stdout, log_file_date = Write_Print_To_Log(log_file, name_of_script)
+        except Exception as e:
+            success = False
+            print '*** ERROR with Write_Print_To_Log() ***'
+            print str(e)
 
     # Get a token with permissions to view the data
     if success == True:
@@ -112,15 +82,33 @@ def main():
             print '*** ERROR with Get_Token() ***'
             print str(e)
 
-    # Get Attachments
-    if success == True:
-        # Set the full FS URL. "1vIhDJwtG5eNmiqX" is the CoSD portal server so it shouldn't change much.
-        FS_url  = r'https://services1.arcgis.com/1vIhDJwtG5eNmiqX/arcgis/rest/services/{}/FeatureServer'.format(FS_names_ls[FS_index_in_ls])
-        gaURL = FS_url + '/CreateReplica?'  # Get Attachments URL
-        ##print gaURL  # For testing purposes
 
-        Get_Attachments(token, gaURL, attachments_folder)
+    #---------------------------------------------------------------------------
+    #+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+    #---------------------------------------------------------------------------
+    #                            Update AGOL Features
 
+
+
+
+    name_of_FS = 'service_f191e38df14c4b26b322014ecdf51837'
+    index_of_layer_in_FS = 0
+    field_to_update = 'SingleExtentOfDamage'
+    new_value = 'Destroyed'
+
+    where_clause = "SingleStructureType = 'Dwelling Unit'"
+
+    ids = AGOL_Get_Object_Ids_Where(name_of_FS, index_of_layer_in_FS, where_clause, token)
+
+
+    for object_id in ids:
+
+        AGOL_Update_Features(name_of_FS, index_of_layer_in_FS, object_id, field_to_update, new_value, token)
+
+
+    #---------------------------------------------------------------------------
+    #+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+    #---------------------------------------------------------------------------
     # Footer for log file
     finish_time_str = [datetime.datetime.now().strftime('%m/%d/%Y  %I:%M:%S %p')][0]
     print '\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++'
@@ -130,30 +118,28 @@ def main():
 
     # End of script reporting
     print 'Success = {}'.format(success)
-##    sys.stdout = orig_stdout
-
-    breakpoint
+    sys.stdout = orig_stdout
 
     # Email recipients
     if success == True:
         subj = 'SUCCESS running {}'.format(name_of_script)
         body = """Success<br>
-        The Log file name is: {}""".format(os.path.basename(log_file_date))
+        The Log is found at: {}""".format(log_file_date)
 
     else:
         subj = 'ERROR running {}'.format(name_of_script)
         body = """There was an error with this script.<br>
         Please see the log file for more info.<br>
-        The Log file name is: {}""".format(os.path.basename(log_file_date))
+        The Log file is found at: {}""".format(log_file_date)
 
-    Email_W_Body(subj, body, email_admin_ls, cfgFile)
+##    Email_W_Body(subj, body, email_admin_ls, cfgFile)
 
-    # End of script reporting
     if success == True:
-        print 'SUCCESSFULLY ran {}'.format(name_of_script)
+        print '\nSUCCESSFULLY ran {}'.format(name_of_script)
+        print 'Please find log file at:\n  {}\n'.format(log_file_date)
     else:
-        print '*** ERROR with {} ***'.format(name_of_script)
-        print 'Please see log file (noted above) for troubleshooting\n'
+        print '\n*** ERROR with {} ***'.format(name_of_script)
+        print 'Please find log file at:\n  {}\n'.format(log_file_date)
 
     if called_by == 'MANUAL':
         raw_input('Press ENTER to continue')
@@ -313,145 +299,129 @@ def Get_Token(cfgFile, gtURL="https://www.arcgis.com/sharing/rest/generateToken"
 
 #-------------------------------------------------------------------------------
 #-------------------------------------------------------------------------------
-#                         FUNCTION:   Get Attachments
-# Attachments (images) are obtained by hitting the REST endpoint of the feature
-# service (gaURL) and returning a URL that downloads a JSON file (which is a
-# replica of the database).  The script then uses that downloaded JSON file to
-# get the URL of the actual images.  The JSON file is then used to get the
-# StationID and SampleEventID of the related feature so they can be used to name
-# the downloaded attachment.
+#                FUNCTION:    Get AGOL Object IDs Where
 
-#TODO: find a way to rotate the images clockwise 90-degrees
-def Get_Attachments(token, gaURL, gaFolder):
+def AGOL_Get_Object_Ids_Where(name_of_FS, index_of_layer_in_FS, where_clause, token):
     """
     PARAMETERS:
-        token (str):
-            The string token obtained in FUNCTION Get_Token().
-        gaURL (str):  URL
-        wkgFolder (str):
-            The variable set in FUNCTION main() which is a path to our working
-            folder.
-        dt_to_append (str):
-            The date and time string returned by FUNCTION Get_DateAndTime().
+      name_of_FS (str): The name of the Feature Service (do not include things
+        like "services1.arcgis.com/1vIhDJwtG5eNmiqX/ArcGIS/rest/services", just
+        the name is needed.  i.e. "DPW_WP_SITES_DEV_VIEW".
+      index_of_layer_in_FS (int): The index of the layer in the Feature Service.
+        This will frequently be 0, but it could be a higer number if the FS has
+        multiple layers in it.
+      where_clause (str): Where clause. i.e.:
+        where_clause = "FIELD_NAME = 'Value in field'"
+      token (str): Obtained from the Get_Token()
 
     RETURNS:
-        gaFolder (str): Path to the folder to contain the downloaded images
+      object_ids (list of str): List of OBJECTID's that satisfied the
+      where_clause.
 
     FUNCTION:
-      Gets the attachments (images) that are related to the database features and
-      stores them as .jpg in a local file inside the gaFolder.
+      To get a list of the OBJECTID's of the features that satisfied the
+      where clause.  This list will be the full list of all the records in the
+      FS regardless of the number of the returned OBJECTID's or the max record
+      count for the FS.
+
+    NOTE: This function assumes that you have already gotten a token from the
+    Get_Token() and are passing it to this function via the 'token' variable.
     """
 
     print '--------------------------------------------------------------------'
-    print 'Getting Attachments...'
+    print "Starting Get_AGOL_Object_Ids_Where()"
+    import urllib2, urllib, json
 
-    import time
-    # Flag to set if Attachments were downloaded.  Set to 'True' if downloaded
-    attachment_dl = False
+    # Create empty list to hold the OBJECTID's that satisfy the where clause
+    object_ids = []
 
-    #---------------------------------------------------------------------------
-    #                       Get the attachments url (ga)
-    # Set the values in a dictionary
-    gaValues = {
-    'f' : 'pjson',
-    'replicaName' : 'Homeless_Activity_Replica',
-    'layers' : '0',
-    'geometryType' : 'esriGeometryPoint',
-    'transportType' : 'esriTransportTypeUrl',
-    'returnAttachments' : 'true',
-    'returnAttachmentDatabyURL' : 'false',
-    'token' : token
-    }
+    # Encode the where_clause so it is readable by URL protocol (ie %27 = ' in URL).
+    # visit http://meyerweb.com/eric/tools/dencoder to test URL encoding.
+    where_encoded = urllib.quote(where_clause)
 
-    # Get the Replica URL
-    gaData = urllib.urlencode(gaValues)
-    gaRequest = urllib2.Request(gaURL, gaData)
-    gaResponse = urllib2.urlopen(gaRequest)
-    gaJson = json.load(gaResponse)
-    replicaUrl = gaJson['URL']
-    ##print '  Replica URL: %s' % str(replicaUrl)  # For testing purposes
+    # Set URLs
+    query_url = r'https://services1.arcgis.com/1vIhDJwtG5eNmiqX/ArcGIS/rest/services/{}/FeatureServer/{}/query'.format(name_of_FS, index_of_layer_in_FS)
+    query = '?where={}&returnIdsOnly=true&f=json&token={}'.format(where_encoded, token)
+    get_object_id_url = query_url + query
 
-    # Set the token into the URL so it can be accessed
-    replicaUrl_token = replicaUrl + '?&token=' + token + '&f=json'
-    ##print '  Replica URL Token: %s' % str(replicaUrl_token)  # For testing purposes
+    # Get the list of OBJECTID's that satisfied the where_clause
 
-    #---------------------------------------------------------------------------
-    #                         Save the JSON file
-    # Access the URL and save the file to the current working directory named
-    # 'myLayer.json'.  This will be a temporary file and will be deleted
+    print '  Getting list of OBJECTID\'s that satisfied the where clause for layer:\n    {}'.format(query_url)
+    print '  Where clause: "{}"'.format(where_clause)
+    response = urllib2.urlopen(get_object_id_url)
+    response_json_obj = json.load(response)
+    object_ids = response_json_obj['objectIds']
 
-    JsonFileName = 'Temp_JSON.json'
+    if len(object_ids) > 0:
+        print '  There are "{}" features that satisfied the query.'.format(len(object_ids))
+        print '  OBJECTID\'s of those features:'
+        for obj in object_ids:
+            print '    {}'.format(obj)
 
-    # Save the file
-    # NOTE: the file is saved to the 'current working directory' + 'JsonFileName'
-    urllib.urlretrieve(replicaUrl_token, JsonFileName)
+    else:
+        print '  No features satisfied the query.'
 
-    # Allow the script to access the saved JSON file
-    cwd = os.getcwd()  # Get the current working directory
-    jsonFilePath = cwd + '\\' + JsonFileName # Path to the downloaded json file
-    print '  Temp JSON file saved to: ' + jsonFilePath
+    print "Finished Get_AGOL_Object_Ids_Where()\n"
 
-    #---------------------------------------------------------------------------
-    #                       Save the attachments
+    return object_ids
 
-    # Make the gaFolder (to hold attachments) if it doesn't exist.
-    if not os.path.exists(gaFolder):
-        os.makedirs(gaFolder)
+#-------------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
+#                FUNCTION:    Update AGOL Features
 
-    # Open the JSON file
-    with open (jsonFilePath) as data_file:
-        data = json.load(data_file)
+def AGOL_Update_Features(name_of_FS, index_of_layer_in_FS, object_id, field_to_update, new_value, token):
+    """
+    PARAMETERS:
+      name_of_FS (str): The name of the Feature Service (do not include things
+        like "services1.arcgis.com/1vIhDJwtG5eNmiqX/ArcGIS/rest/services", just
+        the name is needed.  i.e. "DPW_WP_SITES_DEV_VIEW".
+      index_of_layer_in_FS (int): The index of the layer in the Feature Service.
+        This will frequently be 0, but it could be a higer number if the FS has
+        multiple layers in it.
+      object_id (str or int): OBJECTID that should be updated.
+      field_to_update (str): Field in the FS that should be updated.
+      new_value (str or int): New value that should go into the field.  Data
+        type depends on the data type of the field.
+      token (str): Obtained from the Get_Token().
 
-    # Save the attachments
-    # Loop through each 'attachment' and get its parentGlobalId so we can name
-    #  it based on its corresponding feature
-    print '  Attempting to save attachments to: {}'.format(gaFolder)
+    RETURNS:
+      None
 
-    for attachment in data['layers'][0]['attachments']:
-        parent_ID = attachment['parentGlobalId']
-        pic_name = attachment['name']
+    FUNCTION:
+      To Update features on an AGOL Feature Service.
+    """
 
-        # Now loop through all of the 'features' and break once the corresponding
-        #  GlobalId's match
-        for feature in data['layers'][0]['features']:
-            global_ID     = feature['attributes']['globalid']
-            site_number   = feature['attributes']['Site_Number']
-            date_of_visit = feature['attributes']['Date_Of_Visit']
-            if global_ID == parent_ID:
-                break
+    print '--------------------------------------------------------------------'
+    print "Starting AGOL_Update_Features()"
+    import urllib2, urllib, json
 
-        # Format the attach_name
-        remove_jpg_from_name = pic_name.split('.')[0]  # Strip the '.jpg' from the name
-        pic_letter = remove_jpg_from_name.split('-')[0]  # Get the letter of the picture (this letter matches to the Visits database)
-        pic_date   = time.strftime('%Y%m%d', time.localtime(date_of_visit/1000))  # Format the date to equal the date of the visit
-        pic_time   = remove_jpg_from_name[-6:]  # This may be the time (HHMMSS), or it could be just a unique ID depending on the device taking the pic
+    # Set the json upate
+    features_json = {"attributes" : {"objectid" : object_id, "{}".format(field_to_update) : "{}".format(new_value)}}
+    ##print 'features_json:  {}'.format(features_json)
 
-        attach_name = 'Site_{}_{}-{}_{}.jpg'.format(site_number, pic_date, pic_time, pic_letter)
+    # Set URLs
+    update_url       = r'https://services1.arcgis.com/1vIhDJwtG5eNmiqX/ArcGIS/rest/services/{}/FeatureServer/{}/updateFeatures?token={}'.format(name_of_FS, index_of_layer_in_FS, token)
+    update_params    = urllib.urlencode({'Features': features_json, 'f':'json'})
 
 
-        # Get the token to download the attachment
-        gaValues = {'token' : token }
-        gaData = urllib.urlencode(gaValues)
+    # Update the features
+    print '  Updating Features in FS: {}'.format(name_of_FS)
+    print '                 At index: {}'.format(index_of_layer_in_FS)
+    print '   OBJECTID to be updated: {}'.format(object_id)
+    print '      Field to be updated: {}'.format(field_to_update)
+    print '   New value for updt fld: {}'.format(new_value)
 
-        # Get the attachment and save as attachPath
-        attachmentUrl = attachment['url']
-        attach_path = os.path.join(gaFolder, attach_name)
-        print '    Saving {}'.format(attach_name)
-        urllib.urlretrieve(url=attachmentUrl, filename=attach_path,data=gaData)
-        attachment_dl = True
+    ##print update_url + update_params
+    response  = urllib2.urlopen(update_url, update_params)
+    response_json_obj = json.load(response)
+    ##print response_json_obj
 
-    if (attachment_dl == False):
-        print '    No attachments saved this run.  OK if no attachments submitted since last run.'
+    for result in response_json_obj['updateResults']:
+        ##print result
+        print '    OBJECTID: {}'.format(result['objectId'])
+        print '      Updated? {}'.format(result['success'])
 
-    print '  All attachments can be found at: %s' % gaFolder
-
-    # Delete the JSON file since it is no longer needed.
-    print '  Deleting JSON file'
-##    os.remove(jsonFilePath)
-
-    print 'Successfully got attachments.\n'
-
-    return gaFolder
+    print 'Finished AGOL_Update_Features()\n'
 
 #-------------------------------------------------------------------------------
 #-------------------------------------------------------------------------------
@@ -488,7 +458,7 @@ def Email_W_Body(subj, body, email_list, cfgFile=
     from email.mime.multipart import MIMEMultipart
     import ConfigParser, smtplib
 
-    print '\n  Starting Email_W_Body()'
+    print '  Starting Email_W_Body()'
     print '    With Subject: {}'.format(subj)
 
     # Set the subj, From, To, and body
@@ -513,7 +483,7 @@ def Email_W_Body(subj, body, email_list, cfgFile=
     SMTP_obj.quit()
     time.sleep(2)
 
-    print '  Successfully emailed results.\n'
+    print '  Successfully emailed results.'
 
 #-------------------------------------------------------------------------------
 #+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
