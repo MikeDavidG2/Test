@@ -382,7 +382,8 @@ def AGOL_Update_Features(name_of_FS, index_of_layer_in_FS, object_id, field_to_u
       field_to_update (str): Field in the FS that should be updated.
       new_value (str or int): New value that should go into the field.  Data
         type depends on the data type of the field.
-      token (str): Obtained from the Get_Token().
+      token (str): Token from AGOL that gives permission to interact with
+        data stored on AGOL servers.  Obtained from the Get_Token().
 
     RETURNS:
       None
