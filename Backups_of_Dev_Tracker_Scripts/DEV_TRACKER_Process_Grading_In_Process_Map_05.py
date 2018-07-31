@@ -1,0 +1,1042 @@
+#-------------------------------------------------------------------------------
+# Name:        DEV_TRACKER_Process_Grading_In_Process_Map_05.py
+# Purpose:
+#
+# Author:      mgrue
+#
+# Created:     24/07/2018
+# Copyright:   (c) mgrue 2018
+# Licence:     <your licence>
+#-------------------------------------------------------------------------------
+import arcpy, os, math, datetime
+arcpy.env.overwriteOutput = True
+
+def main():
+    #---------------------------------------------------------------------------
+    #                  Set variables that only need defining once
+    #                    (Shouldn't need to be changed much)
+    #---------------------------------------------------------------------------
+
+    # Name of this script
+    name_of_script = 'DEV_TRACKER_Process_Grading_In_Process_Map_05.py'
+
+
+    # Set name to give outputs for this script
+    shorthand_name    = 'Grading_In_Process_Map_5'
+
+
+    # Paths to folders and local FGDBs
+    folder_with_csvs  = r"P:\20180510_development_tracker\tables\CSV_Extract_20180726"
+    name_of_csv       = 'Dwelling Units - Land Development Grading In-Process (Map 5).csv'
+    path_to_csv       = os.path.join(folder_with_csvs, name_of_csv)
+
+
+    root_folder       = r'P:\20180510_development_tracker\DEV'
+
+    log_file_folder   = '{}\{}\{}'.format(root_folder, 'Scripts', 'Logs')
+
+    data_folder       = '{}\{}'.format(root_folder, 'Data')
+
+    imported_csv_fgdb = '{}\{}'.format(data_folder, '1_Imported_CSVs.gdb')
+
+    wkg_fgdb          = '{}\{}'.format(data_folder, '{}.gdb'.format(shorthand_name))
+
+    success_error_folder = '{}\Scripts\Source_Code\Success_Error'.format(root_folder)
+
+
+    # Paths to SDE Feature Classes
+    PARCELS_HISTORICAL = r'Database Connections\AD@ATLANTIC@SDE.sde\SDE.SANGIS.PARCEL_HISTORICAL'
+    PARCELS_ALL        = r'Database Connections\AD@ATLANTIC@SDE.sde\SDE.SANGIS.PARCELS_ALL'
+
+
+    # Set field names
+    apn_fld           = 'PARCEL_NBR'
+    record_id_fld     = 'RECORD_ID'
+    du_fld            = 'DWP'
+
+
+    # Misc variables
+    success = True
+    data_pass_QAQC_tests = True
+
+
+    # This is the acreage that an overlap of a current parcel and a historic parcel
+    # from two different projects needs to be greater than in order for the
+    # script to flag it as needing human analysis
+    acreage_cutoff_for_overlap = 0.1
+
+
+    #---------------------------------------------------------------------------
+    #+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+    #---------------------------------------------------------------------------
+    #                          Start Main Function
+
+    # Make sure the log file folder exists, create it if it does not
+    if not os.path.exists(log_file_folder):
+        print 'NOTICE, log file folder does not exist, creating it now\n'
+        os.mkdir(log_file_folder)
+
+    # Turn all 'print' statements into a log-writing object
+##    try:
+##        log_file = r'{}\{}'.format(log_file_folder, name_of_script.split('.')[0])
+##        orig_stdout, log_file_date, dt_to_append = Write_Print_To_Log(log_file, name_of_script)
+##    except Exception as e:
+##        success = False
+##        print '\n*** ERROR with Write_Print_To_Log() ***'
+##        print str(e)
+
+
+    #---------------------------------------------------------------------------
+    #                      Create FGDBs if needed
+    #---------------------------------------------------------------------------
+    # Create import FGDB if it does not exist
+    if not arcpy.Exists(imported_csv_fgdb):
+        out_folder_path, out_name = os.path.split(imported_csv_fgdb)
+        print 'Creating FGDB at:\n  {}\n'.format(imported_csv_fgdb)
+        arcpy.CreateFileGDB_management(out_folder_path, out_name)
+
+
+    # Delete and create working FGDB
+    if arcpy.Exists(wkg_fgdb):
+        print 'Deleting FGDB at:\n  {}\n'.format(wkg_fgdb)
+        arcpy.Delete_management(wkg_fgdb)
+
+    if not arcpy.Exists(wkg_fgdb):
+        out_folder_path, out_name = os.path.split(wkg_fgdb)
+        print 'Creating FGDB at:\n  {}\n'.format(wkg_fgdb)
+        arcpy.CreateFileGDB_management(out_folder_path, out_name)
+
+
+    #-------------------------------------------------------------------
+    #                   Import CSV into FGDB Table
+    #-------------------------------------------------------------------
+
+    # Set paths to Feature Classes / Tables
+    name_of_csv_table = '{}_Tbl'.format(shorthand_name)
+    csv_table = os.path.join(imported_csv_fgdb, name_of_csv_table)
+
+    print '------------------------------------------------------------------'
+    print 'Importing CSV to FGDB Table:\n  From:\n    {}'.format(path_to_csv)
+    print '  To:\n    {}\{}'.format(imported_csv_fgdb, os.path.basename(csv_table))
+
+    # Import CSV to FGDB Table
+    arcpy.TableToTable_conversion(path_to_csv, imported_csv_fgdb, os.path.basename(csv_table))
+
+
+    #---------------------------------------------------------------------------
+    #         Get the parcels from PARCELS_ALL and PARCELS_HISTORICAL
+    #---------------------------------------------------------------------------
+    # Set path for the FC to be created from PARCELS_ALL
+    out_name             = 'From_PARCELS_ALL'
+    from_parcels_all_fc  = os.path.join(wkg_fgdb, out_name)
+
+    # Set path for the FC to be created from PARCELS_HISTORICAL
+    out_name             = 'From_PARCELS_HISTORICAL'
+    from_parcels_hist_fc = os.path.join(wkg_fgdb, out_name)
+
+    # Get parcels
+    Get_Parcels(csv_table, PARCELS_ALL, PARCELS_HISTORICAL, from_parcels_all_fc, from_parcels_hist_fc, apn_fld)
+
+    # Get lists of found (or not found) APNs
+    (apns_from_imported_csv,
+    apns_found_in_parcels_all,
+    apns_found_in_parcels_hist,
+    apns_not_found_anywhere) = Get_APN_Lists(csv_table, from_parcels_all_fc, from_parcels_hist_fc, apn_fld)
+
+
+    #---------------------------------------------------------------------------
+    #         Perform QA/QC on the extracted data and the parcels
+    #---------------------------------------------------------------------------
+    data_pass_QAQC_tests = QA_QC(csv_table, from_parcels_all_fc, from_parcels_hist_fc, apns_from_imported_csv, apns_found_in_parcels_all, apns_found_in_parcels_hist, apns_not_found_anywhere, apn_fld, record_id_fld, du_fld, acreage_cutoff_for_overlap)
+
+
+    #---------------------------------------------------------------------------
+    #          If parcels were found in the PARCELS_HISTORICAL FC, then
+    #         Merge the 'from_parcels_all_fc' and 'from_parcels_hist_fc'
+    #---------------------------------------------------------------------------
+    # TODO: Get the below through the Process_Projects() into its own function
+
+    if not arcpy.Exists(from_parcels_hist_fc):  # Then there were no parcels from PARCELS_HISTORICAL (nothing to merge)
+
+        # Set that we want to join to the 'From PARCELS_ALL FC' and set the name of the joined FC
+        fc_to_be_joined = from_parcels_all_fc
+        joined_name     = 'Parcels_ALL_joined'
+
+    else:  # There were parcels from PARCELS_HISTORICAL and we want to merge those with parcels from PARCELS_ALL
+
+        # Merge the current and historical parcels
+        in_features = [from_parcels_all_fc, from_parcels_hist_fc]
+        merged_fc = os.path.join(wkg_fgdb, 'Parcels_ALL_and_HIST_merge')
+        print '\nMerging:'
+        for f in in_features:
+            print '  {}'.format(f)
+        print 'To create:\n  {}\n'.format(merged_fc)
+        arcpy.Merge_management(in_features, merged_fc)
+
+        # Set that we want to join to the merged FC and set the name of the joined FC
+        fc_to_be_joined = merged_fc
+        joined_name     = 'Parcels_ALL_and_HIST_merge_joined'
+
+
+    #---------------------------------------------------------------------------
+    #        Join the Parcels with the Imported Table in order to get the
+    # shapes (from the parcels) and the tabular data (from the imported table)
+    #---------------------------------------------------------------------------
+
+    # Create a layer with the Imported Table joined to the parcel FC
+    print '\nJoining Imported Table to the Parcel FC'
+    joined_tbl_lyr = Join_2_Objects_By_Attr(fc_to_be_joined, 'APN', csv_table, apn_fld, 'KEEP_ALL')
+
+    # Save the joined layer to disk
+    parcels_joined_fc = os.path.join(wkg_fgdb, joined_name)
+    print 'Saving joined layer to:\n  {}\n'.format(parcels_joined_fc)
+    arcpy.FeatureClassToFeatureClass_conversion(joined_tbl_lyr, wkg_fgdb, joined_name)
+
+
+    #---------------------------------------------------------------------------
+    #                    Clean-up the joined data field names
+    #---------------------------------------------------------------------------
+    # Rename the fields in the joined FC back to what they were named in the CSV
+    #   (The join performed above names the CSV fields with a prefix of the
+    #    table that they came from.  I.e. "In_Process_Applicant_GPAs_Tbl_RECORD_ID")
+    # The renaming will simplify readability and scripting below
+    print 'Renaming the field names in the joined table back to what they were in the Imported Table:'
+    where_clause = '{}*'.format(os.path.basename(csv_table))
+    print '  Where:  {}'.format(where_clause)
+    fields_from_csv = arcpy.ListFields(parcels_joined_fc, where_clause)
+    for f in fields_from_csv:
+        old_name = f.name
+        new_name = old_name.replace("{}_".format(os.path.basename(csv_table)),"")
+
+        if new_name != 'OBJECTID':  # Don't try to name a field "OBJECTID", just skip this one
+            print '  Changing Field: "{}"\n  To:  "{}"'.format(old_name, new_name)  # For testing purposes
+            arcpy.AlterField_management(parcels_joined_fc, old_name, new_name)
+
+
+    #---------------------------------------------------------------------------
+    #
+    #---------------------------------------------------------------------------
+    # The data is now ready for processing
+    # TODO: Process_Projects() needs full testing in this script, and change the name of the dissolved FC at the end of the function
+    try:
+        Process_Projects(parcels_joined_fc, record_id_fld, du_fld)
+    except Exception as e:
+        success = False
+        print '*** ERROR with Process_Projects() ***'
+        print str(e)
+
+
+
+
+##    #---------------------------------------------------------------------------
+##    #---------------------------------------------------------------------------
+##    # Write a file to disk to let other scripts know if this script ran
+##    # successfully or not
+##    print '\n------------------------------------------------------------------'
+##    try:
+##        # Set a file_name depending on the 'success' variable.
+##        if success == True:
+##            file_name = 'SUCCESS_running_{}.txt'.format(name_of_script.split('.')[0])
+##
+##        else:
+##            file_name = 'ERROR_running_{}.txt'.format(name_of_script.split('.')[0])
+##
+##        # Write the file
+##        file_path = '{}\{}'.format(success_error_folder, file_name)
+##        print time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+##        print '\nCreating file:\n  {}\n'.format(file_path)
+##        open(file_path, 'w')
+##
+##    except Exception as e:
+##        success = False
+##        print '*** ERROR with Writing a Success or Fail file() ***'
+##        print str(e)
+##
+##
+##    #---------------------------------------------------------------------------
+##    #+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+##    #---------------------------------------------------------------------------
+##    # Footer for log file
+##    finish_time_str = [datetime.datetime.now().strftime('%m/%d/%Y  %I:%M:%S %p')][0]
+##    print '\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++'
+##    print '                    {}'.format(finish_time_str)
+##    print '              Finished {}'.format(name_of_script)
+##    print '++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++'
+##
+##    # End of script reporting
+##    print 'Data passed QA/QC tests = {}'.format(data_pass_QAQC_tests)
+##    print 'Successfully ran script = {}'.format(success)
+##    time.sleep(3)
+##    sys.stdout = orig_stdout
+##    sys.stdout.flush()
+##
+##    if success == True:
+##        print '\nSUCCESSFULLY ran {}'.format(name_of_script)
+##        print 'Please find log file at:\n  {}\n'.format(log_file_date)
+##    else:
+##        print '\n*** ERROR with {} ***'.format(name_of_script)
+##        print 'Please find log file at:\n  {}\n'.format(log_file_date)
+
+    print '\nSuccess = {}'.format(success)
+
+
+#+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+#                            START DEFINING FUNCTIONS
+#+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+#-------------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
+#                          FUNCTION Write_Print_To_Log()
+def Write_Print_To_Log(log_file, name_of_script):
+    """
+    PARAMETERS:
+      log_file (str): Path to log file.  The part after the last "\" will be the
+        name of the .log file after the date, time, and ".log" is appended to it.
+
+    RETURNS:
+      orig_stdout (os object): The original stdout is saved in this variable so
+        that the script can access it and return stdout back to its orig settings.
+      log_file_date (str): Full path to the log file with the date appended to it.
+      dt_to_append (str): Date and time in string format 'YYYY_MM_DD__HH_MM_SS'
+
+    FUNCTION:
+      To turn all the 'print' statements into a log-writing object.  A new log
+        file will be created based on log_file with the date, time, ".log"
+        appended to it.  And any print statements after the command
+        "sys.stdout = write_to_log" will be written to this log.
+      It is a good idea to use the returned orig_stdout variable to return sys.stdout
+        back to its original setting.
+      NOTE: This function needs the function Get_DT_To_Append() to run
+
+    """
+    ##print 'Starting Write_Print_To_Log()...'
+
+    # Get the original sys.stdout so it can be returned to normal at the
+    #    end of the script.
+    orig_stdout = sys.stdout
+
+    # Get DateTime to append
+    dt_to_append = Get_DT_To_Append()
+
+    # Create the log file with the datetime appended to the file name
+    log_file_date = '{}_{}.log'.format(log_file,dt_to_append)
+    write_to_log = open(log_file_date, 'w')
+
+    # Make the 'print' statement write to the log file
+    print 'Find log file found at:\n  {}'.format(log_file_date)
+    print '\nProcessing...\n'
+    sys.stdout = write_to_log
+
+    # Header for log file
+    start_time = datetime.datetime.now()
+    start_time_str = [start_time.strftime('%m/%d/%Y  %I:%M:%S %p')][0]
+    print '++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++'
+    print '                  {}'.format(start_time_str)
+    print '             START {}'.format(name_of_script)
+    print '++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n'
+
+    return orig_stdout, log_file_date, dt_to_append
+
+
+#-------------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
+#                          FUNCTION Get_dt_to_append
+def Get_DT_To_Append():
+    """
+    PARAMETERS:
+      none
+
+    RETURNS:
+      dt_to_append (str): Which is in the format 'YYYY_MM_DD__HH_MM_SS'
+
+    FUNCTION:
+      To get a formatted datetime string that can be used to append to files
+      to keep them unique.
+    """
+    ##print 'Starting Get_DT_To_Append()...'
+
+    start_time = datetime.datetime.now()
+
+    date = start_time.strftime('%Y_%m_%d')
+    time = start_time.strftime('%H_%M_%S')
+
+    dt_to_append = '%s__%s' % (date, time)
+
+    ##print '  DateTime to append: {}'.format(dt_to_append)
+
+    ##print 'Finished Get_DT_To_Append()\n'
+    return dt_to_append
+
+
+#-------------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
+def Get_Parcels(apn_tbl, PARCELS_ALL, PARCELS_HISTORICAL, from_parcels_all_fc, from_parcels_hist_fc, apn_fld):
+    """
+    Get the parcel footprint and tabular data from PARCELS_ALL and PARCELS_HISTORICAL
+    and select which parcels to export from the apn_tbl. Save the exports in the
+    wkg_fgdb
+    """
+
+    print '\n--------------------------------------------------------------------'
+    print 'Start Get_Parcels()\n'
+
+    print '  Getting APNs from table:\n    {}'.format(apn_tbl)
+
+    # Format the APN field to remove the dashes
+    expression = '!{}!.replace("-","")'.format(apn_fld)
+    print '\n  Removing dashes in the field "{}" to equal: {}\n'.format(apn_fld, expression)
+    arcpy.CalculateField_management(apn_tbl, apn_fld, expression, 'PYTHON_9.3')
+
+    # Get a list of parcels from the APN table
+    print '  Getting a list of unique parcels from the APN table:'
+    unique_apns_in_csv = []  # List of unique APNs
+    count = 0
+    with arcpy.da.SearchCursor(apn_tbl, [apn_fld]) as cursor:
+        for row in cursor:
+            apn = row[0]
+
+            if apn not in unique_apns_in_csv:
+                unique_apns_in_csv.append(apn)
+
+            count += 1
+    del cursor
+    print '    There are a total of "{}" rows in the APN table'.format(count)
+    print '    There are "{}" unique APNs in the APN table\n'.format(len(unique_apns_in_csv))
+
+
+    #---------------------------------------------------------------------------
+    #---------------------------------------------------------------------------
+    #                           PARCELS_ALL
+    #          Select from PARCELS_ALL and export to local FGDB
+
+    # Make Feature Layer for PARCELS_ALL
+    arcpy.MakeFeatureLayer_management(PARCELS_ALL, 'parcels_all_lyr')
+
+    # Select parcels from PARCELS_ALL that are in the APN table
+    print '  ------------------------------------------------------------------'
+    print '  Selecting parcels from PARCELS_ALL that are in the APN table:'
+    for apn in unique_apns_in_csv:
+
+        where_clause = "APN = '{}'".format(apn)
+        ##print 'Finding APN: {}'.format(apn)  # For testing
+        arcpy.SelectLayerByAttribute_management('parcels_all_lyr', 'ADD_TO_SELECTION', where_clause)
+
+    # Get the count of selected parcels
+    print '    Getting count of selected parcels:'
+    count = Get_Count_Selected('parcels_all_lyr')
+
+    # Export the selected parcels (if any)
+    if count != 0:
+        out_path, out_name = os.path.split(from_parcels_all_fc)
+        print '  Exporting "{}" selected parcels from PARCELS_ALL to:\n    {}\{}'.format(count, out_path, out_name)
+        arcpy.FeatureClassToFeatureClass_conversion('parcels_all_lyr', out_path, out_name)
+    else:
+        '    No features selected from PARCELS_ALL'
+
+    # Delete the layer with the selection on it
+    arcpy.Delete_management('parcels_all_lyr')
+
+
+    #---------------------------------------------------------------------------
+    #        Find out which APNs from the CSV were not found in PARCELS_ALL
+
+    print '\n  Finding out which APNs from the APN table were not found in PARCELS_ALL:'
+
+    # First get a list of parcels that WERE found in PARCELS_ALL
+    apns_found_in_parcels_all = []
+    apns_not_found_in_parcels_all = []
+    with arcpy.da.SearchCursor(from_parcels_all_fc, ['APN']) as cursor:
+        for row in cursor:
+            apns_found_in_parcels_all.append(row[0])
+    del cursor
+
+    # Next, get a list of parcels that were NOT found in PARCELS_ALL
+    for apn in unique_apns_in_csv:
+        if apn not in apns_found_in_parcels_all:
+            apns_not_found_in_parcels_all.append(apn)
+
+    # Determine if we need to search PARCELS_HISTORICAL
+    if len(apns_not_found_in_parcels_all) == 0:
+        search_historic_parcels = False
+        print '    All APNs in table were found in PARCELS_ALL, no need to search PARCELS_HISTORICAL\n'
+
+    else:
+        search_historic_parcels = True
+        print '    There were "{}" APNs not found in PARCELS_ALL, searching PARCELS_HISTORICAL\n'.format(len(apns_not_found_in_parcels_all))
+
+
+    #---------------------------------------------------------------------------
+    #---------------------------------------------------------------------------
+    #                           PARCELS_HISTORICAL
+    #          Select from PARCELS_HISTORICAL and export to local FGDB
+
+    apns_found_in_parcels_hist = []
+    apns_not_found_anywhere = []
+
+    if search_historic_parcels == True:
+
+        # Make Feature Layer for PARCELS_HISTORICAL
+        arcpy.MakeFeatureLayer_management(PARCELS_HISTORICAL, 'parcels_historical_lyr')
+
+        # Select parcels from PARCELS_HISTORICAL that are in the APN table
+        print '  ------------------------------------------------------------------'
+        print '  Selecting parcels from PARCELS_HISTORICAL that are in the APN table:'
+        for apn in apns_not_found_in_parcels_all:
+
+            where_clause = "APN = '{}'".format(apn)
+            ##print 'Finding APN: {}'.format(apn)  # For testing
+            arcpy.SelectLayerByAttribute_management('parcels_historical_lyr', 'ADD_TO_SELECTION', where_clause)
+
+        # Get the count of selected parcels
+        count = Get_Count_Selected('parcels_historical_lyr')
+
+        # Export the selected parcels (if any)
+        if count != 0:
+            out_path, out_name = os.path.split(from_parcels_hist_fc)
+            print '  Exporting "{}" selected parcels from PARCELS_HISTORICAL to:\n    {}\{}'.format(count, out_path, out_name)
+            arcpy.FeatureClassToFeatureClass_conversion('parcels_historical_lyr', out_path, out_name)
+        else:
+            '  No features selected from PARCELS_HISTORICAL'
+
+        # Delete the layer with the selection on it
+        arcpy.Delete_management('parcels_historical_lyr')
+
+    print '\nFinished Get_Parcels()'
+
+
+#-------------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
+def Get_APN_Lists(apn_tbl, from_parcels_all_fc, from_parcels_hist_fc, apn_fld):
+    """
+    """
+    print '\n--------------------------------------------------------------------'
+    print 'Start Get_APN_Lists()\n'
+
+    # Create lists
+    apns_from_imported_csv     = []
+    apns_found_in_parcels_all  = []
+    apns_found_in_parcels_hist = []
+    apns_not_found_anywhere    = []
+
+
+    # Find list of all APNs from the imported CSV table
+    if arcpy.Exists(apn_tbl):
+        print '  Getting all APNs from Imported Table:\n    {}'.format(apn_tbl)
+        fields = [apn_fld]
+        with arcpy.da.SearchCursor(apn_tbl, fields) as cursor:
+            for row in cursor:
+                apn = row[0]
+                apns_from_imported_csv.append(apn)
+        del cursor
+    print '    There were a total of "{}" APNs from the Table\n'.format(len(apns_from_imported_csv))
+
+
+    # Find unique list of APNs from PARCELS_ALL
+    if arcpy.Exists(from_parcels_all_fc):
+        print '  Getting APNs from FC:\n    {}'.format(from_parcels_all_fc)
+        fields = ['APN']
+        with arcpy.da.SearchCursor(from_parcels_all_fc, fields) as cursor:
+            for row in cursor:
+                apn = row[0]
+
+                if apn not in apns_found_in_parcels_all:
+                    apns_found_in_parcels_all.append(apn)
+        del cursor
+    print '    There were "{}" parcels found from PARCELS_ALL\n'.format(len(apns_found_in_parcels_all))
+
+
+    # Find unique list of APNs from PARCELS_HISTORICAL
+    if arcpy.Exists(from_parcels_hist_fc):
+        print '  Getting APNs from FC:\n    {}'.format(from_parcels_hist_fc)
+        fields = ['APN']
+        with arcpy.da.SearchCursor(from_parcels_hist_fc, fields) as cursor:
+            for row in cursor:
+                apn = row[0]
+
+                if apn not in apns_found_in_parcels_hist:
+                    apns_found_in_parcels_hist.append(apn)
+        del cursor
+    print '    There were "{}" parcels found from PARCELS_HISTORICAL\n'.format(len(apns_found_in_parcels_hist))
+
+
+    # Find unique list of APNs not found anywhere
+    print '  Getting APNs that were not found in PARCELS_ALL or PARCELS_HISTORICAL'
+    for csv_apn in apns_from_imported_csv:
+        if (csv_apn not in apns_found_in_parcels_all) and (csv_apn not in apns_found_in_parcels_hist):
+            if csv_apn not in apns_not_found_anywhere:
+                apns_not_found_anywhere.append(csv_apn)
+    print '    There were "{}" parcels not found in either FC\n'.format(len(apns_not_found_anywhere))
+
+
+    print 'Finished Get_APN_Lists()'
+
+    return apns_from_imported_csv, apns_found_in_parcels_all, apns_found_in_parcels_hist, apns_not_found_anywhere
+
+
+#-------------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
+def QA_QC(apn_tbl, from_parcels_all_fc, from_parcels_hist_fc, apns_from_imported_csv, apns_found_in_parcels_all, apns_found_in_parcels_hist, apns_not_found_anywhere, apn_fld, record_id_fld, du_fld, acreage_cutoff_for_overlap):
+    """
+    """
+
+    print '\n--------------------------------------------------------------------'
+    print 'Start QA_QC()'
+
+    data_pass_QAQC_tests = True
+
+    #---------------------------------------------------------------------------
+    # 1)  Which APNs from the CSV were not found in PARCELS_ALL or PARCELS_HISTORICAL?
+    print '\n  1) Finding which APNs from the CSV were not found in PARCELS_ALL or PARCELS_HISTORICAL:\n'
+
+    if len(apns_not_found_anywhere) == 0:
+        print '\n    OK! All APNs were found in either PARCELS_ALL or PARCELS_HISTORICAL'
+
+    else:
+        data_pass_QAQC_tests = False
+        print '    WARNING!  There are "{}" APNs that were not found in PARCELS_ALL or PARCELS_HISTORICAL:'.format(len(apns_not_found_anywhere))
+        for apn in apns_not_found_anywhere:
+            print '      APN:  {}'.format(apn)
+
+            # Get the Record ID(s) associated with that APN
+            fields = [apn_fld, record_id_fld]
+            where_clause = "{} = '{}'".format(apn_fld, apn)
+            with arcpy.da.SearchCursor(apn_tbl, fields, where_clause) as cursor:
+                for row in cursor:
+                    print '        With Record ID: {}'.format(row[1])
+
+            del cursor
+
+
+    #---------------------------------------------------------------------------
+    # 2)  Find if Parcels showed up more than one time in the CSV table
+    print '\n\n  2) Finding if parcels showed up more than one time in the CSV table:\n'
+
+    # Get a list of parcels from the APN table
+    unique_apns_in_csv = []  # List of unique APNs
+    duplicate_apns_in_csv = []
+    for apn in apns_from_imported_csv:
+        if apn not in unique_apns_in_csv:
+            unique_apns_in_csv.append(apn)
+        elif apn not in duplicate_apns_in_csv:
+            duplicate_apns_in_csv.append(apn)
+
+    if len(duplicate_apns_in_csv) == 0:
+        print '    OK! There were 0 duplicate APNs found in the CSV extract'
+
+    else:
+        data_pass_QAQC_tests = False
+        print '\n    WARNING!  There are "{}" APNs that were duplicated in the CSV:'.format(len(duplicate_apns_in_csv))
+        for apn in duplicate_apns_in_csv:
+            print '      APN: {}'.format(apn)
+
+            # Get the Record ID(s) associated with that APN
+            fields = [apn_fld, record_id_fld]
+            where_clause = "{} = '{}'".format(apn_fld, apn)
+            with arcpy.da.SearchCursor(apn_tbl, fields, where_clause) as cursor:
+                for row in cursor:
+                    print '        With Record ID: {}'.format(row[1])
+
+        print '\n    This might mean that only the parcel from the newest project'
+        print '    should be considered in the analysis.  Further human analysis needed.'
+
+
+
+    #---------------------------------------------------------------------------
+    # 3)  Is there an overlap with a current parcel and an historic parcel?
+    print '\n\n  3) Finding any overlaps with current parcels and historic parcels:\n'
+
+    # Check to see if any parcels came from PARCELS_HISTORICAL, no need to check
+    #   If there are no parcels from PARCELS_HISTORICAL
+    if not arcpy.Exists(from_parcels_hist_fc):
+        print '      OK! There were no parcels found in PARCELS_HISTORICAL'
+        print '      Therefore there can be no overlap'
+
+    else:  # There might be an overlap, continue checking...
+
+        # Intersect the two FC's to see if there are any overlaps
+        in_features = [from_parcels_all_fc, from_parcels_hist_fc]
+        wkg_fgdb = os.path.dirname(from_parcels_all_fc)
+        intersect_fc = os.path.join(wkg_fgdb, 'Parcels_ALL_and_HIST_int')
+        print '\n    Intersecting:'
+        for fc in in_features:
+            print '      {}'.format(fc)
+        print '    To create FC:\n      {}\n'.format(intersect_fc)
+        arcpy.Intersect_analysis(in_features, intersect_fc)
+
+        # Find out if there are any overlapping parcels
+        overlap = False
+        with arcpy.da.SearchCursor(intersect_fc, 'OBJECTID') as cursor:
+            for row in cursor:
+                overlap = True
+                break
+
+        if overlap == False:
+            print '    OK! There are no overlapping parcels'
+
+        # If there is an overlap, get a list of the parcels that overlap and report on them
+        if overlap == True:
+            print '    INFO!  There are overlapping parcels from current and historic parcels:'
+            apns_that_overlap = []
+            fields = ['APN', 'APN_1', 'Shape_Area']
+            with arcpy.da.SearchCursor(intersect_fc, fields) as int_cursor:
+                for row in int_cursor:
+                    apn_1 = row[0]
+                    apn_2 = row[1]
+                    sq_ft = row[2]
+
+                    # Get the acreage of the overlap feature
+                    acreage = sq_ft/43560
+
+                    if acreage <= acreage_cutoff_for_overlap:
+                        print '      APN: "{}" overlaps with APN: "{}"'.format(apn_1, apn_2)
+                        print '      but the overlap ({} acres) is <= the script-defined cutoff for analysis ({} acres)'.format(acreage, acreage_cutoff_for_overlap)
+
+                    # Only analyze overlaps that are large enough to matter
+                    if acreage > acreage_cutoff_for_overlap:
+
+                        # Set which apn is current and which is historical
+                        if apn_1 in apns_found_in_parcels_hist:
+                            historic_apn = apn_1
+                        if apn_1 in apns_found_in_parcels_all:
+                            current_apn = apn_1
+
+                        if apn_2 in apns_found_in_parcels_hist:
+                            historic_apn = apn_2
+                        if apn_2 in apns_found_in_parcels_all:
+                            current_apn = apn_2
+
+                        # Get the Record ID(s) associated with the historic APN
+                        record_ids_historic = []
+                        fields = [apn_fld, record_id_fld]
+                        where_clause = "{} = '{}'".format(apn_fld, historic_apn)
+                        with arcpy.da.SearchCursor(apn_tbl, fields, where_clause) as csv_cursor:
+                            for row in csv_cursor:
+                                record_ids_historic.append(row[1])
+                        del csv_cursor
+
+                        # Get the Record ID(s) associated with the current APN
+                        record_ids_current = []
+                        fields = [apn_fld, record_id_fld]
+                        where_clause = "{} = '{}'".format(apn_fld, current_apn)
+                        with arcpy.da.SearchCursor(apn_tbl, fields, where_clause) as csv_cursor:
+                            for row in csv_cursor:
+                                record_ids_current.append(row[1])
+                        del csv_cursor
+
+                        # If the apn of the current and the apn of the historic overlapping parcels
+                        # are each only in one project, and if the project is the same project,
+                        # then the dissolve that happens below will remove any double-counting
+                        if (len(record_ids_current) == 1) and (len(record_ids_historic) == 1) and (record_ids_current[0] == record_ids_historic[0]):
+                                print '      There is overlap between CURRENT parcel "{}" and HISTORIC parcel "{}"'.format(current_apn, historic_apn)
+                                print '      But as both are from the same project: "{}", there will be no overlap when the data is dissolved'.format(record_ids_current[0])
+                                print '      No need for human analysis, but PDS may want to know that they should update the historic apn in the above project\n'
+                        else:
+                            data_pass_QAQC_tests = False
+                            print '      WARNING!  The overlap between CURRENT parcel "{}" and HISTORIC parcel "{}" may cause double counting'.format(current_apn, historic_apn)
+                            print '      Please let PDS know that they should remove the historic parcel and add current parcel(s) in Accela for project {}\n'.format(record_ids_historic[0])
+
+            del int_cursor
+
+
+    #---------------------------------------------------------------------------
+    # 4)  Check any critical fields to ensure there are no blank values
+    print '\n  4) Finding any critical fields that are blank in imported CSV table:\n'
+    critical_fields = [record_id_fld, apn_fld, du_fld]
+    for f in critical_fields:
+
+        # Set the where clause
+        if f == 'DWP':  # Set a where clause for an integer field
+            where_clause = "{0} IS NULL".format(f)
+        else:  # Set a where clause for a string field
+            where_clause = "{0} IS NULL or {0} = ''".format(f)
+
+        # Get list of ids
+        print '    Checking where: {}:'.format(where_clause)
+        ids_w_nulls = []  # List to hold the ID of reports with null values
+        with arcpy.da.SearchCursor(apn_tbl, critical_fields, where_clause) as cursor:
+            for row in cursor:
+                record_id = row[0]
+                ids_w_nulls.append(record_id)
+        del cursor
+
+        # Get a sorted list of only unique values
+        ids_w_nulls = sorted(set(ids_w_nulls))
+
+        # Report on the sorted list
+        if len(ids_w_nulls) != 0:
+            data_pass_QAQC_tests = False
+            print '      WARNING! There are records in the CSV extract that have a blank value in column: "{}":'.format(f)
+            for id_num in ids_w_nulls:
+                if (id_num == None) or (id_num == ''):
+                    print '        No Record ID available to report'
+                else:
+                    print '        {}'.format(id_num)
+        if len(ids_w_nulls) == 0:
+            print '      OK! No blank values in {}'.format(f)
+
+        print ''
+
+
+    #---------------------------------------------------------------------------
+    print '\n  ----------------------------------------------------------------'
+    print '  Data Passed all QA/QC tests = {}\n'.format(data_pass_QAQC_tests)
+
+    print 'Finished QA_QC()'
+
+    return data_pass_QAQC_tests
+
+
+#-------------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
+def Process_Projects(fc_to_process, record_id_fld, du_fld):
+    """
+    """
+    print '\n------------------------------------------------------------------'
+    print 'Starting Process_Parcels()'
+    print '  Processing FC at:\n    {}\n'.format(fc_to_process)
+
+    # Set the names of the fields to be added
+    parcel_acres_fld    = 'Parcel_Acres'
+    project_acres_fld   = 'Project_Acres'
+    density_fld         = 'DENSITY'
+
+
+    #---------------------------------------------------------------------------
+    # Get a list of unique RECORD_IDs
+    print '  Getting list of all RECORD_IDs:'
+    project_ids = []
+    with arcpy.da.SearchCursor(fc_to_process, [record_id_fld]) as cursor:
+        for row in cursor:
+            project_ids.append(row[0])
+    del cursor
+
+    # Get a list of all the UNIQUE ID's
+    # set() returns a list of only unique values
+    unique_project_ids = sorted(set(project_ids))
+    print '    There are "{}" unique project IDs\n'.format(len(unique_project_ids))
+
+
+    #---------------------------------------------------------------------------
+    # Add fields to hold calculations
+    print '  Adding fields:'
+
+    fields_to_add = [parcel_acres_fld, project_acres_fld, density_fld]
+
+    for field_name in fields_to_add:
+        field_type = 'DOUBLE'
+        print '    [{}] as a:  {}'.format(field_name, field_type)
+        arcpy.AddField_management(fc_to_process, field_name, field_type)
+
+
+    #---------------------------------------------------------------------------
+    #                             Calculate fields
+
+    # Repair geometry to ensure correct geometry calculation below
+    print '\n  Repairing Geometry'
+    arcpy.RepairGeometry_management(fc_to_process)
+
+    # Calc Acres for each Parcel
+    expression      = '!shape.area@acres!'
+    expression_type = 'PYTHON_9.3'
+
+    print '\n  Calculating field:\n    {} = {}\n'.format(parcel_acres_fld, expression)
+    arcpy.CalculateField_management(fc_to_process, parcel_acres_fld, expression, expression_type)
+
+
+    # Calc Total Project Acres for each Project
+    print '  Calculating field: {} to equal the total acreage of each project'.format(project_acres_fld)
+    for project in unique_project_ids:
+
+        ##print '  Calculating total acreage of project:  {}'.format(project)  # For testing
+
+        # Get the acreage of the project
+        total_project_acres = 0
+
+        where_clause = "{} = '{}'".format(record_id_fld, project)
+        fields       = [record_id_fld, parcel_acres_fld, project_acres_fld]
+        with arcpy.da.SearchCursor(fc_to_process, fields, where_clause) as cursor:
+            for row in cursor:
+                acres = row[1]
+                total_project_acres = (total_project_acres + acres)
+
+        ##print '    Total Project Acres:  {}\n'.format(total_project_acres)  # For testing
+        del cursor
+
+        # Set the acreage of the project into the fc
+        where_clause = "{} = '{}'".format(record_id_fld, project)
+        fields       = [record_id_fld, project_acres_fld]
+        with arcpy.da.UpdateCursor(fc_to_process, fields, where_clause) as cursor:
+            for row in cursor:
+                row[1] = total_project_acres
+                cursor.updateRow(row)
+        del cursor
+
+
+    # Calc DENSITY designation for each Project
+    expression = "!{}!/!{}!".format(du_fld, project_acres_fld)
+    print '\n  Calculating field:\n    {} = {}\n'.format(density_fld, expression)
+    arcpy.CalculateField_management(fc_to_process, density_fld, expression, expression_type)
+
+
+    #---------------------------------------------------------------------------
+    # Dissolve to the project level
+    dissolve_fields = [record_id_fld, du_fld, project_acres_fld, density_fld]
+    dissolve_fc     = os.path.join(os.path.dirname(fc_to_process), 'Parcels_Applicant_joined_diss')
+    print '\n  Dissolving FC:\n    {}\n  To:\n    {}\n  On Fields:'.format(fc_to_process, dissolve_fc)
+    for f in dissolve_fields:
+        print '    {}'.format(f)
+
+    arcpy.Dissolve_management(fc_to_process, dissolve_fc, dissolve_fields, '#', 'SINGLE_PART')
+
+
+    #---------------------------------------------------------------------------
+    # Delete any records that do not have a value in the Dwelling Unit field
+    #   (which would result in not having a value in the Density field)
+    print '\n\n  Checking for any records that do not have a value in the Dwelling Unit field'
+    print '    since this would cause a null value in the density field, resulting in bad data'
+    where_clause = "{} IS NULL".format(du_fld)
+    missing_density_lyr = Select_By_Attribute(dissolve_fc, 'NEW_SELECTION', where_clause)
+
+    # Get count of selected records
+    count = Get_Count_Selected(missing_density_lyr)
+
+    if count != 0:
+        print '    There were "{}" features where "{}"'.format(count, where_clause)
+        print '    Deleting those features now in FC:\n      {}'.format(dissolve_fc)
+        arcpy.DeleteFeatures_management(missing_density_lyr)
+    else:
+        print '    OK! No records missing a value in the Dewlling Unit field'
+
+    #---------------------------------------------------------------------------
+    # Delete any records that do not have a value in the Record ID field
+    print '\n\n  Checking for any records that do not have a value in the Record ID field:'
+    where_clause = "{0} IS NULL or {0} = ''".format(record_id_fld)
+    missing_record_id_lyr = Select_By_Attribute(dissolve_fc, 'NEW_SELECTION', where_clause)
+
+    # Get count of selected records
+    count = Get_Count_Selected(missing_record_id_lyr)
+
+    if count != 0:
+        print '    There were "{}" features where "{}"'.format(count, where_clause)
+        print '    Deleting those features now in FC:\n      {}'.format(dissolve_fc)
+        arcpy.DeleteFeatures_management(missing_record_id_lyr)
+    else:
+        print '    OK! No records missing a value in the Record ID field'
+
+    print '\nFinished Process_Parcels()'
+
+
+#-------------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
+#                    FUNCTION Join 2 Objects by Attribute
+
+def Join_2_Objects_By_Attr(target_obj, target_join_field, to_join_obj, to_join_field, join_type):
+    """
+    PARAMETERS:
+      target_obj (str): The full path to the FC or Table that you want to have
+        another object join to.
+
+      target_join_field (str): The field name in the target_obj to be used as the
+        primary key.
+
+      to_join_obj (str): The full path to the FC or Table that you want to join
+        to the target_obj.
+
+      to_join_field (str): The field name in the to_join_obj to be used as the
+        foreign key.
+
+      join_type (str): Specifies what will be done with records in the input
+        that match a record in the join table. Valid values:
+          KEEP_ALL
+          KEEP_COMMON
+
+    RETURNS:
+      target_obj (lyr): Return the layer/view of the joined object so that
+        it can be processed.
+
+    FUNCTION:
+      To join two different objects via a primary key field and a foreign key
+      field by:
+        1) Creating a layer or table view for each object ('target_obj', 'to_join_obj')
+        2) Joining the layer(s) / view(s) via the 'target_join_field' and the
+           'to_join_field'
+
+    NOTE:
+      This function returns a layer/view of the joined object, remember to delete
+      the joined object (arcpy.Delete_management(target_obj)) if performing
+      multiple joins in one script.
+    """
+
+    print '\n    Starting Join_2_Objects_By_Attr()...'
+
+    # Create the layer or view for the target_obj using try/except
+    try:
+        arcpy.MakeFeatureLayer_management(target_obj, 'target_obj')
+        ##print '      Made FEATURE LAYER for: {}'.format(target_obj)
+    except:
+        arcpy.MakeTableView_management(target_obj, 'target_obj')
+        ##print '      Made TABLE VIEW for: {}'.format(target_obj)
+
+    # Create the layer or view for the to_join_obj using try/except
+    try:
+        arcpy.MakeFeatureLayer_management(to_join_obj, 'to_join_obj')
+        ##print '      Made FEATURE LAYER for: {}'.format(to_join_obj)
+    except:
+        arcpy.MakeTableView_management(to_join_obj, 'to_join_obj')
+        ##print '      Made TABLE VIEW for: {}'.format(to_join_obj)
+
+    # Join the layers
+    print '      Joining "{}"\n         With "{}"\n           On "{}"\n          And "{}"\n         Type "{}"\n'.format(target_obj, to_join_obj, target_join_field, to_join_field, join_type)
+    arcpy.AddJoin_management('target_obj', target_join_field, 'to_join_obj', to_join_field, join_type)
+
+    # Print the fields (only really needed during testing)
+    ##fields = arcpy.ListFields('target_obj')
+    ##print '  Fields in joined layer:'
+    ##for field in fields:
+    ##    print '    ' + field.name
+
+    print '    Finished Join_2_Objects_By_Attr()\n'
+
+    # Return the layer/view of the joined object so it can be processed
+    return 'target_obj'
+
+
+#-------------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
+def Get_Count_Selected(lyr):
+    """
+    PARAMETERS:
+      lyr (lyr): The layer that should have a selection on it that we want to test.
+
+    RETURNS:
+      count_selected (int): The number of selected records in the lyr
+
+    FUNCTION:
+      To get the count of the number of selected records in the lyr.
+    """
+
+    print '\n    Starting Get_Count()...'
+
+    # See if there are any selected records
+    desc = arcpy.Describe(lyr)
+
+    if desc.fidSet: # True if there are selected records
+        result = arcpy.GetCount_management(lyr)
+        count_selected = int(result.getOutput(0))
+
+    # If there weren't any selected records
+    else:
+        count_selected = 0
+
+    print '      Count of Selected: {}'.format(str(count_selected))
+
+    print '    Finished Get_Count()\n'
+
+    return count_selected
+
+
+#-------------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
+if __name__ == '__main__':
+    main()
