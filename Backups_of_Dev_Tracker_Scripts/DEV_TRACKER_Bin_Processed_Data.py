@@ -21,10 +21,6 @@ def main():
     name_of_script = 'DEV_TRACKER_Bin_Processed_Data.py'
 
 
-    # Set name to give outputs for this script
-    shorthand_name = 'Bin_Processed_Data'
-
-
     # Paths to folders and local FGDBs
     root_folder          = r'P:\20180510_development_tracker\DEV'
 
@@ -32,19 +28,22 @@ def main():
 
     data_folder          = '{}\{}'.format(root_folder, 'Data')
 
-    wkg_fgdb             = '{}\{}'.format(data_folder, '{}.gdb'.format(shorthand_name))
+    wkg_fgdb             = '{}\{}'.format(data_folder, 'Bin_Processed_Data.gdb')
 
     success_error_folder = '{}\Scripts\Source_Code\Success_Error'.format(root_folder)
 
+    success_file = '{}\SUCCESS_running_{}.txt'.format(success_error_folder, name_of_script.split('.')[0])
+
+    error_file   = '{}\ERROR_running_{}.txt'.format(success_error_folder, name_of_script.split('.')[0])
+
 
     # Paths to SDE Feature Classes
-    CONTROL_TABLE      = r'Database Connections\AD@ATLANTIC@SDW.sde\SDW.PDS.PDS_DEV_TRACKER_CONTROL_TABLE'
+    CONTROL_TABLE      = r'Database Connections\AD@ATLANTIC@SDW.sde\SDW.PDS.PDS_DEV_TRACKER_BINNING_CONTROL_TABLE'
     GRID_HEX_060_ACRES = r'Database Connections\AD@ATLANTIC@SDE.sde\SDE.SANGIS.GRID_HEX_060_ACRES'
     CMTY_PLAN_CN       = r'Database Connections\AD@ATLANTIC@SDE.sde\SDE.SANGIS.CMTY_PLAN_CN'
 
 
     # Set the final location for each binned FC & CPASG Table
-    prod_binned_fc = r'Database Connections\AD@ATLANTIC@SDW.sde\SDW.PDS.PDS_DEV_TRACKER\SDW.PDS.PDS_DEV_TRACKER_In_Process_GPAs_HEXBIN'
     prod_cpasg_tbl = r'Database Connections\AD@ATLANTIC@SDW.sde\SDW.PDS.PDS_DEV_TRACKER_In_Process_GPAs_CPASG'
 
 
@@ -67,126 +66,171 @@ def main():
         print 'NOTICE, log file folder does not exist, creating it now\n'
         os.mkdir(log_file_folder)
 
-##    # Turn all 'print' statements into a log-writing object
-##    try:
-##        log_file = r'{}\{}'.format(log_file_folder, name_of_script.split('.')[0])
-##        orig_stdout, log_file_date, dt_to_append = Write_Print_To_Log(log_file, name_of_script)
-##    except Exception as e:
-##        success = False
-##        print '\n*** ERROR with Write_Print_To_Log() ***'
-##        print str(e)
+    # Turn all 'print' statements into a log-writing object
+    try:
+        log_file = r'{}\{}'.format(log_file_folder, name_of_script.split('.')[0])
+        orig_stdout, log_file_date, dt_to_append = Write_Print_To_Log(log_file, name_of_script)
+    except Exception as e:
+        success = False
+        print '\n*** ERROR with Write_Print_To_Log() ***'
+        print str(e)
+
+
+    #---------------------------------------------------------------------------
+    #          Delete any previously created SUCCESS/ERROR files
+    #---------------------------------------------------------------------------
+    if os.path.exists(success_file):
+        print 'Deleting old file at:\n  {}\n'.format(success_file)
+        os.remove(success_file)
+    if os.path.exists(error_file):
+        print 'Deleting old file at:\n  {}\n'.format(error_file)
+        os.remove(error_file)
 
 
     #---------------------------------------------------------------------------
     #                      Create FGDBs if needed
     #---------------------------------------------------------------------------
-    # Delete and create working FGDB
-    if arcpy.Exists(wkg_fgdb):
-        print 'Deleting FGDB at:\n  {}\n'.format(wkg_fgdb)
-        arcpy.Delete_management(wkg_fgdb)
+    try:
+        # Delete and create working FGDB
+        if arcpy.Exists(wkg_fgdb):
+            print 'Deleting FGDB at:\n  {}\n'.format(wkg_fgdb)
+            arcpy.Delete_management(wkg_fgdb)
 
-    if not arcpy.Exists(wkg_fgdb):
-        out_folder_path, out_name = os.path.split(wkg_fgdb)
-        print 'Creating FGDB at:\n  {}\n'.format(wkg_fgdb)
-        arcpy.CreateFileGDB_management(out_folder_path, out_name)
+        if not arcpy.Exists(wkg_fgdb):
+            out_folder_path, out_name = os.path.split(wkg_fgdb)
+            print 'Creating FGDB at:\n  {}\n'.format(wkg_fgdb)
+            arcpy.CreateFileGDB_management(out_folder_path, out_name)
 
-    #---------------------------------------------------------------------------
-    #                 Get Variables for each FC to Bin
-    #---------------------------------------------------------------------------
-    print '--------------------------------------------------------------------'
-    fields = ['PATH_TO_FC_TO_BIN']
-    with arcpy.da.SearchCursor(CONTROL_TABLE, fields) as cursor:
-        for row in cursor:
-            fc_to_bin = row[0]
-            print 'Processing: "{}"\n'.format(os.path.basename(fc_to_bin))
-            print 'Path to FC to Bin:\n  {}'.format(fc_to_bin)
-
-            if not arcpy.Exists(fc_to_bin):
-                success = False
-                print '\nERROR! That FC does not exist\n'
-
-            else:
-                # Find if the fc_to_bin is a 'Polygon' or a 'Point'
-                desc = arcpy.Describe(fc_to_bin)
-                shape_type = desc.shapeType
-                print '\nShape type = "{}"\n'.format(shape_type)
+    except Exception as e:
+        success = False
+        print '\n*** ERROR with Creating FGDBs ***'
+        print str(e)
 
 
-                #-------------------------------------------------------------------
-                #-------------------------------------------------------------------
-                #                       Process if Polygon
-                #-------------------------------------------------------------------
-                # If it is a 'Polygon' make sure that it has the density_fld field
-                if shape_type == 'Polygon':
-                    print 'Confirming Polygon has field: [{}]'.format(density_fld)
+    if success == True:
+        #-----------------------------------------------------------------------
+        #                 Get Variables for each FC to Bin
+        #-----------------------------------------------------------------------
+        print '----------------------------------------------------------------'
+        print '----------------------------------------------------------------'
+        fields = ['PATH_TO_FC_TO_PROCESS', 'SHORTHAND_NAME', 'PROD_BINNED_FC', 'PROD_CPASG_TBL']
+        with arcpy.da.SearchCursor(CONTROL_TABLE, fields) as cursor:
+            for row in cursor:
+                fc_to_process  = row[0]
+                shorthand_name = row[1]
+                prod_binned_fc = row[2]
+                prod_cpasg_tbl = row[3]
 
-                    field_names = [f.name for f in arcpy.ListFields(fc_to_bin)]
+                print 'Processing: "{}"\n'.format(os.path.basename(fc_to_process))
+                print 'Path to FC to Bin:\n  {}'.format(fc_to_process)
 
-                    if density_fld in field_names:
-                        valid_polygon = True
-                        print '  OK! Polygon has required field\n'
-                    else:
-                        valid_polygon = False
-                        success = False
-                        print '  ERROR!  This FC is a "{}", but it does not have the field: "{}'.format(shape_type, density_fld)
-                        print '  It cannot--therefore--be processed\n'
+                if not arcpy.Exists(fc_to_process):
+                    success = False
+                    print '\nERROR! That FC does not exist\n'
 
-
-                    #---------------------------------------------------------------
-                    # Process valid Polygons
-                    if valid_polygon == True:
-                        #-----------------------------------------------------------
-                        #                Bin Polygons with a Density Field
-                        #-----------------------------------------------------------
-                        print 'Bin_Polys_w_Density'
-    ##                    Bin_Polys_w_Density(wkg_fgdb, fc_to_bin, GRID_HEX_060_ACRES, prod_binned_fc, density_fld)
+                else:
+                    # Find if the fc_to_process is a 'Polygon' or a 'Point'
+                    desc = arcpy.Describe(fc_to_process)
+                    shape_type = desc.shapeType
+                    print '\nShape type = "{}"\n'.format(shape_type)
 
 
-                        #-----------------------------------------------------------
-                        #       Create CPASG table for Polygons with a Density Field
-                        #-----------------------------------------------------------
-                        print 'CPASG_Polys_w_Density'
-    ##                    CPASG_Polys_w_Density(wkg_fgdb, fc_to_bin, CMTY_PLAN_CN, prod_cpasg_tbl, density_fld)
+                    #-----------------------------------------------------------
+                    #-----------------------------------------------------------
+                    #                       Process if Polygon
+                    #-----------------------------------------------------------
+                    # If it is a 'Polygon' make sure that it has the density_fld field
+                    if shape_type == 'Polygon':
+                        print 'Confirming Polygon has field: [{}]'.format(density_fld)
+
+                        field_names = [f.name for f in arcpy.ListFields(fc_to_process)]
+
+                        if density_fld in field_names:
+                            valid_polygon = True
+                            print '  OK! Polygon has required field\n'
+                        else:
+                            valid_polygon = False
+                            success = False
+                            print '  ERROR!  This FC is a "{}", but it does not have the field: "{}'.format(shape_type, density_fld)
+                            print '  It cannot--therefore--be processed\n'
 
 
-                #-------------------------------------------------------------------
-                #-------------------------------------------------------------------
-                #                        Process if Point
-                #-------------------------------------------------------------------
-                # If it is a 'Point' make sure that it has the unit_count_fld field
-                if shape_type == 'Point':
-                    print 'Confirming Point has field: [{}]'.format(unit_count_fld)
+                        #-------------------------------------------------------
+                        # Process valid Polygons
+                        if valid_polygon == True:
+                            #---------------------------------------------------
+                            #                Bin Polygons with a Density Field
+                            #---------------------------------------------------
+                            try:
+                                Bin_Polys_w_Density(wkg_fgdb, fc_to_process, prod_binned_fc, GRID_HEX_060_ACRES, shorthand_name, density_fld)
+                                pass
 
-                    field_names = [f.name for f in arcpy.ListFields(fc_to_bin)]
-
-                    if unit_count_fld in field_names:
-                        valid_point = True
-                        print '  OK! Point has required field\n'
-                    else:
-                        valid_point = False
-                        success = False
-                        print '  ERROR!  This FC is a "{}", but it does not have the field: "{}"'.format(shape_type, unit_count_fld)
-                        print '  It cannot--therefore--be processed\n'
+                            except Exception as e:
+                                success = False
+                                print '\n*** ERROR with Bin_Polys_w_Density() ***'
+                                print str(e)
 
 
-                    #---------------------------------------------------------------
-                    # Process valid Points
-                    if valid_point == True:
-                        #-----------------------------------------------------------
-                        #                Bin Points with a Unit Count Field
-                        #-----------------------------------------------------------
-                        Bin_Points_w_UnitCount(wkg_fgdb, fc_to_bin, GRID_HEX_060_ACRES, prod_binned_fc, unit_count_fld)
+                            #---------------------------------------------------
+                            #       Create CPASG table for Polygons with a Density Field
+                            #---------------------------------------------------
+                            try:
+                                CPASG_Polys_w_Density(wkg_fgdb, fc_to_process, prod_cpasg_tbl, CMTY_PLAN_CN, shorthand_name, density_fld)
+
+                            except Exception as e:
+                                success = False
+                                print '\n*** ERROR with CPASG_Polys_w_Density() ***'
+                                print str(e)
 
 
-                        #-----------------------------------------------------------
-                        #    Create CPASG table for Points with a Unit Count Field
-                        #-----------------------------------------------------------
-##                        CPASG_Points_w_UnitCount(wkg_fgdb, fc_to_bin, CMTY_PLAN_CN, prod_cpasg_tbl, density_fld)
+                    #-----------------------------------------------------------
+                    #-----------------------------------------------------------
+                    #                        Process if Point
+                    #-----------------------------------------------------------
+                    # If it is a 'Point' make sure that it has the unit_count_fld field
+                    if shape_type == 'Point':
+                        print 'Confirming Point has field: [{}]'.format(unit_count_fld)
 
-                        pass
+                        field_names = [f.name for f in arcpy.ListFields(fc_to_process)]
 
-            print '\n------------------------------------------------------'
-            print '------------------------------------------------------'
+                        if unit_count_fld in field_names:
+                            valid_point = True
+                            print '  OK! Point has required field\n'
+                        else:
+                            valid_point = False
+                            success = False
+                            print '  ERROR!  This FC is a "{}", but it does not have the field: "{}"'.format(shape_type, unit_count_fld)
+                            print '  It cannot--therefore--be processed\n'
+
+
+                        #-------------------------------------------------------
+                        # Process valid Points
+                        if valid_point == True:
+                            #---------------------------------------------------
+                            #                Bin Points with a Unit Count Field
+                            #---------------------------------------------------
+                            try:
+                                Bin_Points_w_UnitCount(wkg_fgdb, fc_to_process, prod_binned_fc, GRID_HEX_060_ACRES, shorthand_name, unit_count_fld)
+
+                            except Exception as e:
+                                success = False
+                                print '\n*** ERROR with Bin_Points_w_UnitCount() ***'
+                                print str(e)
+
+
+                            #---------------------------------------------------
+                            #    Create CPASG table for Points with a Unit Count Field
+                            #---------------------------------------------------
+                            try:
+                                CPASG_Points_w_UnitCount(wkg_fgdb, fc_to_process, prod_cpasg_tbl, CMTY_PLAN_CN, shorthand_name, unit_count_fld)
+
+                            except Exception as e:
+                                success = False
+                                print '\n*** ERROR with CPASG_Points_w_UnitCount() ***'
+                                print str(e)
+
+                print '\n\n----------------------------------------------------'
+                print '----------------------------------------------------'
 
     #---------------------------------------------------------------------------
     #---------------------------------------------------------------------------
@@ -194,27 +238,12 @@ def main():
     # successfully or not
     print '\n------------------------------------------------------------------'
     try:
-        # Set the file paths for the SUCCESS/ERROR files
-        success_file = '{}\SUCCESS_running_{}.txt'.format(success_error_folder, name_of_script.split('.')[0])
-        error_file   = '{}\ERROR_running_{}.txt'.format(success_error_folder, name_of_script.split('.')[0])
-
-
-        # Delete any previously created SUCCESS/ERROR files
-        if os.path.exists(success_file):
-            print 'Deleting old file at:\n  {}'.format(success_file)
-            os.remove(success_file)
-        if os.path.exists(error_file):
-            print 'Deleting old file at:\n  {}'.format(error_file)
-            os.remove(error_file)
-        time.sleep(3)
-
 
         # Set a file_name depending on the 'success' variable.
         if success == True:
             file_to_create = success_file
         else:
             file_to_create = error_file
-
 
         # Write the file
         print '\nCreating file:\n  {}\n'.format(file_to_create)
@@ -239,15 +268,15 @@ def main():
     # End of script reporting
     print 'Successfully ran script = {}'.format(success)
     time.sleep(3)
-##    sys.stdout = orig_stdout
-##    sys.stdout.flush()
+    sys.stdout = orig_stdout
+    sys.stdout.flush()
 
     if success == True:
         print '\nSUCCESSFULLY ran {}'.format(name_of_script)
     else:
         print '\n*** ERROR with {} ***'.format(name_of_script)
 
-##    print 'Please find log file at:\n  {}\n'.format(log_file_date)
+    print 'Please find log file at:\n  {}\n'.format(log_file_date)
     print '\nSuccess = {}'.format(success)
 
 
@@ -342,7 +371,7 @@ def Get_DT_To_Append():
 
 #-------------------------------------------------------------------------------
 #-------------------------------------------------------------------------------
-def Bin_Polys_w_Density(wkg_fgdb, fc_to_bin, GRID_HEX_060_ACRES, prod_binned_fc, density_fld):
+def Bin_Polys_w_Density(wkg_fgdb, fc_to_bin, prod_binned_fc, GRID_HEX_060_ACRES, shorthand_name, density_fld):
     """
     To take unique single-part (not multipart) polygons with a density field
     and to create a Hexbin FC with a VALUE field
@@ -355,8 +384,7 @@ def Bin_Polys_w_Density(wkg_fgdb, fc_to_bin, GRID_HEX_060_ACRES, prod_binned_fc,
     hex_id_fld       = 'HEXAGONID'
     row_acres_fld    = 'Row_Acres'
     value_temp_fld   = 'VALUE_Temp'
-    short_name       = os.path.basename(fc_to_bin)
-    value_final_fld  = 'VALUE_{}'.format(short_name)
+    value_final_fld  = 'VALUE_{}'.format(shorthand_name)
     expression_type  = 'PYTHON_9.3'
 
 
@@ -366,7 +394,7 @@ def Bin_Polys_w_Density(wkg_fgdb, fc_to_bin, GRID_HEX_060_ACRES, prod_binned_fc,
     #                 Intersect FC to bin with Hexbin FC
 
     in_features = [fc_to_bin, GRID_HEX_060_ACRES]
-    intersect_fc = os.path.join(wkg_fgdb, '{}_Hex_int'.format(short_name))
+    intersect_fc = os.path.join(wkg_fgdb, '{}_Hex_int'.format(shorthand_name))
     print '\n  Intersecting:'
     for fc in in_features:
         print '    {}'.format(fc)
@@ -377,33 +405,37 @@ def Bin_Polys_w_Density(wkg_fgdb, fc_to_bin, GRID_HEX_060_ACRES, prod_binned_fc,
     #---------------------------------------------------------------------------
     #                    Clean up the intersected data
 
+    print '  Clean up the intersected data before performing area calculations:\n'
+
     # Repair the geometry
-    print '  Repairing geometry at:\n    {}\n'.format(intersect_fc)
+    print '    Repairing geometry at:\n      {}\n'.format(intersect_fc)
     arcpy.RepairGeometry_management(intersect_fc)
 
     # Explode multipart to singlepart
     int_single_part_fc = '{}_expld'.format(intersect_fc)
-    print '  Exploding multipart to single part from:\n    {}\n  To:\n    {}\n'.format(intersect_fc, int_single_part_fc)
+    print '    Exploding multipart to single part from:\n      {}\n    To:\n      {}\n'.format(intersect_fc, int_single_part_fc)
     arcpy.MultipartToSinglepart_management(intersect_fc, int_single_part_fc)
 
     # Repair the geometry
-    print '  Repairing geometry at:\n    {}\n'.format(int_single_part_fc)
+    print '    Repairing geometry at:\n      {}\n'.format(int_single_part_fc)
     arcpy.RepairGeometry_management(int_single_part_fc)
 
 
     #---------------------------------------------------------------------------
     #              Add Acreage field and calc each rows acreage
 
+    print '\n  Add and calculate fields to FC:\n    {}'.format(int_single_part_fc)
+
     # Add field to hold Acreage
-    print '\n  Adding field:'
+    print '\n    Adding field:'
     field_name = row_acres_fld
     field_type = 'DOUBLE'
-    print '    [{}] as a:  {}'.format(field_name, field_type)
+    print '      [{}] as a:  {}'.format(field_name, field_type)
     arcpy.AddField_management(int_single_part_fc, field_name, field_type)
 
     # Calculate acres for each row
     expression      = '!shape.area@acres!'
-    print '\n  Calculating field:\n    {} = {}\n'.format(field_name, expression)
+    print '\n    Calculating field:\n      {} = {}\n'.format(field_name, expression)
     arcpy.CalculateField_management(int_single_part_fc, field_name, expression, expression_type)
 
 
@@ -411,22 +443,22 @@ def Bin_Polys_w_Density(wkg_fgdb, fc_to_bin, GRID_HEX_060_ACRES, prod_binned_fc,
     #         Add VALUE field and calc = to Density * Acreage
 
     # Add field to hold VALUE temporarily
-    print '\n  Adding field:'
+    print '\n    Adding field:'
     field_name = value_temp_fld
     field_type = 'DOUBLE'
-    print '    [{}] as a:  {}'.format(field_name, field_type)
+    print '      [{}] as a:  {}'.format(field_name, field_type)
     arcpy.AddField_management(int_single_part_fc, field_name, field_type)
 
     # Calculate VALUE for each row
     expression      = '!{}!*!{}!'.format(density_fld, row_acres_fld)
-    print '\n  Calculating field:\n    {} = {}\n'.format(field_name, expression)
+    print '\n    Calculating field:\n      {} = {}\n'.format(field_name, expression)
     arcpy.CalculateField_management(int_single_part_fc, field_name, expression, expression_type)
 
 
     #---------------------------------------------------------------------------
     #       Perform Frequency on Hexagon ID, while summing the VALUE field
 
-    freq_analysis_fc = os.path.join(wkg_fgdb, '{}_Hex_int_expld_freq'.format(short_name))
+    freq_analysis_fc = '{}_freq'.format(int_single_part_fc)
     freq_fields = [hex_id_fld]
     sum_fields  = [value_temp_fld]
 
@@ -435,8 +467,9 @@ def Bin_Polys_w_Density(wkg_fgdb, fc_to_bin, GRID_HEX_060_ACRES, prod_binned_fc,
     for f in freq_fields:
         print '    {}'.format(f)
     print '  Sum fields:'
-    for fi in sum_fields:
+    for f in sum_fields:
         print '    {}'.format(f)
+    print '  To create FC at:\n    {}'.format(freq_analysis_fc)
     arcpy.Frequency_analysis(int_single_part_fc, freq_analysis_fc, freq_fields, sum_fields)
 
 
@@ -444,10 +477,10 @@ def Bin_Polys_w_Density(wkg_fgdb, fc_to_bin, GRID_HEX_060_ACRES, prod_binned_fc,
     #             Copy the SDE Hexagon grid to a local FGDB
 
     # Set the path to copy the SDE Hexagon grid to
-    copied_hex_fc = os.path.join(wkg_fgdb, '{}_Hex_int_expld_freq_BINNED'.format(short_name))
+    FINAL_hex_fc = '{}_BINNED'.format(freq_analysis_fc)
 
     # Get the parameters the copy tool needs and copy
-    out_path, out_name = os.path.split(copied_hex_fc)
+    out_path, out_name = os.path.split(FINAL_hex_fc)
     print '\n  Copying FC:\n    {}\n  To:\n    {}\{}'.format(GRID_HEX_060_ACRES, out_path, out_name)
     arcpy.FeatureClassToFeatureClass_conversion(GRID_HEX_060_ACRES, out_path, out_name)
 
@@ -461,11 +494,11 @@ def Bin_Polys_w_Density(wkg_fgdb, fc_to_bin, GRID_HEX_060_ACRES, prod_binned_fc,
     field_name = value_final_fld
     field_type = 'DOUBLE'
     print '    [{}] as a:  {}'.format(field_name, field_type)
-    arcpy.AddField_management(copied_hex_fc, field_name, field_type)
+    arcpy.AddField_management(FINAL_hex_fc, field_name, field_type)
 
 
     # Join the copied Hex FC with the Frequency Table
-    join_lyr = Join_2_Objects_By_Attr(copied_hex_fc, hex_id_fld, freq_analysis_fc, hex_id_fld, 'KEEP_ALL')
+    join_lyr = Join_2_Objects_By_Attr(FINAL_hex_fc, hex_id_fld, freq_analysis_fc, hex_id_fld, 'KEEP_ALL')
 
 
     # Calculate the VALUE field in the Hex FC from the Frequency Table
@@ -473,37 +506,44 @@ def Bin_Polys_w_Density(wkg_fgdb, fc_to_bin, GRID_HEX_060_ACRES, prod_binned_fc,
     expression      = '!{}.{}!'.format(table_name, value_temp_fld)
     print '\n  Calculating field:\n    {} = {}\n'.format(field_name, expression)
     arcpy.CalculateField_management(join_lyr, value_final_fld, expression, expression_type)
-
+    arcpy.Delete_management(join_lyr)  # Need to delete this join so it does not conflict with other joins
 
     #---------------------------------------------------------------------------
     #             Calc any <Null> values in VALUE field to 0
 
+    print '\n  Calculating any <Null> values in VALUE field to 0:'
+
     # Make a layer that only has <Null> values in the VALUE field
     where_clause = "{} IS NULL".format(value_final_fld)
-    arcpy.MakeFeatureLayer_management(copied_hex_fc, 'null_values', where_clause)
+    arcpy.MakeFeatureLayer_management(FINAL_hex_fc, 'null_values', where_clause)
 
     # Calculate the layer
     field_name = value_final_fld
     expression = '0'
-    print '\n  Calculating field:\n    {} = {}\n'.format(field_name, expression)
+    print '    Calculating field:\n      [{}] = {}\n'.format(field_name, expression)
     arcpy.CalculateField_management('null_values', field_name, expression, expression_type)
+    arcpy.Delete_management('null_values')
 
     #---------------------------------------------------------------------------
     #         Delete the prod data and append the working data to prod
-##    print '\n  Deleting features at:\n    {}'.format(prod_binned_fc)
-##    arcpy.DeleteFeatures_management(prod_binned_fc)
-##
-##    print '\n  Append features from:\n    {}\n  To:\n    {}'.format(copied_hex_fc, prod_binned_fc)
-##    arcpy.Append_management(copied_hex_fc, prod_binned_fc)
+
+    print '  Get working data to prod:'
+
+    print '\n    Deleting features at:\n      {}'.format(prod_binned_fc)
+    arcpy.DeleteFeatures_management(prod_binned_fc)
+
+    print '\n    Append features from:\n      {}\n    To:\n      {}'.format(FINAL_hex_fc, prod_binned_fc)
+    arcpy.Append_management(FINAL_hex_fc, prod_binned_fc)
 
 
-
-    print 'Finished Bin_Polys_w_Density()'
+    #---------------------------------------------------------------------------
+    print '\nFinished Bin_Polys_w_Density()'
+    return
 
 
 #-------------------------------------------------------------------------------
 #-------------------------------------------------------------------------------
-##def CPASG_Polys_w_Density(wkg_fgdb, fc_to_make_cpasg_tbl, CMTY_PLAN_CN, prod_cpasg_tbl, density_fld):
+def CPASG_Polys_w_Density(wkg_fgdb, fc_to_make_cpasg_tbl, prod_cpasg_tbl, CMTY_PLAN_CN, shorthand_name, density_fld):
     """
     To take unique single-part (not multipart) polygons with a density field
     and to create a CPASG table with a VALUE field
@@ -517,8 +557,7 @@ def Bin_Polys_w_Density(wkg_fgdb, fc_to_bin, GRID_HEX_060_ACRES, prod_binned_fc,
     cpasg_label_new_fld   = 'CPASG_NAME'  # The new field name to give the CPASG_LABE
     cpasg_fld             = 'CPASG'
     row_acres_fld         = 'Row_Acres'
-    short_name            = os.path.basename(fc_to_make_cpasg_tbl)
-    value_final_fld       = 'VALUE_{}'.format(short_name)
+    value_final_fld       = 'VALUE_{}'.format(shorthand_name)
     expression_type       = 'PYTHON_9.3'
 
 
@@ -528,7 +567,7 @@ def Bin_Polys_w_Density(wkg_fgdb, fc_to_bin, GRID_HEX_060_ACRES, prod_binned_fc,
     #                 Union 'FC to make CPASG table' with CMTY_PLAN_CN
 
     in_features = [fc_to_make_cpasg_tbl, CMTY_PLAN_CN]
-    union_fc = os.path.join(wkg_fgdb, '{}_CPASG_union'.format(short_name))
+    union_fc = os.path.join(wkg_fgdb, '{}_CPASG_union'.format(shorthand_name))
     print '\n  Unioning:'
     for fc in in_features:
         print '    {}'.format(fc)
@@ -539,33 +578,37 @@ def Bin_Polys_w_Density(wkg_fgdb, fc_to_bin, GRID_HEX_060_ACRES, prod_binned_fc,
     #---------------------------------------------------------------------------
     #                    Clean up the unioned data
 
+    print '\n  Clean up the unioned data before performing area calculations:\n'
+
     # Repair the geometry
-    print '  Repairing geometry at:\n    {}\n'.format(union_fc)
+    print '    Repairing geometry at:\n      {}\n'.format(union_fc)
     arcpy.RepairGeometry_management(union_fc)
 
     # Explode multipart to singlepart
     union_single_part_fc = '{}_expld'.format(union_fc)
-    print '  Exploding multipart to single part from:\n    {}\n  To:\n    {}\n'.format(union_fc, union_single_part_fc)
+    print '    Exploding multipart to single part from:\n      {}\n    To:\n      {}\n'.format(union_fc, union_single_part_fc)
     arcpy.MultipartToSinglepart_management(union_fc, union_single_part_fc)
 
     # Repair the geometry
-    print '  Repairing geometry at:\n    {}\n'.format(union_single_part_fc)
+    print '    Repairing geometry at:\n      {}\n'.format(union_single_part_fc)
     arcpy.RepairGeometry_management(union_single_part_fc)
 
 
     #---------------------------------------------------------------------------
     #              Add Acreage field and calc each rows acreage
 
+    print '\n  Add and calculate fields to FC:\n    {}'.format(union_single_part_fc)
+
     # Add field to hold Acreage
-    print '\n  Adding field:'
+    print '\n    Adding field:'
     field_name = row_acres_fld
     field_type = 'DOUBLE'
-    print '    [{}] as a:  {}'.format(field_name, field_type)
+    print '      [{}] as a:  {}'.format(field_name, field_type)
     arcpy.AddField_management(union_single_part_fc, field_name, field_type)
 
     # Calculate acres for each row
     expression      = '!shape.area@acres!'
-    print '\n  Calculating field:\n    {} = {}\n'.format(field_name, expression)
+    print '\n    Calculating field:\n      [{}] = {}\n'.format(field_name, expression)
     arcpy.CalculateField_management(union_single_part_fc, field_name, expression, expression_type)
 
 
@@ -573,22 +616,22 @@ def Bin_Polys_w_Density(wkg_fgdb, fc_to_bin, GRID_HEX_060_ACRES, prod_binned_fc,
     #         Add VALUE field and calc = to Density * Acreage
 
     # Add field to hold VALUE
-    print '\n  Adding field:'
+    print '\n    Adding field:'
     field_name = value_final_fld
     field_type = 'DOUBLE'
-    print '    [{}] as a:  {}'.format(field_name, field_type)
+    print '      [{}] as a:  {}'.format(field_name, field_type)
     arcpy.AddField_management(union_single_part_fc, field_name, field_type)
 
     # Calculate VALUE for each row
     expression      = '!{}!*!{}!'.format(density_fld, row_acres_fld)
-    print '\n  Calculating field:\n    {} = {}\n'.format(field_name, expression)
+    print '\n    Calculating field:\n      [{}] = {}\n'.format(field_name, expression)
     arcpy.CalculateField_management(union_single_part_fc, field_name, expression, expression_type)
 
 
     #---------------------------------------------------------------------------
     #       Perform Frequency on CPASG_LABE & CPASG, while summing the VALUE field
 
-    freq_analysis_tbl = os.path.join(wkg_fgdb, '{}_CPASG_union_expld_freq'.format(short_name))
+    freq_analysis_tbl = '{}_freq_CPASG_FINAL'.format(union_single_part_fc)
     freq_fields = [cpasg_label_exist_fld, cpasg_fld]
     sum_fields  = [value_final_fld]
 
@@ -597,30 +640,33 @@ def Bin_Polys_w_Density(wkg_fgdb, fc_to_bin, GRID_HEX_060_ACRES, prod_binned_fc,
     for f in freq_fields:
         print '    {}'.format(f)
     print '  Sum fields:'
-    for fi in sum_fields:
+    for f in sum_fields:
         print '    {}'.format(f)
+    print '  To create FC at:\n    {}'.format(freq_analysis_tbl)
     arcpy.Frequency_analysis(union_single_part_fc, freq_analysis_tbl, freq_fields, sum_fields)
 
 
     #---------------------------------------------------------------------------
     #                    Clean up the Frequency Analysis Table
 
+    print '\n  Cleaning up the Frequency Analysis Table:'
+
     # Delete the [FREQUENCY] field created by the Frequency Analysis (for clarity)
-    print '\n  Delete the field: [FREQUENCY] created by the Frequency Analysis b/c it is not needed'
+    print '\n    Delete the field: [FREQUENCY] created by the Frequency Analysis b/c it is not needed'
     arcpy.DeleteField_management(freq_analysis_tbl, 'FREQUENCY')
 
 
     # Change the field name [CPASG_LABE] to [CPASG_NAME] (for clarity)
     existing_field_name = cpasg_label_exist_fld
     new_field_name      = cpasg_label_new_fld
-    print '\n    Changing field name from: "{}" to: "{}" for FC:\n      {}\n'.format(existing_field_name, new_field_name, freq_analysis_tbl)
+    print '\n    Changing field name from: [{}] to: [{}] for FC:\n      {}'.format(existing_field_name, new_field_name, freq_analysis_tbl)
     arcpy.AlterField_management(freq_analysis_tbl, existing_field_name, new_field_name)
 
 
     # Delete rows that don't have a value for the CPASG Name
     fields = [cpasg_label_new_fld]
     where_clause = "{0} = '' or {0} IS NULL".format(cpasg_label_new_fld)
-    print '\n  Deleting any rows in Frequency Analysis table where: "{}"'.format(where_clause)
+    print '\n    Deleting any rows in Frequency Analysis table where: "{}"\n'.format(where_clause)
     with arcpy.da.UpdateCursor(freq_analysis_tbl, fields, where_clause) as cursor:
         for row in cursor:
             cursor.deleteRow()
@@ -631,19 +677,20 @@ def Bin_Polys_w_Density(wkg_fgdb, fc_to_bin, GRID_HEX_060_ACRES, prod_binned_fc,
     #                 Create a row to hold 'Countywide' and
     #                calc it as a sum of the VALUE field
 
+    print '\n  Adding "Countywide" feature in Table:\n    {}'.format(freq_analysis_tbl)
+
     # Find the sum of the VALUE field
     # (to input for the 'Countywide' feature created below)
-    print '\n  Finding sum of the field: "{}":'.format(value_final_fld)
+    print '\n    Finding sum of field [{}]:'.format(value_final_fld)
     sum_of_quantity = 0
     with arcpy.da.SearchCursor(freq_analysis_tbl, [value_final_fld]) as cursor:
         for row in cursor:
             sum_of_quantity = sum_of_quantity + row[0]
     del cursor
-    print '      VALUE Sum = {}\n'.format(sum_of_quantity)
+    print '      {}'.format(sum_of_quantity)
 
     # Add the 'Countywide' feature and calc the quantity to equal the sum of all quantities
-    print '   Adding "Countywide" feature in Table:\n    {}'.format(freq_analysis_tbl)
-    print '  Calculating the VALUE of "Countywide" feature to equal "{}"\n'.format(sum_of_quantity)
+    print '\n    Adding feature "Countywide"\n'
     fields = [cpasg_label_new_fld, cpasg_fld, value_final_fld]
     with arcpy.da.InsertCursor(freq_analysis_tbl, fields) as cursor:
         cursor.insertRow(('Countywide', 190000, sum_of_quantity))
@@ -659,49 +706,54 @@ def Bin_Polys_w_Density(wkg_fgdb, fc_to_bin, GRID_HEX_060_ACRES, prod_binned_fc,
     County.  This will mean that 'Countywide' will not exactly match up
     with the sum of the CPASG's, but we believe that this is the most accurate
     representation of the data--Mike Grue and Gary Ross
+
+    TODO: Ask Gary about this:
+      20180803 MG: Actually, I'm not sure we should do this.
+        A value of 0.999999999 gets truncated to 0 when it should clearly be 1
+
     """
 
-    # Truncate the VALUE field (round down to the nearest integer)
-    field_name = value_final_fld
-    expression = 'math.trunc(!{}!)'.format(value_final_fld)
-    print '\n  Calculating field:\n    {} = {}\n'.format(field_name, expression)
-    arcpy.CalculateField_management(freq_analysis_tbl, field_name, expression, expression_type)
+##    # Truncate the VALUE field (round down to the nearest integer)
+##    field_name = value_final_fld
+##    expression = 'math.trunc(!{}!)'.format(value_final_fld)
+##    print '\n  Truncating field:\n    [{}] = {}\n'.format(field_name, expression)
+##    arcpy.CalculateField_management(freq_analysis_tbl, field_name, expression, expression_type)
+
 
     #---------------------------------------------------------------------------
     #         Delete the prod data and append the working data to prod
-##    print '\n  Deleting rows at:\n    {}'.format(prod_cpasg_tbl)
-##    arcpy.DeleteRows_management(prod_cpasg_tbl)
-##
-##    print '\n  Append rows from:\n    {}\n  To:\n    {}'.format(freq_analysis_tbl, prod_cpasg_tbl)
-##    arcpy.Append_management(freq_analysis_tbl, prod_cpasg_tbl)
+
+    print '  Get working data to prod:'
+
+    print '\n    Deleting rows at:\n      {}'.format(prod_cpasg_tbl)
+    arcpy.DeleteRows_management(prod_cpasg_tbl)
+
+    print '\n    Append rows from:\n      {}\n    To:\n      {}'.format(freq_analysis_tbl, prod_cpasg_tbl)
+    arcpy.Append_management(freq_analysis_tbl, prod_cpasg_tbl)
 
 
     print '\nFinished CPASG_Polys_w_Density()'
-
+    return
 
 #-------------------------------------------------------------------------------
 #-------------------------------------------------------------------------------
-def Bin_Points_w_UnitCount(wkg_fgdb, fc_to_bin, GRID_HEX_060_ACRES, prod_binned_fc, unit_count_fld):
+def Bin_Points_w_UnitCount(wkg_fgdb, fc_to_bin, prod_binned_fc, GRID_HEX_060_ACRES, shorthand_name, unit_count_fld):
     """
     """
-    print '\n------------------------------------------------------------------'
-    print 'Starting Bin_Points_w_UnitCount()\n'
+    print '\nStarting Bin_Points_w_UnitCount():\n'
 
     # Set variables
     hex_id_fld       = 'HEXAGONID'
-    short_name = os.path.basename(fc_to_bin)
-    value_final_fld  = 'VALUE_{}'.format(short_name)
+    value_final_fld  = 'VALUE_{}'.format(shorthand_name)
     expression_type  = 'PYTHON_9.3'
 
+    print '\n  Creating Hexbin FC from processed data found at:\n    {}\n'.format(fc_to_bin)
 
     #---------------------------------------------------------------------------
     #                              Spatial Join
 
     # Spatial Join Points with GRID_HEX_060_ACRES
-    print '  ------------------------------------------------------------------'
-    print '            Spatial Join Points with GRID_HEX_060_ACRES\n'
-
-    points_GRID_HEX_join = os.path.join(wkg_fgdb, '{}_HEX_join'.format(short_name))
+    points_GRID_HEX_join = os.path.join(wkg_fgdb, '{}_HEX_join'.format(shorthand_name))
     print '  Spatially Joining:\n    {}\n  And:\n    {}\n  To create Feature Class:\n    {}\n'.format(fc_to_bin, GRID_HEX_060_ACRES, points_GRID_HEX_join)
     arcpy.SpatialJoin_analysis(fc_to_bin, GRID_HEX_060_ACRES, points_GRID_HEX_join)
 
@@ -710,8 +762,6 @@ def Bin_Points_w_UnitCount(wkg_fgdb, fc_to_bin, GRID_HEX_060_ACRES, prod_binned_
     #                            Frequency Analysis
 
     # Get the frequency of how many points (using the unit count field) are in each HEXBIN
-    print '  ------------------------------------------------------------------'
-    print '                 Perform Frequency Analysis\n'
     freq_analysis_fc = points_GRID_HEX_join + '_freq'
     frequency_fields = [hex_id_fld]
     summary_fields = [unit_count_fld]
@@ -727,14 +777,13 @@ def Bin_Points_w_UnitCount(wkg_fgdb, fc_to_bin, GRID_HEX_060_ACRES, prod_binned_
 
     #---------------------------------------------------------------------------
     #             Copy the SDE Hexagon grid to a local FGDB
-    print '  ------------------------------------------------------------------'
-    print '                 Copy SDE HEX Grid to a local FGDB'
 
     # Set the path to copy the SDE Hexagon grid to
-    copied_hex_fc = os.path.join(wkg_fgdb, '{}_HEX_join_freq_BINNED'.format(short_name))
+    # TODO: Get below string more 'flexible' so that I don't have to use shorthand_name
+    FINAL_hex_fc = os.path.join(wkg_fgdb, '{}_HEX_join_freq_BINNED'.format(shorthand_name))
 
     # Get the parameters the copy tool needs and copy
-    out_path, out_name = os.path.split(copied_hex_fc)
+    out_path, out_name = os.path.split(FINAL_hex_fc)
     print '\n  Copying FC:\n    {}\n  To:\n    {}\{}\n'.format(GRID_HEX_060_ACRES, out_path, out_name)
     arcpy.FeatureClassToFeatureClass_conversion(GRID_HEX_060_ACRES, out_path, out_name)
 
@@ -743,66 +792,224 @@ def Bin_Points_w_UnitCount(wkg_fgdb, fc_to_bin, GRID_HEX_060_ACRES, prod_binned_
     # Add VALUE field to newly copied SDE Hexagon grid and calc it to equal the
     # summed VALUE field by joining the copied Hexagon grid to the intersected data
 
-    print '  ------------------------------------------------------------------'
-    print '          Add and calc field in copied Hex FC from freq tbl\n'
+    print '  Add field to copied Hex FC, and calculate it from the Frequency analysis FC'
 
     # Add field to hold VALUE
-    print '  Adding field:'
+    print '    Adding field:'
     field_name = value_final_fld
     field_type = 'DOUBLE'
-    print '    [{}] as a:  {}'.format(field_name, field_type)
-    arcpy.AddField_management(copied_hex_fc, field_name, field_type)
+    print '      [{}] as a:  {}'.format(field_name, field_type)
+    arcpy.AddField_management(FINAL_hex_fc, field_name, field_type)
 
 
     # Join the copied Hex FC with the Frequency Table
-    join_lyr = Join_2_Objects_By_Attr(copied_hex_fc, hex_id_fld, freq_analysis_fc, hex_id_fld, 'KEEP_ALL')
+    join_lyr = Join_2_Objects_By_Attr(FINAL_hex_fc, hex_id_fld, freq_analysis_fc, hex_id_fld, 'KEEP_ALL')
 
 
     # Calculate the VALUE field in the Hex FC from the Frequency Table
     table_name      = os.path.basename(freq_analysis_fc)
     expression      = '!{}.{}!'.format(table_name, unit_count_fld)
-    print '\n  Calculating field:\n    [{}] = {}\n'.format(field_name, expression)
+    print '\n    Calculating field:\n      [{}] = {}'.format(field_name, expression)
     arcpy.CalculateField_management(join_lyr, value_final_fld, expression, expression_type)
-
+    arcpy.Delete_management(join_lyr)  # Need to delete this join so it does not conflict with other joins
 
     #---------------------------------------------------------------------------
     #             Calc any <Null> values in VALUE field to 0
 
+    print '\n  Calculating any <Null> values in VALUE field to 0:'
+
     # Make a layer that only has <Null> values in the VALUE field
     where_clause = "{} IS NULL".format(value_final_fld)
-    arcpy.MakeFeatureLayer_management(copied_hex_fc, 'null_values', where_clause)
+    arcpy.MakeFeatureLayer_management(FINAL_hex_fc, 'null_values', where_clause)
 
     # Calculate the layer
     field_name = value_final_fld
     expression = '0'
-    print '\n  Where: "{}":'.format(where_clause)
-    print '\n    Calculating field:\n      [{}] = {}\n'.format(field_name, expression)
+    ##print '\n  Where: "{}":'.format(where_clause)  # For testing
+    print '    Calculating field:\n      [{}] = {}\n'.format(field_name, expression)
     arcpy.CalculateField_management('null_values', field_name, expression, expression_type)
-
+    arcpy.Delete_management('null_values')
 
     #---------------------------------------------------------------------------
     #         Delete the prod data and append the working data to prod
-##    print '  ------------------------------------------------------------------'
-##    print '                  Append working data to prod\n'
-##    print '  Deleting features at:\n    {}'.format(prod_binned_fc)
-##    arcpy.DeleteFeatures_management(prod_binned_fc)
-##
-##    print '\n  Append features from:\n    {}\n  To:\n    {}'.format(copied_hex_fc, prod_binned_fc)
-##    arcpy.Append_management(copied_hex_fc, prod_binned_fc)
+
+    print '  Get working data to prod:'
+    print '    Deleting features at:\n      {}'.format(prod_binned_fc)
+    arcpy.DeleteFeatures_management(prod_binned_fc)
+
+    print '\n    Append features from:\n      {}\n    To:\n      {}'.format(FINAL_hex_fc, prod_binned_fc)
+    arcpy.Append_management(FINAL_hex_fc, prod_binned_fc)
 
     print '\nFinished Bin_Points_w_UnitCount()'
+    return
 
 
 #-------------------------------------------------------------------------------
 #-------------------------------------------------------------------------------
-##def CPASG_Points_w_UnitCount():
-##    """
-##    """
-##    print '\n------------------------------------------------------------------'
-##    print 'Starting CPASG_Points_w_UnitCount()'
-##
-##
-##    print '\nFinished CPASG_Points_w_UnitCount()'
+def CPASG_Points_w_UnitCount(wkg_fgdb, fc_to_make_cpasg_tbl, prod_cpasg_tbl, CMTY_PLAN_CN, shorthand_name, unit_count_fld):
+    """
+    """
+    print '\nStarting CPASG_Points_w_UnitCount():'
+
+    # Set variables
+    cpasg_label_exist_fld = 'CPASG_LABE'  # The name of the existing field in CMTY_PLAN_CN
+    cpasg_label_new_fld   = 'CPASG_NAME'  # The new field name to give the CPASG_LABE
+    cpasg_fld             = 'CPASG'
+    value_final_fld       = 'VALUE_{}'.format(shorthand_name)
+    expression_type       = 'PYTHON_9.3'
+
+
+    print '\n  Creating CPASG table from processed data found at:\n    {}'.format(fc_to_make_cpasg_tbl)
+
+
+    #---------------------------------------------------------------------------
+    #      Get the CMTY_PLAN_CN FC into a frequency table (with all CPASGs)
+    # This will be the table that will become the FINAL CPASG table
+    final_CPASG_tbl = os.path.join(wkg_fgdb, '{}_CPASG_FINAL'.format(shorthand_name))
+    freq_fields = [cpasg_label_exist_fld, cpasg_fld]
+
+    print '\n  Performing Frequency Analysis on FC:\n    {}'.format(CMTY_PLAN_CN)
+    print '  Frequency Fields:'
+    for f in freq_fields:
+        print '    {}'.format(f)
+    print '  To create table:\n    {}'.format(final_CPASG_tbl)
+    arcpy.Frequency_analysis(CMTY_PLAN_CN, final_CPASG_tbl, freq_fields)
+
+
+    #---------------------------------------------------------------------------
+    #              Clean up the FINAL Frequency Analysis Table
+
+    print '\n  Cleaning up the CPASG Table at:\n    {}'.format(final_CPASG_tbl)
+
+    # Delete the [FREQUENCY] field created by the Frequency Analysis (for clarity)
+    print '\n    Delete the field: [FREQUENCY] created by the Frequency Analysis b/c it is not needed'
+    arcpy.DeleteField_management(final_CPASG_tbl, 'FREQUENCY')
+
+
+    # Change the field name [CPASG_LABE] to [CPASG_NAME] (for clarity)
+    existing_field_name = cpasg_label_exist_fld
+    new_field_name      = cpasg_label_new_fld
+    print '\n    Changing field name from: "{}" to: "{}"'.format(existing_field_name, new_field_name)
+    arcpy.AlterField_management(final_CPASG_tbl, existing_field_name, new_field_name)
+
+
+    # Add VALUE field
+    print '\n    Adding field:'
+    field_name = value_final_fld
+    field_type = 'DOUBLE'
+    print '      [{}] as a:  {}'.format(field_name, field_type)
+    arcpy.AddField_management(final_CPASG_tbl, field_name, field_type)
+
+
+    # Add the 'Countywide' feature
+    print '\n    Adding "Countywide" feature'
+    fields = [cpasg_label_new_fld, cpasg_fld]
+    with arcpy.da.InsertCursor(final_CPASG_tbl, fields) as cursor:
+        cursor.insertRow(('Countywide', 190000))
+    del cursor
+
+
+    #---------------------------------------------------------------------------
+    #           Intersect 'FC to make CPASG table' with CMTY_PLAN_CN
+
+    in_features = [fc_to_make_cpasg_tbl, CMTY_PLAN_CN]
+    int_fc = os.path.join(wkg_fgdb, '{}_CPASG_int'.format(shorthand_name))
+    print '\n  Intersecting:'
+    for fc in in_features:
+        print '    {}'.format(fc)
+    print '  To create FC:\n    {}'.format(int_fc)
+    arcpy.Intersect_analysis(in_features, int_fc)
+
+
+    #---------------------------------------------------------------------------
+    # Perform Frequency on Intersected FC, while summing the Unit Count field
+    # This will be the table that will be used to find the sum of the VALUE field
+
+    freq_analysis_tbl = os.path.join(wkg_fgdb, '{}_CPASG_int_freq'.format(shorthand_name))
+    freq_fields = [cpasg_label_exist_fld, cpasg_fld]
+    sum_fields  = [unit_count_fld]
+
+    print '\n  Performing Frequency Analysis on FC:\n    {}'.format(int_fc)
+    print '  Frequency Fields:'
+    for f in freq_fields:
+        print '    {}'.format(f)
+    print '  Sum fields:'
+    for f in sum_fields:
+        print '    {}'.format(f)
+    print '  To create TEMP Table:\n    {}'.format(freq_analysis_tbl)
+    arcpy.Frequency_analysis(int_fc, freq_analysis_tbl, freq_fields, sum_fields)
+
+
+    #---------------------------------------------------------------------------
+    # For Freq Table from Intersected FC, Create a row to hold 'Countywide' and
+    #                calc it as a sum of the VALUE field
+
+
+    # Find the sum of the VALUE field
+    # (to input for the 'Countywide' feature created below)
+    print '\n  In TEMP Table, finding sum of the field: "{}":'.format(unit_count_fld)
+    sum_of_quantity = 0
+    with arcpy.da.SearchCursor(freq_analysis_tbl, [unit_count_fld]) as cursor:
+        for row in cursor:
+            sum_of_quantity = sum_of_quantity + row[0]
+    del cursor
+
+
+    # Add the 'Countywide' feature and calc the quantity to equal the sum of all quantities
+    print '\n  Adding "Countywide" feature in TEMP Table:'
+    print '    Calculating the VALUE of "Countywide" feature to equal "{}"\n'.format(sum_of_quantity)
+    fields = [cpasg_label_exist_fld, cpasg_fld, unit_count_fld]
+    with arcpy.da.InsertCursor(freq_analysis_tbl, fields) as cursor:
+        cursor.insertRow(('Countywide', 190000, sum_of_quantity))
+    del cursor
+
+
+    #---------------------------------------------------------------------------
+    #           Join the FINAL freq table and the Intersected freq table
+    #                         and calc the VALUE field
+
+    # Join the Final Frequency Table with the Intersected Frequency Table
+    print '\n  Join the CPASG FINAL table with the TEMP Frequency Analysis tbl to calc the VALUE field'
+    join_lyr = Join_2_Objects_By_Attr(final_CPASG_tbl, cpasg_fld, freq_analysis_tbl, cpasg_fld, 'KEEP_ALL')
+
+
+    # Calculate the VALUE field in the FINAL Frequency Table
+    table_name      = os.path.basename(freq_analysis_tbl)
+    expression      = '!{}.{}!'.format(table_name, unit_count_fld)
+    print '\n  Calculating field:\n    {} = {}\n'.format(value_final_fld, expression)
+    arcpy.CalculateField_management(join_lyr, value_final_fld, expression, expression_type)
+    arcpy.Delete_management(join_lyr)  # Need to delete this join so it does not conflict with other joins
+
+    #---------------------------------------------------------------------------
+    #             Calc any <Null> values in VALUE field to 0
+
+    print '\n  In FINAL table, calculating any <Null> values in VALUE field to 0:'
+
+    # Make a layer that only has <Null> values in the VALUE field
+    where_clause = "{} IS NULL".format(value_final_fld)
+    arcpy.MakeTableView_management(final_CPASG_tbl, 'null_values', where_clause)
+
+    # Calculate the layer
+    field_name = value_final_fld
+    expression = "0"
+    print '\n  Where: "{}":'.format(where_clause)  # For testing
+    print '    Calculating field:\n      [{}] = {}\n'.format(field_name, expression)
+    arcpy.CalculateField_management('null_values', field_name, expression, expression_type)
+    arcpy.Delete_management('null_values')
+
+    #---------------------------------------------------------------------------
+    #         Delete the prod data and append the working data to prod
+
+    print '  Get working data into prod:'
+    print '    Deleting features at:\n      {}'.format(prod_cpasg_tbl)
+    arcpy.DeleteRows_management(prod_cpasg_tbl)
+
+    print '\n    Append features from:\n      {}\n    To:\n      {}'.format(final_CPASG_tbl, prod_cpasg_tbl)
+    arcpy.Append_management(final_CPASG_tbl, prod_cpasg_tbl)
+
+
+    print '\nFinished CPASG_Points_w_UnitCount()'
+    return
 
 
 #-------------------------------------------------------------------------------
@@ -874,7 +1081,7 @@ def Join_2_Objects_By_Attr(target_obj, target_join_field, to_join_obj, to_join_f
     ##for field in fields:
     ##    print '    ' + field.name
 
-    print '    Finished Join_2_Objects_By_Attr()\n'
+    print '    Finished Join_2_Objects_By_Attr()'
 
     # Return the layer/view of the joined object so it can be processed
     return 'target_obj'

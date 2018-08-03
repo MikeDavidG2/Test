@@ -32,7 +32,7 @@ def main():
     #---------------------------------------------------------------------------
 
     # Set name to give outputs for this script
-    shorthand_name    = 'Existing_DU_Map_03'
+    shorthand_name    = 'Cmpltd_Bld_Permits_Map_11'
 
 
     # Name of this script
@@ -65,17 +65,14 @@ def main():
     # Paths to SDE Feature Classes
     PARCELS_HISTORICAL = r'Database Connections\AD@ATLANTIC@SDE.sde\SDE.SANGIS.PARCEL_HISTORICAL'
     PARCELS_ALL        = r'Database Connections\AD@ATLANTIC@SDE.sde\SDE.SANGIS.PARCELS_ALL'
-    SANDAG_LU_DU_2012  = r'Database Connections\AD@ATLANTIC@SDE.sde\SDE.SANGIS.SANDAG_LU_DU_2012'
-    JUR_MUNICIPAL      = r'Database Connections\AD@ATLANTIC@SDE.sde\SDE.SANGIS.JUR_MUNICIPAL'
 
 
     # Set Field names from the CSV
-    apn_fld         = 'PARCEL_NBR'
-    x_fld           = 'LONGITUDE'
-    y_fld           = 'LATITUDE'
-    record_id_fld   = 'RECORD_ID'
-    existing_du_fld = 'HOUSING_UNITS'
-    new_du_fld      = 'UNIT_COUNT'
+    apn_fld       = 'PARCEL_NBR'
+    x_fld         = 'LONGITUDE'
+    y_fld         = 'LATITUDE'
+    record_id_fld = 'RECORD_ID'
+    du_fld        = 'HOUSING_UNITS'
 
 
     # Misc variables
@@ -194,8 +191,8 @@ def main():
     #-------------------------------------------------------------------
 
     try:
-        points_name = '{}_Pts'.format(shorthand_name)
-        points_fc   = '{}\{}'.format(wkg_fgdb, points_name)
+        out_name   = '{}_Pts_READY2BIN'.format(shorthand_name)
+        points_fc  = '{}\{}'.format(wkg_fgdb, out_name)
 
         # Create points
         success = Create_Points_From_XY_Table(csv_table, points_fc, x_fld, y_fld)
@@ -206,82 +203,16 @@ def main():
         print str(e)
 
 
-    #-------------------------------------------------------------------
-    #              Get Appropriate SANDAG LUDU Data
-    #-------------------------------------------------------------------
-    try:
-        SANDAG_LU_DU_subset = os.path.join(wkg_fgdb, 'SANDAG_LU_DU_2012_subset')
-
-        Get_SANDAG_LUDU_Data(SANDAG_LU_DU_2012, JUR_MUNICIPAL, SANDAG_LU_DU_subset)
-
-    except Exception as e:
-        success = False
-        print '*** ERROR with Get_SANDAG_LUDU_Data() ***'
-        print str(e)
-
-
-    #------------------------------------------------------------------
-    #         Change/drop fields so the merge (below)
-    #             and future processing will work
-    #------------------------------------------------------------------
-    try:
-        print '\nFormatting FC at:\n  {}'.format(SANDAG_LU_DU_subset)
-
-        # Change Field Name.  We want to keep the Dwelling Unit info from the SANDAG data
-        old_name = 'du'
-        new_name = existing_du_fld
-        print '\n  Changing Field: "{}"\n  To:  "{}"'.format(old_name, new_name)  # For testing purposes
-        arcpy.AlterField_management(SANDAG_LU_DU_subset, old_name, new_name)
-
-
-        # Change Field Name.  We want to keep the APN info from the SANDAG data
-        old_name = 'apn8'
-        new_name = apn_fld
-        print '\n  Changing Field: "{}"\n  To:  "{}"'.format(old_name, new_name)  # For testing purposes
-        arcpy.AlterField_management(SANDAG_LU_DU_subset, old_name, new_name)
-
-
-        # Delete CPASG field from the SANDAG data because it messes up
-        # The CPASG Frequency table creation in the DEV_TRACKER_Bin_Processed_Data.py
-        drop_field = 'CPASG'
-        print '\n  Deleting Field: "{}"'
-        arcpy.DeleteField_management(SANDAG_LU_DU_subset, drop_field)
-
-
-    except Exception as e:
-        success = False
-        print '*** ERROR with Changing Field Names ***'
-        print str(e)
-
-
-    #-------------------------------------------------------------------
-    #      Merge the Extract Points with the SANDAG LUDU Subset Data
-    #-------------------------------------------------------------------
-    try:
-        inputs   = [points_fc, SANDAG_LU_DU_subset]
-        merge_fc = os.path.join(wkg_fgdb, '{}_SANDAG_merge_READY2BIN'.format(points_name))
-        print '\nMerging:'
-        for f in inputs:
-            print '  {}'.format(f)
-        print 'To create FC at:\n  {}'.format(merge_fc)
-        arcpy.Merge_management(inputs, merge_fc)
-
-    except Exception as e:
-        success = False
-        print '*** ERROR with Merge Extract Points with SANDAG Data ***'
-        print str(e)
-
-
     #------------------------------------------------------------------
     #    Change field names so the Bin_Processed_Data.py script will work
     #------------------------------------------------------------------
     # This is because the binning script will expect for the Dwelling Unit
     # Field to be named [UNIT_COUNT]
     try:
-        old_name = existing_du_fld
-        new_name = new_du_fld
-        print '\nChanging Field:\n  "{}"\nTo:\n  "{}"\nIn FC:\n  {}'.format(old_name, new_name, merge_fc)  # For testing purposes
-        arcpy.AlterField_management(merge_fc, old_name, new_name)
+        old_name = du_fld
+        new_name = 'UNIT_COUNT'
+        print '\nChanging Field:\n  "{}"\nTo:\n  "{}"\nIn FC:\n  {}'.format(old_name, new_name, points_fc)  # For testing purposes
+        arcpy.AlterField_management(points_fc, old_name, new_name)
 
     except Exception as e:
         success = False
@@ -336,7 +267,6 @@ def main():
 
     print 'Please find log file at:\n  {}\n'.format(log_file_date)
     print '\nSuccess = {}'.format(success)
-
 
 #+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 #                            START DEFINING FUNCTIONS
@@ -709,56 +639,6 @@ def Create_Points_From_XY_Table(xy_table, points_fc, x_field, y_field):
     print '\nFinished Create_Points_From_XY_Table()'
 
     return success
-
-
-#-------------------------------------------------------------------------------
-#-------------------------------------------------------------------------------
-def Get_SANDAG_LUDU_Data(SANDAG_LU_DU_2012, JUR_MUNICIPAL, SANDAG_LU_DU_subset):
-    """
-    PARAMETERS:
-      SANDAG_LU_DU_2012 (str): Full path to the SDE dataset
-      JUR_MUNICIPAL (str): Full path to the SDE dataset
-      SANDAG_LU_DU_subset (str): Full path to the dataset that will result from
-        the merging of the two above FCs
-
-    RETURNS:
-      None
-
-    FUNCTION:
-    From the SANDAG_LU_DU_2012 Data, we only want to include:
-      1) Records where "DU > 0"
-      2) Records that are in Unincorporated County
-      This function will merge a subset of the SANDAG LU DU Dataset with the
-      unincorporated lands in the County.
-    """
-
-    print '\n----------------------------------------------------------------'
-    print 'Starting Get_SANDAG_LUDU_Data()\n'
-
-    # Make a Feature Layer of the SANDAG_LU_DU_2012 where "DU > 0"
-    where_clause = "du > 0"
-    print '  Making a Feature Layer from:\n    {}\n  Where:\n    {}\n'.format(SANDAG_LU_DU_2012, where_clause)
-    arcpy.MakeFeatureLayer_management(SANDAG_LU_DU_2012, 'sandag_lyr', where_clause)
-
-
-    # Make a Feature Layer of JUR_MUNICIPAL of Unincorporated Lands
-    where_clause = "NAME = 'S.D. COUNTY'"
-    print '  Making a Feature Layer from:\n    {}\n  Where:\n    {}\n'.format(JUR_MUNICIPAL, where_clause)
-    arcpy.MakeFeatureLayer_management(JUR_MUNICIPAL, 'uninc_lyr', where_clause)
-
-
-    # Intersect the two layers to get the appropriate SANDAG data
-    in_features       = ['sandag_lyr', 'uninc_lyr']
-
-    print '  Intersecting:'
-    for fc in in_features:
-        print '    {}'.format(fc)
-    print '  To create FC:\n    {}\n'.format(SANDAG_LU_DU_subset)
-
-    arcpy.Intersect_analysis(in_features, SANDAG_LU_DU_subset)
-
-
-    print 'Finished Get_SANDAG_LUDU_Data()'
 
 
 #-------------------------------------------------------------------------------

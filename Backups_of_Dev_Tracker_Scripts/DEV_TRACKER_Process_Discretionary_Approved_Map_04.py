@@ -30,7 +30,7 @@ def main():
     #---------------------------------------------------------------------------
 
     # Set name to give outputs for this script
-    shorthand_name    = 'Grading_In_Process_Map_05'
+    shorthand_name    = 'Discretionary_Approved_Map_04'
 
 
     # Name of this script
@@ -39,7 +39,7 @@ def main():
 
     # Paths to folders and local FGDBs
     folder_with_csvs  = r"P:\20180510_development_tracker\tables\CSV_Extract_20180726"
-    name_of_csv       = 'Dwelling Units - Land Development Grading In-Process (Map 5).csv'
+    name_of_csv       = 'Dwelling Units - Discretionary Approved (2011 GP Forward) (Map 4).csv'
     path_to_csv       = os.path.join(folder_with_csvs, name_of_csv)
 
 
@@ -68,7 +68,7 @@ def main():
     # Set field names
     apn_fld           = 'PARCEL_NBR'
     record_id_fld     = 'RECORD_ID'
-    du_fld            = 'DWP'
+    du_fld            = 'DWELLING_UNITS'
 
 
     # Misc variables
@@ -93,13 +93,13 @@ def main():
         os.mkdir(log_file_folder)
 
     # Turn all 'print' statements into a log-writing object
-    try:
-        log_file = r'{}\{}'.format(log_file_folder, name_of_script.split('.')[0])
-        orig_stdout, log_file_date, dt_to_append = Write_Print_To_Log(log_file, name_of_script)
-    except Exception as e:
-        success = False
-        print '\n*** ERROR with Write_Print_To_Log() ***'
-        print str(e)
+##    try:
+##        log_file = r'{}\{}'.format(log_file_folder, name_of_script.split('.')[0])
+##        orig_stdout, log_file_date, dt_to_append = Write_Print_To_Log(log_file, name_of_script)
+##    except Exception as e:
+##        success = False
+##        print '\n*** ERROR with Write_Print_To_Log() ***'
+##        print str(e)
 
 
     #---------------------------------------------------------------------------
@@ -140,20 +140,39 @@ def main():
         print str(e)
 
 
-    #-------------------------------------------------------------------
-    #                   Import CSV into FGDB Table
-    #-------------------------------------------------------------------
+    #---------------------------------------------------------------------------
+    #       Import CSV into FGDB Table and make a copy (to preserve original)
+    #---------------------------------------------------------------------------
 
     # Set paths to Feature Classes / Tables
-    name_of_csv_table = '{}_Tbl'.format(shorthand_name)
-    csv_table = os.path.join(imported_csv_fgdb, name_of_csv_table)
+    name_of_orig_csv_table = '{}_Tbl'.format(shorthand_name)
+    csv_table_orig = os.path.join(imported_csv_fgdb, name_of_orig_csv_table)
 
     print '------------------------------------------------------------------'
     print 'Importing CSV to FGDB Table:\n  From:\n    {}'.format(path_to_csv)
-    print '  To:\n    {}\{}'.format(imported_csv_fgdb, os.path.basename(csv_table))
+    print '  To:\n    {}\{}'.format(imported_csv_fgdb, os.path.basename(csv_table_orig))
 
     # Import CSV to FGDB Table
-    arcpy.TableToTable_conversion(path_to_csv, imported_csv_fgdb, os.path.basename(csv_table))
+    arcpy.TableToTable_conversion(path_to_csv, imported_csv_fgdb, os.path.basename(csv_table_orig))
+
+    # Copy the ORIGINAL Imported Table to the wkg_fgdb
+    name_of_copy_csv_table = '{}_copy'.format(name_of_orig_csv_table)
+    csv_table = os.path.join(wkg_fgdb, name_of_copy_csv_table)
+
+    print '\n------------------------------------------------------------------'
+    print 'Copying FGDB Table:\n  From:\n    {}'.format(csv_table_orig)
+    print '  To:\n    {}\{}'.format(wkg_fgdb, os.path.basename(name_of_copy_csv_table))
+
+    arcpy.TableToTable_conversion(csv_table_orig, wkg_fgdb, name_of_copy_csv_table)
+
+
+    #---------------------------------------------------------------------------
+    #
+    #---------------------------------------------------------------------------
+
+    # The data for this extract only has one value in the DU field per each
+    # Record ID, this function completes the DU value for every row for every project
+    Complete_DU_Field(csv_table, record_id_fld, du_fld)
 
 
     #---------------------------------------------------------------------------
@@ -318,7 +337,7 @@ def main():
     print 'Data passed QA/QC tests = {}'.format(data_pass_QAQC_tests)
     print 'Successfully ran script = {}'.format(success)
     time.sleep(3)
-    sys.stdout = orig_stdout
+##    sys.stdout = orig_stdout
     sys.stdout.flush()
 
     if success == True:
@@ -326,7 +345,7 @@ def main():
     else:
         print '\n*** ERROR with {} ***'.format(name_of_script)
 
-    print 'Please find log file at:\n  {}\n'.format(log_file_date)
+##    print 'Please find log file at:\n  {}\n'.format(log_file_date)
     print '\nSuccess = {}'.format(success)
 
 
@@ -417,6 +436,56 @@ def Get_DT_To_Append():
 
     ##print 'Finished Get_DT_To_Append()\n'
     return dt_to_append
+
+
+#-------------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
+def Complete_DU_Field(csv_table_complete_du, record_id_fld, du_fld):
+    """
+    """
+
+    print '\n------------------------------------------------------------------'
+    print 'Starting Complete_DU_Field()'
+
+
+    #---------------------------------------------------------------------------
+    #                  Get a list of unique RECORD_IDs
+    print '  Getting list of all RECORD_IDs:'
+    record_ids = []
+    with arcpy.da.SearchCursor(csv_table_complete_du, [record_id_fld]) as cursor:
+        for row in cursor:
+            record_ids.append(row[0])
+    del cursor
+
+    # Get a list of all the UNIQUE ID's
+    # set() returns a list of only unique values
+    unique_record_ids = sorted(set(record_ids))
+    print '    There are "{}" unique Record IDs\n'.format(len(unique_record_ids))
+
+
+    # For each record_id, find a value for the du_fld
+    print '  For each Record ID (project), find the projects DU value, and add'
+    print '  that value to any rows for that project that do not have a DU value'
+    for record_id in unique_record_ids:
+        fields = [record_id_fld, du_fld]
+
+        # Set the where_clause (for records that have a du_value)
+        has_du_value = "{} = '{}' AND {} IS NOT NULL".format(record_id_fld, record_id, du_fld)
+        with arcpy.da.SearchCursor(csv_table_complete_du, fields, has_du_value) as cursor:
+            for row in cursor:
+                du_value  = row[1]  # This is the value for the du_fld to be added
+
+                ##print 'Record ID: {}'.format(record_id)  # For testing
+                ##print '  DU Value: {}'.format(du_value)  # For testing
+
+                # Now, set the du_value into all of the same record_id that does not have a value in the du_fld
+                no_du_value = "{} = '{}' AND {} IS NULL".format(record_id_fld, record_id, du_fld)
+                with arcpy.da.UpdateCursor(csv_table_complete_du, fields, no_du_value) as updt_cursor:
+                    for updt_row in updt_cursor:
+                        updt_row[1] = du_value
+                        updt_cursor.updateRow(updt_row)
+
+    print '\nFinished Complete_DU_Field()'
 
 
 #-------------------------------------------------------------------------------
@@ -584,9 +653,8 @@ def Get_APN_Lists(csv_table, from_parcels_all_fc, from_parcels_hist_fc, apn_fld)
                 apn = row[0]
                 apns_from_imported_csv.append(apn)
         del cursor
-    print '    There were "{}" APNs (Total--not unique) from the Import Table\n'.format(len(apns_from_imported_csv))
+    print '    There were "{}" APNs (Total--not unique) from the Import Table'.format(len(apns_from_imported_csv))
     print '    There were "{}" Unique APNs from the Import Table\n'.format(len(set(apns_from_imported_csv)))
-
 
     # Find unique list of APNs from PARCELS_ALL
     if arcpy.Exists(from_parcels_all_fc):
@@ -673,7 +741,7 @@ def QA_QC(csv_table, from_parcels_all_fc, from_parcels_hist_fc, apns_from_import
 
     #---------------------------------------------------------------------------
     # 2)  Find if Parcels showed up more than one time in the CSV table
-    print '\n\n  2) Finding if parcels showed up more than one time in the CSV table:\n'
+    print '\n\n  2) Finding if parcels showed up more than one time in the CSV table:'
 
     # Get a list of parcels from the APN table
     unique_apns_in_csv = []  # List of unique APNs
@@ -685,7 +753,7 @@ def QA_QC(csv_table, from_parcels_all_fc, from_parcels_hist_fc, apns_from_import
             duplicate_apns_in_csv.append(apn)
 
     if len(duplicate_apns_in_csv) == 0:
-        print '    OK! There were 0 duplicate APNs found in the CSV extract'
+        print '\n    OK! There were 0 duplicate APNs found in the CSV extract'
 
     else:
         data_pass_QAQC_tests = False
@@ -721,7 +789,7 @@ def QA_QC(csv_table, from_parcels_all_fc, from_parcels_hist_fc, apns_from_import
         in_features = [from_parcels_all_fc, from_parcels_hist_fc]
         wkg_fgdb = os.path.dirname(from_parcels_all_fc)
         intersect_fc = os.path.join(wkg_fgdb, 'Parcels_ALL_and_HIST_int')
-        print '\n    Intersecting:'
+        print '    Intersecting:'
         for fc in in_features:
             print '      {}'.format(fc)
         print '    To create FC:\n      {}\n'.format(intersect_fc)
@@ -753,7 +821,7 @@ def QA_QC(csv_table, from_parcels_all_fc, from_parcels_hist_fc, apns_from_import
 
                     if acreage <= acreage_cutoff_for_overlap:
                         print '      APN: "{}" overlaps with APN: "{}"'.format(apn_1, apn_2)
-                        print '      but the overlap ({} acres) is <= the script-defined cutoff for analysis ({} acres)'.format(acreage, acreage_cutoff_for_overlap)
+                        print '      but the overlap ({} acres) is <= the script-defined cutoff for analysis ({} acres)\n'.format(acreage, acreage_cutoff_for_overlap)
 
                     # Only analyze overlaps that are large enough to matter
                     if acreage > acreage_cutoff_for_overlap:
@@ -804,7 +872,7 @@ def QA_QC(csv_table, from_parcels_all_fc, from_parcels_hist_fc, apns_from_import
 
     #---------------------------------------------------------------------------
     # 4)  Check any critical fields to ensure there are no blank values
-    print '\n  4) Finding any critical fields that are blank in imported CSV table:\n'
+    print '\n  4) Finding any critical fields that are blank in the Imported Table:\n'
     critical_fields = [record_id_fld, apn_fld, du_fld]
     for f in critical_fields:
 
@@ -876,7 +944,7 @@ def Remove_FieldName_Prefix(fc_or_table, prefix_to_remove):
 
     # Get list of fields that start with the prefix to remove
     where_clause = '{}*'.format(prefix_to_remove)
-    print '\n  Removing Fields that start with:  "{}"\n'.format(where_clause)
+    print '\n  Removing Fields that start with:  "{}"'.format(where_clause)
     fields = arcpy.ListFields(fc_or_table, where_clause)
 
 
@@ -894,7 +962,7 @@ def Remove_FieldName_Prefix(fc_or_table, prefix_to_remove):
                 arcpy.AlterField_management(fc_or_table, old_name, new_name)
                 renamed_count += 1
             except Exception as e:
-                print '      WARNING! Couldn\'t change field name [{}] to [{}].  Name may already exist'.format(old_name, new_name)
+                print '\n      WARNING! Couldn\'t change field name [{}] to [{}].  Name may already exist'.format(old_name, new_name)
                 print '{}\n'.format(str(e))
                 not_renamed_count += 1
 
