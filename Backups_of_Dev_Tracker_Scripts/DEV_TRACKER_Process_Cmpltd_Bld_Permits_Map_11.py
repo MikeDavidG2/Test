@@ -63,8 +63,8 @@ def main():
 
 
     # Paths to SDE Feature Classes
-    PARCELS_HISTORICAL = r'Database Connections\AD@ATLANTIC@SDE.sde\SDE.SANGIS.PARCEL_HISTORICAL'
-    PARCELS_ALL        = r'Database Connections\AD@ATLANTIC@SDE.sde\SDE.SANGIS.PARCELS_ALL'
+    PARCELS_HISTORICAL = r'P:\20180510_development_tracker\DEV\Scripts\Connection_Files\AD@ATLANTIC@SDE.sde\SDE.SANGIS.PARCEL_HISTORICAL'
+    PARCELS_ALL        = r'P:\20180510_development_tracker\DEV\Scripts\Connection_Files\AD@ATLANTIC@SDE.sde\SDE.SANGIS.PARCELS_ALL'
 
 
     # Set Field names from the CSV

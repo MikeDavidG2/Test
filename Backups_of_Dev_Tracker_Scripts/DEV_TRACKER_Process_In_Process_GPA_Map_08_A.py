@@ -4,6 +4,8 @@
 """
 POLYGONS/DENSITY Data Processing
 
+Process the Applicant Initiated, In Process GPAs
+
 To create a polygon feature class from a CSV when you want a shape of a project
 with a DENSITY for the whole project
 
@@ -30,7 +32,7 @@ def main():
     #---------------------------------------------------------------------------
 
     # Set name to give outputs for this script
-    shorthand_name    = 'Grading_In_Process_Map_05'
+    shorthand_name    = 'In_Process_GPA_Map_08_A'
 
 
     # Name of this script
@@ -39,7 +41,7 @@ def main():
 
     # Paths to folders and local FGDBs
     folder_with_csvs  = r"P:\20180510_development_tracker\tables\CSV_Extract_20180726"
-    name_of_csv       = 'Dwelling Units - Land Development Grading In-Process (Map 5).csv'
+    name_of_csv       = 'In-Process Applicant General Plan Amendments (Map 8).csv'
     path_to_csv       = os.path.join(folder_with_csvs, name_of_csv)
 
 
@@ -550,6 +552,7 @@ def Get_Parcels(csv_table, PARCELS_ALL, PARCELS_HISTORICAL, from_parcels_all_fc,
             arcpy.SelectLayerByAttribute_management('parcels_historical_lyr', 'ADD_TO_SELECTION', where_clause)
 
         # Get the count of selected parcels
+        print '    Getting count of selected parcels:'
         count = Get_Count_Selected('parcels_historical_lyr')
 
         # Export the selected parcels (if any)
@@ -595,7 +598,7 @@ def Get_APN_Lists(csv_table, from_parcels_all_fc, from_parcels_hist_fc, apn_fld)
                 apn = row[0]
                 apns_from_imported_csv.append(apn)
         del cursor
-    print '    There were "{}" APNs (Total--not unique) from the Import Table\n'.format(len(apns_from_imported_csv))
+    print '    There were "{}" APNs (Total--not unique) from the Import Table'.format(len(apns_from_imported_csv))
     print '    There were "{}" Unique APNs from the Import Table\n'.format(len(set(apns_from_imported_csv)))
 
 
@@ -718,7 +721,7 @@ def QA_QC(csv_table, from_parcels_all_fc, from_parcels_hist_fc, apns_from_import
 
     #---------------------------------------------------------------------------
     # 3)  Is there an overlap with a current parcel and an historic parcel?
-    print '\n\n  3) Finding any overlaps with current parcels and historic parcels:\n'
+    print '\n\n  3) Finding any overlaps with current parcels and historic parcels:'
 
     # Check to see if any parcels came from PARCELS_HISTORICAL, no need to check
     #   If there are no parcels from PARCELS_HISTORICAL
@@ -746,7 +749,7 @@ def QA_QC(csv_table, from_parcels_all_fc, from_parcels_hist_fc, apns_from_import
                 break
 
         if overlap == False:
-            print '    OK! There are no overlapping parcels'
+            print '    OK! There are no overlapping parcels\n'
 
         # If there is an overlap, get a list of the parcels that overlap and report on them
         if overlap == True:
@@ -1023,7 +1026,7 @@ def Get_DENSITY_Per_Project(fc_to_process, record_id_fld, du_fld):
     #---------------------------------------------------------------------------
     #                  Dissolve to the project level
     dissolve_fields = [record_id_fld, du_fld, project_acres_fld, density_fld]
-    dissolve_fc     = os.path.join(wkg_fgdb, 'Parcels_joined_diss_READY2BIN')
+    dissolve_fc     = os.path.join(wkg_fgdb, 'Parcels_Applicant_joined_diss_READY2MERGE')
     print '\n  Dissolving FC:\n    {}\n  On Fields:'.format(fc_to_process)
     for f in dissolve_fields:
         print '    {}'.format(f)

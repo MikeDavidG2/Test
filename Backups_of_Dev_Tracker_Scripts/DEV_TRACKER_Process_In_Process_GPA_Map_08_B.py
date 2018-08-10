@@ -4,6 +4,8 @@
 """
 POLYGONS/DENSITY Data Processing
 
+Process the County Initiated, In Process GPAs
+
 To create a polygon feature class from a CSV when you want a shape of a project
 with a DENSITY for the whole project
 
@@ -30,7 +32,7 @@ def main():
     #---------------------------------------------------------------------------
 
     # Set name to give outputs for this script
-    shorthand_name    = 'Grading_In_Process_Map_05'
+    shorthand_name    = 'In_Process_GPA_Map_08_B'
 
 
     # Name of this script
@@ -39,7 +41,7 @@ def main():
 
     # Paths to folders and local FGDBs
     folder_with_csvs  = r"P:\20180510_development_tracker\tables\CSV_Extract_20180726"
-    name_of_csv       = 'Dwelling Units - Land Development Grading In-Process (Map 5).csv'
+    name_of_csv       = 'In-Process County General Plan Amendments (Map 8).csv'
     path_to_csv       = os.path.join(folder_with_csvs, name_of_csv)
 
 
@@ -61,14 +63,18 @@ def main():
 
 
     # Paths to SDE Feature Classes
-    PARCELS_HISTORICAL = r'P:\20180510_development_tracker\DEV\Scripts\Connection_Files\AD@ATLANTIC@SDE.sde\SDE.SANGIS.PARCEL_HISTORICAL'
-    PARCELS_ALL        = r'P:\20180510_development_tracker\DEV\Scripts\Connection_Files\AD@ATLANTIC@SDE.sde\SDE.SANGIS.PARCELS_ALL'
+    sde_connection_file           = r'P:\20180510_development_tracker\DEV\Scripts\Connection_Files\AD@ATLANTIC@SDE.sde'
+    PARCELS_HISTORICAL            = r'{}\SDE.SANGIS.PARCEL_HISTORICAL'.format(sde_connection_file)
+    PARCELS_ALL                   = r'{}\SDE.SANGIS.PARCELS_ALL'.format(sde_connection_file)
+    PDS_HOUSING_MODEL_CONSTRAINTS = r'{}\SDE.SANGIS.PDS_HOUSING_MODEL_CONSTRAINTS_2011'.format(sde_connection_file)
 
 
     # Set field names
-    apn_fld           = 'PARCEL_NBR'
-    record_id_fld     = 'RECORD_ID'
-    du_fld            = 'DWP'
+    apn_fld       = 'APNS'
+    record_id_fld = 'RECORD_ID'
+    gp_code_fld   = 'GPCODE95'
+    density_fld   = 'DENSITY'
+    unconstrained_density_fld = 'Unconstrained_DENSITY'
 
 
     # Misc variables
@@ -82,6 +88,53 @@ def main():
     acreage_cutoff_for_overlap = 0.1
 
 
+    # Dictionary of the {general plan code : general plan description}
+    gen_plan_dict = {
+        0:0,
+        1:30,
+        2:24,
+        3:15,
+        4:10.9,
+        5:7.3,
+        6:4.3,
+        7:2.9,
+        8:2,
+        9:1,
+        10:1,
+        11:0.5,
+        12:0.5,
+        13:0.25,
+        14:0.25,
+        15:0.25,
+        17:0.1,
+        18:0.05,
+        19:0.025,
+        20:0.0125,
+        21:0.00625,
+        22:0,
+        23:0,
+        24:0,
+        25:0,
+        26:0,
+        27:0,
+        28:0,
+        29:0,
+        30:0,
+        31:0,
+        32:0,
+        33:0,
+        34:0,
+        35:0,
+        36:0,
+        37:0,
+        38:0,
+        39:30,
+        40:20,
+        41:2,
+        42:0
+        }
+
+
     #---------------------------------------------------------------------------
     #+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
     #---------------------------------------------------------------------------
@@ -93,6 +146,7 @@ def main():
         os.mkdir(log_file_folder)
 
     # Turn all 'print' statements into a log-writing object
+
     try:
         log_file = r'{}\{}'.format(log_file_folder, name_of_script.split('.')[0])
         orig_stdout, log_file_date, dt_to_append = Write_Print_To_Log(log_file, name_of_script)
@@ -114,7 +168,7 @@ def main():
 
 
     #---------------------------------------------------------------------------
-    #                      Create FGDBs if needed
+    #                Delete and Create FGDBs if needed
     #---------------------------------------------------------------------------
     if success == True:
         try:
@@ -142,25 +196,52 @@ def main():
 
 
     #-------------------------------------------------------------------
-    #                   Import CSV into FGDB Table
+    #  Import CSV into FGDB Table and make a copy (to preserve original)
     #-------------------------------------------------------------------
     if success == True:
         try:
             # Set paths to Feature Classes / Tables
-            name_of_csv_table = '{}_Tbl'.format(shorthand_name)
-            csv_table = os.path.join(imported_csv_fgdb, name_of_csv_table)
+            name_of_orig_csv_table = '{}_Tbl'.format(shorthand_name)
+            csv_table_orig = os.path.join(imported_csv_fgdb, name_of_orig_csv_table)
 
             print '------------------------------------------------------------------'
             print 'Importing CSV to FGDB Table:\n  From:\n    {}'.format(path_to_csv)
-            print '  To:\n    {}\{}'.format(imported_csv_fgdb, os.path.basename(csv_table))
+            print '  To:\n    {}\{}'.format(imported_csv_fgdb, os.path.basename(csv_table_orig))
 
             # Import CSV to FGDB Table
-            arcpy.TableToTable_conversion(path_to_csv, imported_csv_fgdb, os.path.basename(csv_table))
+            arcpy.TableToTable_conversion(path_to_csv, imported_csv_fgdb, os.path.basename(csv_table_orig))
+
+
+            # Copy the ORIGINAL Imported Table to the wkg_fgdb
+            name_of_copy_csv_table = '{}_copy'.format(name_of_orig_csv_table)
+            csv_table_copy = os.path.join(wkg_fgdb, name_of_copy_csv_table)
+
+            print '\n------------------------------------------------------------------'
+            print 'Copying FGDB Table:\n  From:\n    {}'.format(csv_table_orig)
+            print '  To:\n    {}\{}'.format(wkg_fgdb, os.path.basename(name_of_copy_csv_table))
+
+            arcpy.TableToTable_conversion(csv_table_orig, wkg_fgdb, name_of_copy_csv_table)
 
         except Exception as e:
             success = False
-            print '\n*** ERROR with Importing CSV ***'
+            print '\n*** ERROR with Importing CSV and creating a copy ***'
             print str(e)
+
+    #---------------------------------------------------------------------------
+    #                            Unmerge the APNs
+    #             (from many APNs in one cell to one row per APN)
+    #---------------------------------------------------------------------------
+    if success == True:
+        try:
+            csv_table = '{}_APNs_Unmerged'.format(csv_table_copy)
+
+            Unmerge_APNs(csv_table_copy, csv_table, record_id_fld, apn_fld, gp_code_fld)
+
+        except Exception as e:
+            success = False
+            print '\n*** ERROR with Unmerge_APNs() ***'
+            print str(e)
+
 
     #---------------------------------------------------------------------------
     #         Get the parcels from PARCELS_ALL and PARCELS_HISTORICAL
@@ -204,7 +285,7 @@ def main():
     #---------------------------------------------------------------------------
     if success == True:
         try:
-            data_pass_QAQC_tests = QA_QC(csv_table, from_parcels_all_fc, from_parcels_hist_fc, apns_from_imported_csv, apns_found_in_parcels_all, apns_found_in_parcels_hist, apns_not_found_anywhere, apn_fld, record_id_fld, du_fld, acreage_cutoff_for_overlap)
+            data_pass_QAQC_tests = QA_QC(csv_table, from_parcels_all_fc, from_parcels_hist_fc, apns_from_imported_csv, apns_found_in_parcels_all, apns_found_in_parcels_hist, apns_not_found_anywhere, apn_fld, record_id_fld, gp_code_fld, acreage_cutoff_for_overlap, gen_plan_dict)
 
         except Exception as e:
             success = False
@@ -279,16 +360,17 @@ def main():
             print '*** ERROR with Remove_FieldName_Prefix() ***'
             print str(e)
 
+
     #---------------------------------------------------------------------------
-    #                      Get the DENSITY per project
+    #                Get the DENSITY per project
     #---------------------------------------------------------------------------
     if success == True:
         try:
-            Get_DENSITY_Per_Project(parcels_joined_fc, record_id_fld, du_fld)
+            Get_DENSITY_Per_Project_w_GP_CD(parcels_joined_fc, PDS_HOUSING_MODEL_CONSTRAINTS, record_id_fld, gp_code_fld, unconstrained_density_fld, density_fld, gen_plan_dict)
 
         except Exception as e:
             success = False
-            print '*** ERROR with Get_DENSITY_Per_Project() ***'
+            print '*** ERROR with Get_DENSITY_Per_Project_w_GP_CD() ***'
             print str(e)
 
 
@@ -432,6 +514,102 @@ def Get_DT_To_Append():
 
 #-------------------------------------------------------------------------------
 #-------------------------------------------------------------------------------
+def Unmerge_APNs(csv_table_w_merged, csv_table_unmerged, record_id_fld, apn_fld, gp_code_fld):
+    """
+    Unmerge the APNs that are in one cell and create one row for every APN
+    while still keeping all the data that was in the extract
+    """
+
+    print '\n------------------------------------------------------------------'
+    print 'Starting Unmerge_APNs()\n'
+
+
+    # Get the schema from the imported table and delete the existing data
+    print '  Get the schema from the imported table and delete the existing data:'
+    print '    Copying table from:\n      {}\n    To:\n      {}\n'.format(csv_table_w_merged, csv_table_unmerged)
+    out_path, out_name = os.path.split(csv_table_unmerged)
+    arcpy.TableToTable_conversion(csv_table_w_merged, out_path, out_name)
+
+    print '    Deleting rows in:\n    {}\n'.format(csv_table_unmerged)
+    arcpy.DeleteRows_management(csv_table_unmerged)
+
+    #---------------------------------------------------------------------------
+    #                             Format the APN field
+
+    # Format the APN field to remove the dashes
+    expression = '!{}!.replace("-","")'.format(apn_fld)
+    print '\n  Removing dashes in the field [{}] to equal: {}'.format(apn_fld, expression)
+    arcpy.CalculateField_management(csv_table_w_merged, apn_fld, expression, 'PYTHON_9.3')
+
+    # Format the APN field to remove any whitespace
+    expression = '!{}!.replace(" ","")'.format(apn_fld)
+    print '\n  Removing white space in the field [{}] to equal: {}\n'.format(apn_fld, expression)
+    arcpy.CalculateField_management(csv_table_w_merged, apn_fld, expression, 'PYTHON_9.3')
+
+
+    #---------------------------------------------------------------------------
+    #            Unmerge all rows that had more than one APNs
+    #                so that there is one APN per cell
+
+    print '  Unmerge the APNs listed in one cell to have one APN per cell'
+
+    # Loop through each row that has more than 10 characters in it (i.e. has more than 1 APN)
+    search_fields = [record_id_fld, apn_fld, gp_code_fld]
+    where_clause = "CHAR_LENGTH({}) > 10".format(apn_fld)
+    with arcpy.da.SearchCursor(csv_table_w_merged, search_fields, where_clause) as search_cursor:
+        for row in search_cursor:
+            # Set the values from the cursor into temp variables
+            rec_id      = row[0]
+            apn         = row[1]
+            gp_cd       = row[2]
+
+
+            # Create a list based off each comma
+            apn_list = apn.split(',')
+
+
+            # For each apn that was in the cell, create a new record with only that APN
+            # Keep information for the Record ID, APN, and GP Code fields
+            for apn in apn_list:
+                ##print '    Record ID: {}  has APN: {}  and GP code: {}'.format(rec_id, apn, gp_cd)  # For testing
+
+                # The schema for the seperate APN table should be identical to the CSV extract
+                # So the fields we want to write data to should be the same name
+                # and in the same order
+                insert_fields = search_fields
+
+                row_value     = [(rec_id, apn, gp_cd)]
+
+                with arcpy.da.InsertCursor(csv_table_unmerged, insert_fields) as insert_cursor:
+                    for row in row_value:
+                        insert_cursor.insertRow(row)
+                del insert_cursor
+    del search_cursor
+
+
+    #---------------------------------------------------------------------------
+    #            Salect and Append all the records that had only one
+    #                     APN into the csv_table_unmerged
+    #              (faster than using the insert cursor above)
+
+    where_clause = "CHAR_LENGTH({}) = 10".format(apn_fld)
+    print '\n  Selecting all the records that had only one APN (nothing to unmerge) from:\n    {}'.format(csv_table_w_merged)
+    one_apn_lyr = Select_By_Attribute(csv_table_w_merged, 'NEW_SELECTION', where_clause)
+
+    count = Get_Count_Selected(one_apn_lyr)
+
+    if count != 0:
+        inputs = [one_apn_lyr]
+        target = csv_table_unmerged
+        print '  Appending selected records to:\n    {}'.format(target)
+        arcpy.Append_management(inputs, target, 'NO_TEST')
+
+
+    print '\nFinished Unmerge_APNs()'
+
+
+#-------------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 def Get_Parcels(csv_table, PARCELS_ALL, PARCELS_HISTORICAL, from_parcels_all_fc, from_parcels_hist_fc, apn_fld):
     """
     Get the parcel footprint and tabular data from PARCELS_ALL and PARCELS_HISTORICAL
@@ -550,6 +728,7 @@ def Get_Parcels(csv_table, PARCELS_ALL, PARCELS_HISTORICAL, from_parcels_all_fc,
             arcpy.SelectLayerByAttribute_management('parcels_historical_lyr', 'ADD_TO_SELECTION', where_clause)
 
         # Get the count of selected parcels
+        print '    Getting count of selected parcels:'
         count = Get_Count_Selected('parcels_historical_lyr')
 
         # Export the selected parcels (if any)
@@ -595,7 +774,7 @@ def Get_APN_Lists(csv_table, from_parcels_all_fc, from_parcels_hist_fc, apn_fld)
                 apn = row[0]
                 apns_from_imported_csv.append(apn)
         del cursor
-    print '    There were "{}" APNs (Total--not unique) from the Import Table\n'.format(len(apns_from_imported_csv))
+    print '    There were "{}" APNs (Total--not unique) from the Import Table'.format(len(apns_from_imported_csv))
     print '    There were "{}" Unique APNs from the Import Table\n'.format(len(set(apns_from_imported_csv)))
 
 
@@ -643,13 +822,14 @@ def Get_APN_Lists(csv_table, from_parcels_all_fc, from_parcels_hist_fc, apn_fld)
 
 #-------------------------------------------------------------------------------
 #-------------------------------------------------------------------------------
-def QA_QC(csv_table, from_parcels_all_fc, from_parcels_hist_fc, apns_from_imported_csv, apns_found_in_parcels_all, apns_found_in_parcels_hist, apns_not_found_anywhere, apn_fld, record_id_fld, du_fld, acreage_cutoff_for_overlap):
+def QA_QC(csv_table, from_parcels_all_fc, from_parcels_hist_fc, apns_from_imported_csv, apns_found_in_parcels_all, apns_found_in_parcels_hist, apns_not_found_anywhere, apn_fld, record_id_fld, gp_code_fld, acreage_cutoff_for_overlap, gen_plan_dict):
     """
     Perform QA/QC on the csv_table.  The below checks are performed:
       1)  Which APNs from the CSV were not found in PARCELS_ALL or PARCELS_HISTORICAL?
       2)  Find if Parcels showed up more than one time in the CSV table
       3)  Is there an overlap with a current parcel and an historic parcel?
       4)  Check any critical fields to ensure there are no blank values
+      5)  Find any invalid values in the GP Code field
 
     This is only for reporting purposes, this function does not edit the data
     """
@@ -718,7 +898,7 @@ def QA_QC(csv_table, from_parcels_all_fc, from_parcels_hist_fc, apns_from_import
 
     #---------------------------------------------------------------------------
     # 3)  Is there an overlap with a current parcel and an historic parcel?
-    print '\n\n  3) Finding any overlaps with current parcels and historic parcels:\n'
+    print '\n\n  3) Finding any overlaps with current parcels and historic parcels:'
 
     # Check to see if any parcels came from PARCELS_HISTORICAL, no need to check
     #   If there are no parcels from PARCELS_HISTORICAL
@@ -746,7 +926,7 @@ def QA_QC(csv_table, from_parcels_all_fc, from_parcels_hist_fc, apns_from_import
                 break
 
         if overlap == False:
-            print '    OK! There are no overlapping parcels'
+            print '    OK! There are no overlapping parcels\n'
 
         # If there is an overlap, get a list of the parcels that overlap and report on them
         if overlap == True:
@@ -816,11 +996,11 @@ def QA_QC(csv_table, from_parcels_all_fc, from_parcels_hist_fc, apns_from_import
     #---------------------------------------------------------------------------
     # 4)  Check any critical fields to ensure there are no blank values
     print '\n  4) Finding any critical fields that are blank in imported CSV table:\n'
-    critical_fields = [record_id_fld, apn_fld, du_fld]
+    critical_fields = [record_id_fld, apn_fld, gp_code_fld]
     for f in critical_fields:
 
         # Set the where clause
-        if f == du_fld:  # Set a where clause for an integer field
+        if f == gp_code_fld:  # Set a where clause for an integer field
             where_clause = "{0} IS NULL".format(f)
         else:  # Set a where clause for a string field
             where_clause = "{0} IS NULL or {0} = ''".format(f)
@@ -850,6 +1030,71 @@ def QA_QC(csv_table, from_parcels_all_fc, from_parcels_hist_fc, apns_from_import
             print '      OK! No blank values in {}'.format(f)
 
         print ''
+
+
+    #---------------------------------------------------------------------------
+    # 5) Confirm that all GP codes are valid using the general plan dictionary
+    #    defined at the beginning of this script (gen_plan_dict)
+    print '\n  5) Finding any invalid values in the GP Code field:'
+    fields = [gp_code_fld]
+    invalid_gp_codes = []
+    any_gp_22_cd = False  # flag to control if there are any GP 22 codes
+    with arcpy.da.SearchCursor(csv_table, fields) as cursor:
+        for row in cursor:
+            gp_code = row[0]
+
+            # See if the code exists in the dictionary and see if the code = 22 (which has an unknown density)
+            try:
+                gen_plan_dict[gp_code]
+
+                if gp_code == 22:
+                    data_pass_QAQC_tests = False
+                    any_gp_22_cd = True
+
+            # This except will catch if there is not a matching code in the dict
+            except KeyError:
+                data_pass_QAQC_tests = False
+                if gp_code not in invalid_gp_codes:
+                    invalid_gp_codes.append(gp_code)  # Get a unique list of invalid codes
+    del cursor
+
+    # Report on any invalid GP codes
+    if len(invalid_gp_codes) == 0:
+        print '    OK!  There were no invalid GP codes.'
+
+    else:
+        print '    WARNING! There is at least one GP Code that is is not valid,'
+        print '      The parcel with this code will be deleted later in the script.'
+
+        # Loop through each invalid code and print out the projects that have that code in them
+        for invalid_cd in invalid_gp_codes:
+            print '\n    Invalid Code: {}'.format(invalid_cd)
+            print '    Is found in Record ID:'
+
+            # Make a cursor with where_clause equals [GPCODE95] = <an invalid code>
+            invalid_record_ids = []
+            fields = [record_id_fld, gp_code_fld]
+            where_clause = "{} = {}".format(gp_code_fld, invalid_cd)
+            with arcpy.da.SearchCursor(apn_tbl, fields, where_clause) as cursor:
+                for row in cursor:
+                    invalid_record_id = row[0]
+
+                    # Get a unique list of invalid record ids
+                    if invalid_record_id not in invalid_record_ids:
+                        invalid_record_ids.append(invalid_record_id)
+            del cursor
+
+            # Print out the unique list of invalid record ids
+            for invalid_id in invalid_record_ids:
+                print '      {}'.format(invalid_id)
+
+    # Report if there are any records with a GP code of 22
+    if any_gp_22_cd == True:
+        print '\n    WARNING!  There is a GP code in the extract that does not have'
+        print '      a density value available.  Code: 22 (Specific Plan Area) is technically a valid GP code'
+        print '      BUT, there is no Density information available for this code'
+        print '      As a result, this script will give any parcel with this GP code'
+        print '      a value of 0 in its density column.'
 
 
     #---------------------------------------------------------------------------
@@ -920,156 +1165,168 @@ def Remove_FieldName_Prefix(fc_or_table, prefix_to_remove):
 
 #-------------------------------------------------------------------------------
 #-------------------------------------------------------------------------------
-def Get_DENSITY_Per_Project(fc_to_process, record_id_fld, du_fld):
+def Get_DENSITY_Per_Project_w_GP_CD(parcels_joined_fc, PDS_HOUSING_MODEL_CONSTRAINTS, record_id_fld, gp_code_fld, unconstrained_density_fld, density_fld, gen_plan_dict):
     """
-    The main goal of this function is to find the DENSITY of each project
-
-    This function:
-      Adds fields
-      Calculates them to find the field [DENSITY]
-      Dissolves to the Project level (record_id_fld)
-      Cleans up the data
+    The main goal of this function is to find the DENSITY of each project using
+    the Area and the dictionary "gen_plan_dict" to relate the GP code and the
+    amound of dwelling units allowed per acre
     """
     print '\n------------------------------------------------------------------'
-    print 'Starting Get_DENSITY_Per_Project()'
-    print '  Processing FC at:\n    {}\n'.format(fc_to_process)
+    print 'Starting Get_DENSITY_Per_Project_w_GP_CD()'
 
-    wkg_fgdb = os.path.dirname(fc_to_process)
+    # Set variables
+    wkg_fgdb = os.path.dirname(parcels_joined_fc)
 
-    # Set the names of the fields to be added
-    parcel_acres_fld    = 'Parcel_Acres'
-    project_acres_fld   = 'Project_Acres'
-    density_fld         = 'DENSITY'
 
 
     #---------------------------------------------------------------------------
-    #                  Get a list of unique RECORD_IDs
-    print '  Getting list of all RECORD_IDs:'
-    project_ids = []
-    with arcpy.da.SearchCursor(fc_to_process, [record_id_fld]) as cursor:
+    #              Add field to hold UNCONSTRAINED DENSITY
+    print '\n  Adding field:'
+    field_name = unconstrained_density_fld
+    field_type = 'DOUBLE'
+    print '    [{}] as a:  {}'.format(field_name, field_type)
+    arcpy.AddField_management(parcels_joined_fc, field_name, field_type)
+
+
+    #---------------------------------------------------------------------------
+    #                         Calculate density field
+    # Get the code from the FC and then get the correct value from the dictionary
+    print '\n  Calculating [{}] field based on the GP Dictionary provided at the beginning of this script'.format(unconstrained_density_fld)
+    fields = [gp_code_fld, unconstrained_density_fld]
+    with arcpy.da.UpdateCursor(parcels_joined_fc, fields) as cursor:
         for row in cursor:
-            project_ids.append(row[0])
+            gp_code = row[0]  # GP Code from the FC
+
+            try:
+                row[1] = gen_plan_dict[gp_code]  # Get the description from the dict and add it to the density field
+
+            except KeyError:  #This KeyError happens if the GPCODE does not exist in the dictionary (We want to delete this row)
+                row[1] = -99  # Add this value to the density field to flag it for deletion later in script
+
+            cursor.updateRow(row)
+            del gp_code
     del cursor
 
-    # Get a list of all the UNIQUE ID's
-    # set() returns a list of only unique values
-    unique_project_ids = sorted(set(project_ids))
-    print '    There are "{}" unique Record IDs\n'.format(len(unique_project_ids))
-
 
     #---------------------------------------------------------------------------
-    #                  Add fields to hold calculations
-    print '  Adding fields:'
-
-    fields_to_add = [parcel_acres_fld, project_acres_fld, density_fld]
-
-    for field_name in fields_to_add:
-        field_type = 'DOUBLE'
-        print '    [{}] as a:  {}'.format(field_name, field_type)
-        arcpy.AddField_management(fc_to_process, field_name, field_type)
-
-
+    #                              Dissolve data
     #---------------------------------------------------------------------------
-    #                  Calculate fields to find DENSITY
+    # Dissolve to the dissolve_fields
+    dissolve_fields = [record_id_fld, gp_code_fld, unconstrained_density_fld]
 
-    # Repair geometry to ensure correct geometry calculation below
-    print '\n  Repairing Geometry before performing area calculations below'
-    arcpy.RepairGeometry_management(fc_to_process)
-
-
-    # Calc Acres for each Parcel
-    expression      = '!shape.area@acres!'
-    expression_type = 'PYTHON_9.3'
-
-    print '\n  Calculating field:\n    [{}] = {}\n'.format(parcel_acres_fld, expression)
-    arcpy.CalculateField_management(fc_to_process, parcel_acres_fld, expression, expression_type)
-
-
-    # Calc Total Project Acres for each Project
-    print '  Calculating field [{}] to equal the total acreage of each project'.format(project_acres_fld)
-    for project in unique_project_ids:
-
-        ##print '  Calculating total acreage of project:  {}'.format(project)  # For testing
-
-        # Get the acreage of the project
-        total_project_acres = 0
-
-        where_clause = "{} = '{}'".format(record_id_fld, project)
-        fields       = [record_id_fld, parcel_acres_fld, project_acres_fld]
-        with arcpy.da.SearchCursor(fc_to_process, fields, where_clause) as cursor:
-            for row in cursor:
-                acres = row[1]
-                total_project_acres = (total_project_acres + acres)
-
-        ##print '    Total Project Acres:  {}\n'.format(total_project_acres)  # For testing
-        del cursor
-
-        # Set the acreage of the project into the fc
-        where_clause = "{} = '{}'".format(record_id_fld, project)
-        fields       = [record_id_fld, project_acres_fld]
-        with arcpy.da.UpdateCursor(fc_to_process, fields, where_clause) as cursor:
-            for row in cursor:
-                row[1] = total_project_acres
-                cursor.updateRow(row)
-        del cursor
-
-
-    # Calc DENSITY designation for each Project
-    expression = "!{}!/!{}!".format(du_fld, project_acres_fld)
-    print '\n  Calculating field:\n    [{}] = {}\n'.format(density_fld, expression)
-    arcpy.CalculateField_management(fc_to_process, density_fld, expression, expression_type)
-
-
-    #---------------------------------------------------------------------------
-    #                  Dissolve to the project level
-    dissolve_fields = [record_id_fld, du_fld, project_acres_fld, density_fld]
-    dissolve_fc     = os.path.join(wkg_fgdb, 'Parcels_joined_diss_READY2BIN')
-    print '\n  Dissolving FC:\n    {}\n  On Fields:'.format(fc_to_process)
+    dissolve_fc     = os.path.join(wkg_fgdb, 'Parcels_County_joined_diss')
+    print '\n  Dissolving FC:\n    {}\n  To:\n    {}\n  On Fields:'.format(parcels_joined_fc, dissolve_fc)
     for f in dissolve_fields:
         print '    {}'.format(f)
-    print '  To create FC:\n    {}'.format(dissolve_fc)
 
-    arcpy.Dissolve_management(fc_to_process, dissolve_fc, dissolve_fields, '#', 'SINGLE_PART')
+    arcpy.Dissolve_management(parcels_joined_fc, dissolve_fc, dissolve_fields, '#', 'SINGLE_PART')
+
+
+    # Delete any records with -99 density
+    fields = [unconstrained_density_fld]
+    where_clause = "{} = -99".format(unconstrained_density_fld)
+    count = 0
+    print '\n  Deleting any rows where: "{}" in FC at:\n    {}'.format(where_clause, dissolve_fc)
+    with arcpy.da.UpdateCursor(dissolve_fc, fields, where_clause) as cursor:
+        for row in cursor:
+            ##print '  {}'.format(row[0])  # For testing
+            cursor.deleteRow()
+            count +=1
+
+    print '\n    There were {} records deleted'.format(count)
 
 
     #---------------------------------------------------------------------------
-    #                       Cleanup the dissolved FC
+    #            Intersect Dissolved Data w/ Housing Model
+    #---------------------------------------------------------------------------
 
-    # Delete any records that do not have a value in the Dwelling Unit field
-    #   (which would result in not having a value in the Density field)
-    print '\n\n  Checking for any records that do not have a value in the Dwelling Unit field'
-    print '  since this would cause a null value in the density field, resulting in bad data:'
-    where_clause = "{} IS NULL".format(du_fld)
-    missing_density_lyr = Select_By_Attribute(dissolve_fc, 'NEW_SELECTION', where_clause)
+    print('\n  Intersecting Dissolved Data w/ Housing Model:')
 
-    # Get count of selected records
-    count = Get_Count_Selected(missing_density_lyr)
-
-    if count != 0:
-        print '    There were "{}" features where "{}"'.format(count, where_clause)
-        print '    Deleting those features now in FC:\n      {}'.format(dissolve_fc)
-        arcpy.DeleteFeatures_management(missing_density_lyr)
-    else:
-        print '    OK! No records missing a value in the Dewlling Unit field'
+    # Intersect the two FC's
+    in_features = [dissolve_fc, PDS_HOUSING_MODEL_CONSTRAINTS]
+    intersect_fc = os.path.join(wkg_fgdb, '{}_HOUSING_int'.format(os.path.basename(dissolve_fc)))
+    print '\n    Intersecting:'
+    for fc in in_features:
+        print '      {}'.format(fc)
+    print '    To create FC:\n      {}\n'.format(intersect_fc)
+    arcpy.Intersect_analysis(in_features, intersect_fc)
 
 
-    # Delete any records that do not have a value in the Record ID field
-    print '\n\n  Checking for any records that do not have a value in the Record ID field:'
-    where_clause = "{0} IS NULL or {0} = ''".format(record_id_fld)
-    missing_record_id_lyr = Select_By_Attribute(dissolve_fc, 'NEW_SELECTION', where_clause)
+    #---------------------------------------------------------------------------
+    #       Dissolve Intersected Data to include only fields of interest
+    #---------------------------------------------------------------------------
+    #              Get a list of fields we want to dissolve on
 
-    # Get count of selected records
-    count = Get_Count_Selected(missing_record_id_lyr)
+    # Get a list of the 'GPMAX' fields from PDS_HOUSING_MODEL_CONSTRAINTS
+    dissolve_fields = [f.name for f in arcpy.ListFields(intersect_fc, 'GPMAX*')]
 
-    if count != 0:
-        print '    There were "{}" features where "{}"'.format(count, where_clause)
-        print '    Deleting those features now in FC:\n      {}'.format(dissolve_fc)
-        arcpy.DeleteFeatures_management(missing_record_id_lyr)
-    else:
-        print '    OK! No records missing a value in the Record ID field'
-    arcpy.Delete_management(missing_record_id_lyr)
+    # Add the fields from the County Extract we want to keep
+    dissolve_fields.append(record_id_fld)
+    dissolve_fields.append(gp_code_fld)
+    dissolve_fields.append(unconstrained_density_fld)
 
-    print '\nFinished Get_DENSITY_Per_Project()'
+    # Perform the dissolve
+    FINAL_fc = os.path.join(wkg_fgdb, '{}_diss_READY2MERGE'.format(os.path.basename(intersect_fc)))
+    print '\n  Dissolving FC:\n    {}\n  To:\n    {}\n  On Fields:'.format(intersect_fc, FINAL_fc)
+    for f in dissolve_fields:
+        print '    {}'.format(f)
+
+    arcpy.Dissolve_management(intersect_fc, FINAL_fc, dissolve_fields, '#', 'SINGLE_PART')
+
+
+    #---------------------------------------------------------------------------
+    #              Add field to hold DENSITY (which is constrained)
+    print '\n  Adding field:'
+    field_name = density_fld
+    field_type = 'DOUBLE'
+    print '    [{}] as a:  {}'.format(field_name, field_type)
+    arcpy.AddField_management(FINAL_fc, field_name, field_type)
+
+
+    #---------------------------------------------------------------------------
+    #                     Calcualte DENSITY field
+    #---------------------------------------------------------------------------
+
+    print ('\n  Calculating DENSITY Field in FC:\n    {}\n'.format(FINAL_fc))
+
+    # Get a list of the 'GPMAX' fields from PDS_HOUSING_MODEL_CONSTRAINTS
+    gp_max_fields = [f.name for f in arcpy.ListFields(FINAL_fc, 'GPMAX*')]
+
+    # Get a list of GPCODE values from the dictionary gen_plan_dict
+    gp_codes_list = list(gen_plan_dict.keys())
+
+    for gp_code in gp_codes_list:
+
+            # Create a layer with only records that have this gp_code
+            where_clause = "{} = {}".format(gp_code_fld, gp_code)
+            print('    Making Feature Layer where: "{}"'.format(where_clause))
+            arcpy.MakeFeatureLayer_management(FINAL_fc, 'gp_lyr', where_clause)
+
+            # Set the calculation expression based on if there is a corresponding GPMAX field
+            if ('GPMAX{}'.format(gp_code)) in gp_max_fields:
+
+                # Calcualte the DENSITY field for that layer based on the corresponding GPMAX field
+                expression = '!{}!*(1-!GPMAX{}!)'.format(unconstrained_density_fld, gp_code)
+
+            else:
+
+                # Calculate the DENSITY field to 0 (if there is no corresponding GPMAX field
+                #   then there are 0 possible DU for this GP code--i.e. industrial)
+                expression = 0
+
+            # Perform the calculation
+            print '    Calculating the field [{}] to equal: {}\n'.format(density_fld, expression)
+            arcpy.CalculateField_management('gp_lyr', density_fld, expression, 'PYTHON_9.3')
+            arcpy.Delete_management('gp_lyr')
+
+
+    # Delete any of the GPMAX fields (for readability)
+    print('  Deleting all GPMAX fields for readability')
+    arcpy.DeleteField_management(FINAL_fc, gp_max_fields)  # Comment this out if need to QA/QC manually
+
+
+    print('\nFinished Get_DENSITY_Per_Project_w_GP_CD()')
+    return
 
 
 #-------------------------------------------------------------------------------

@@ -38,13 +38,9 @@ def main():
 
 
     # Paths to SDE Feature Classes
-    CONTROL_TABLE      = r'Database Connections\AD@ATLANTIC@SDW.sde\SDW.PDS.PDS_DEV_TRACKER_BINNING_CONTROL_TABLE'
-    GRID_HEX_060_ACRES = r'Database Connections\AD@ATLANTIC@SDE.sde\SDE.SANGIS.GRID_HEX_060_ACRES'
-    CMTY_PLAN_CN       = r'Database Connections\AD@ATLANTIC@SDE.sde\SDE.SANGIS.CMTY_PLAN_CN'
-
-
-    # Set the final location for each binned FC & CPASG Table
-    prod_cpasg_tbl = r'Database Connections\AD@ATLANTIC@SDW.sde\SDW.PDS.PDS_DEV_TRACKER_In_Process_GPAs_CPASG'
+    CONTROL_TABLE      = r'P:\20180510_development_tracker\DEV\Scripts\Connection_Files\AD@ATLANTIC@SDW.sde\SDW.PDS.PDS_DEV_TRACKER_BINNING_CONTROL_TABLE'
+    GRID_HEX_060_ACRES = r'P:\20180510_development_tracker\DEV\Scripts\Connection_Files\AD@ATLANTIC@SDE.sde\SDE.SANGIS.GRID_HEX_060_ACRES'
+    CMTY_PLAN_CN       = r'P:\20180510_development_tracker\DEV\Scripts\Connection_Files\AD@ATLANTIC@SDE.sde\SDE.SANGIS.CMTY_PLAN_CN'
 
 
     # Set Field names
@@ -458,7 +454,7 @@ def Bin_Polys_w_Density(wkg_fgdb, fc_to_bin, prod_binned_fc, GRID_HEX_060_ACRES,
     #---------------------------------------------------------------------------
     #       Perform Frequency on Hexagon ID, while summing the VALUE field
 
-    freq_analysis_fc = '{}_freq'.format(int_single_part_fc)
+    freq_analysis_tbl = '{}_freq'.format(int_single_part_fc)
     freq_fields = [hex_id_fld]
     sum_fields  = [value_temp_fld]
 
@@ -469,15 +465,15 @@ def Bin_Polys_w_Density(wkg_fgdb, fc_to_bin, prod_binned_fc, GRID_HEX_060_ACRES,
     print '  Sum fields:'
     for f in sum_fields:
         print '    {}'.format(f)
-    print '  To create FC at:\n    {}'.format(freq_analysis_fc)
-    arcpy.Frequency_analysis(int_single_part_fc, freq_analysis_fc, freq_fields, sum_fields)
+    print '  To create FC at:\n    {}'.format(freq_analysis_tbl)
+    arcpy.Frequency_analysis(int_single_part_fc, freq_analysis_tbl, freq_fields, sum_fields)
 
 
     #---------------------------------------------------------------------------
     #             Copy the SDE Hexagon grid to a local FGDB
 
     # Set the path to copy the SDE Hexagon grid to
-    FINAL_hex_fc = '{}_BINNED'.format(freq_analysis_fc)
+    FINAL_hex_fc = '{}_BINNED'.format(freq_analysis_tbl)
 
     # Get the parameters the copy tool needs and copy
     out_path, out_name = os.path.split(FINAL_hex_fc)
@@ -498,11 +494,11 @@ def Bin_Polys_w_Density(wkg_fgdb, fc_to_bin, prod_binned_fc, GRID_HEX_060_ACRES,
 
 
     # Join the copied Hex FC with the Frequency Table
-    join_lyr = Join_2_Objects_By_Attr(FINAL_hex_fc, hex_id_fld, freq_analysis_fc, hex_id_fld, 'KEEP_ALL')
+    join_lyr = Join_2_Objects_By_Attr(FINAL_hex_fc, hex_id_fld, freq_analysis_tbl, hex_id_fld, 'KEEP_ALL')
 
 
     # Calculate the VALUE field in the Hex FC from the Frequency Table
-    table_name      = os.path.basename(freq_analysis_fc)
+    table_name      = os.path.basename(freq_analysis_tbl)
     expression      = '!{}.{}!'.format(table_name, value_temp_fld)
     print '\n  Calculating field:\n    {} = {}\n'.format(field_name, expression)
     arcpy.CalculateField_management(join_lyr, value_final_fld, expression, expression_type)
@@ -698,26 +694,18 @@ def CPASG_Polys_w_Density(wkg_fgdb, fc_to_make_cpasg_tbl, prod_cpasg_tbl, CMTY_P
 
 
     #---------------------------------------------------------------------------
-    #                     Truncate the value field
+    #                     Round the value field
     """
-    This is done because a value of 10.9 really means that 10 DU could be built
-    in the CPASG.  The truncate also happens after 'Countywide' is calculated
-    so that we truncate down to the nearest integer of DU available in the
-    County.  This will mean that 'Countywide' will not exactly match up
-    with the sum of the CPASG's, but we believe that this is the most accurate
-    representation of the data--Mike Grue and Gary Ross
-
-    TODO: Ask Gary about this:
-      20180803 MG: Actually, I'm not sure we should do this.
-        A value of 0.999999999 gets truncated to 0 when it should clearly be 1
-
+    We are rounding here in order to get a whole number (1.49 = 1 while 1.5 = 2)
+    We are no longer truncating because a value of 0.999999999 gets truncated
+    to 0 when it should clearly be 1.
     """
 
-##    # Truncate the VALUE field (round down to the nearest integer)
-##    field_name = value_final_fld
-##    expression = 'math.trunc(!{}!)'.format(value_final_fld)
-##    print '\n  Truncating field:\n    [{}] = {}\n'.format(field_name, expression)
-##    arcpy.CalculateField_management(freq_analysis_tbl, field_name, expression, expression_type)
+    # Round the VALUE field
+    field_name = value_final_fld
+    expression = 'round(!{}!)'.format(value_final_fld)
+    print '\n  Rounding field:\n    [{}] = {}\n'.format(field_name, expression)
+    arcpy.CalculateField_management(freq_analysis_tbl, field_name, expression, expression_type)
 
 
     #---------------------------------------------------------------------------
@@ -734,6 +722,7 @@ def CPASG_Polys_w_Density(wkg_fgdb, fc_to_make_cpasg_tbl, prod_cpasg_tbl, CMTY_P
 
     print '\nFinished CPASG_Polys_w_Density()'
     return
+
 
 #-------------------------------------------------------------------------------
 #-------------------------------------------------------------------------------
@@ -762,17 +751,17 @@ def Bin_Points_w_UnitCount(wkg_fgdb, fc_to_bin, prod_binned_fc, GRID_HEX_060_ACR
     #                            Frequency Analysis
 
     # Get the frequency of how many points (using the unit count field) are in each HEXBIN
-    freq_analysis_fc = points_GRID_HEX_join + '_freq'
+    freq_analysis_tbl = points_GRID_HEX_join + '_freq'
     frequency_fields = [hex_id_fld]
     summary_fields = [unit_count_fld]
-    print '  Performing Frequency analysis on FC:\n    {}\n  To create Table:\n    {}'.format(points_GRID_HEX_join, freq_analysis_fc)
+    print '  Performing Frequency analysis on FC:\n    {}\n  To create Table:\n    {}'.format(points_GRID_HEX_join, freq_analysis_tbl)
     print '  Frequency Fields:'
     for freq_field in frequency_fields:
         print '    {}'.format(freq_field)
     print '  Summary Fields:'
     for summary_field in summary_fields:
         print '    {}'.format(summary_field)
-    arcpy.Frequency_analysis(points_GRID_HEX_join, freq_analysis_fc, frequency_fields, summary_fields)
+    arcpy.Frequency_analysis(points_GRID_HEX_join, freq_analysis_tbl, frequency_fields, summary_fields)
 
 
     #---------------------------------------------------------------------------
@@ -803,11 +792,11 @@ def Bin_Points_w_UnitCount(wkg_fgdb, fc_to_bin, prod_binned_fc, GRID_HEX_060_ACR
 
 
     # Join the copied Hex FC with the Frequency Table
-    join_lyr = Join_2_Objects_By_Attr(FINAL_hex_fc, hex_id_fld, freq_analysis_fc, hex_id_fld, 'KEEP_ALL')
+    join_lyr = Join_2_Objects_By_Attr(FINAL_hex_fc, hex_id_fld, freq_analysis_tbl, hex_id_fld, 'KEEP_ALL')
 
 
     # Calculate the VALUE field in the Hex FC from the Frequency Table
-    table_name      = os.path.basename(freq_analysis_fc)
+    table_name      = os.path.basename(freq_analysis_tbl)
     expression      = '!{}.{}!'.format(table_name, unit_count_fld)
     print '\n    Calculating field:\n      [{}] = {}'.format(field_name, expression)
     arcpy.CalculateField_management(join_lyr, value_final_fld, expression, expression_type)
