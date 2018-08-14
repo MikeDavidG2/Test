@@ -55,10 +55,10 @@ def main():
 
     wkg_fgdb          = '{}\{}'.format(data_folder, '{}.gdb'.format(shorthand_name))
 
+
+    # Success / Error file info
     success_error_folder = '{}\Scripts\Source_Code\Success_Error'.format(root_folder)
-
     success_file = '{}\SUCCESS_running_{}.txt'.format(success_error_folder, name_of_script.split('.')[0])
-
     error_file   = '{}\ERROR_running_{}.txt'.format(success_error_folder, name_of_script.split('.')[0])
 
 
@@ -66,15 +66,15 @@ def main():
     sde_connection_file           = r'P:\20180510_development_tracker\DEV\Scripts\Connection_Files\AD@ATLANTIC@SDE.sde'
     PARCELS_HISTORICAL            = r'{}\SDE.SANGIS.PARCEL_HISTORICAL'.format(sde_connection_file)
     PARCELS_ALL                   = r'{}\SDE.SANGIS.PARCELS_ALL'.format(sde_connection_file)
-    PDS_HOUSING_MODEL_CONSTRAINTS = r'{}\SDE.SANGIS.PDS_HOUSING_MODEL_CONSTRAINTS_2011'.format(sde_connection_file)
+    MODEL_CONSTRAINTS_w_FCI       = r'{}\SDE.SANGIS.PDS_HOUSING_MODEL_CONSTRAINTS_2011'.format(sde_connection_file)
+    MODEL_CONSTRAINTS_NO_FCI      = r'{}\SDE.SANGIS.PDS_HOUSING_MODEL_CONSTRAINTS_2011_NO_FCI'.format(sde_connection_file)
 
 
     # Set field names
     apn_fld       = 'APNS'
     record_id_fld = 'RECORD_ID'
+    proj_name_fld = 'PROJECT_NAME'
     gp_code_fld   = 'GPCODE95'
-    density_fld   = 'DENSITY'
-    unconstrained_density_fld = 'Unconstrained_DENSITY'
 
 
     # Misc variables
@@ -285,11 +285,11 @@ def main():
     #---------------------------------------------------------------------------
     if success == True:
         try:
-            data_pass_QAQC_tests = QA_QC(csv_table, from_parcels_all_fc, from_parcels_hist_fc, apns_from_imported_csv, apns_found_in_parcels_all, apns_found_in_parcels_hist, apns_not_found_anywhere, apn_fld, record_id_fld, gp_code_fld, acreage_cutoff_for_overlap, gen_plan_dict)
+            data_pass_QAQC_tests = QA_QC_Map_08_B(csv_table, from_parcels_all_fc, from_parcels_hist_fc, apns_from_imported_csv, apns_found_in_parcels_all, apns_found_in_parcels_hist, apns_not_found_anywhere, apn_fld, record_id_fld, gp_code_fld, acreage_cutoff_for_overlap, gen_plan_dict)
 
         except Exception as e:
             success = False
-            print '*** ERROR with QA_QC() ***'
+            print '*** ERROR with QA_QC_Map_08_B() ***'
             print str(e)
 
     #---------------------------------------------------------------------------
@@ -362,15 +362,32 @@ def main():
 
 
     #---------------------------------------------------------------------------
-    #                Get the DENSITY per project
+    #                Get the DENSITY per project With FCI
     #---------------------------------------------------------------------------
     if success == True:
         try:
-            Get_DENSITY_Per_Project_w_GP_CD(parcels_joined_fc, PDS_HOUSING_MODEL_CONSTRAINTS, record_id_fld, gp_code_fld, unconstrained_density_fld, density_fld, gen_plan_dict)
+            MODEL_CONSTRAINTS = MODEL_CONSTRAINTS_w_FCI
+            print('\n\nGetting DENSITY using constraint model:\n  {}'.format(MODEL_CONSTRAINTS))
+            Get_DENSITY_Per_Project_Map_08_B(parcels_joined_fc, MODEL_CONSTRAINTS, record_id_fld, gp_code_fld, gen_plan_dict)
 
         except Exception as e:
             success = False
-            print '*** ERROR with Get_DENSITY_Per_Project_w_GP_CD() ***'
+            print '*** ERROR with Get_DENSITY_Per_Project_Map_08_B() ***'
+            print str(e)
+
+
+    #---------------------------------------------------------------------------
+    #                Get the DENSITY per project With NO FCI
+    #---------------------------------------------------------------------------
+    if success == True:
+        try:
+            MODEL_CONSTRAINTS = MODEL_CONSTRAINTS_NO_FCI
+            print('\n\nGetting DENSITY using constraint model:\n  {}'.format(MODEL_CONSTRAINTS))
+            Get_DENSITY_Per_Project_Map_08_B(parcels_joined_fc, MODEL_CONSTRAINTS, record_id_fld, gp_code_fld, gen_plan_dict)
+
+        except Exception as e:
+            success = False
+            print '*** ERROR with Get_DENSITY_Per_Project_Map_08_B() ***'
             print str(e)
 
 
@@ -822,7 +839,7 @@ def Get_APN_Lists(csv_table, from_parcels_all_fc, from_parcels_hist_fc, apn_fld)
 
 #-------------------------------------------------------------------------------
 #-------------------------------------------------------------------------------
-def QA_QC(csv_table, from_parcels_all_fc, from_parcels_hist_fc, apns_from_imported_csv, apns_found_in_parcels_all, apns_found_in_parcels_hist, apns_not_found_anywhere, apn_fld, record_id_fld, gp_code_fld, acreage_cutoff_for_overlap, gen_plan_dict):
+def QA_QC_Map_08_B(csv_table, from_parcels_all_fc, from_parcels_hist_fc, apns_from_imported_csv, apns_found_in_parcels_all, apns_found_in_parcels_hist, apns_not_found_anywhere, apn_fld, record_id_fld, gp_code_fld, acreage_cutoff_for_overlap, gen_plan_dict):
     """
     Perform QA/QC on the csv_table.  The below checks are performed:
       1)  Which APNs from the CSV were not found in PARCELS_ALL or PARCELS_HISTORICAL?
@@ -835,7 +852,7 @@ def QA_QC(csv_table, from_parcels_all_fc, from_parcels_hist_fc, apns_from_import
     """
 
     print '\n--------------------------------------------------------------------'
-    print 'Start QA_QC()'
+    print 'Start QA_QC_Map_08_B()'
 
     data_pass_QAQC_tests = True
 
@@ -898,6 +915,7 @@ def QA_QC(csv_table, from_parcels_all_fc, from_parcels_hist_fc, apns_from_import
 
     #---------------------------------------------------------------------------
     # 3)  Is there an overlap with a current parcel and an historic parcel?
+
     print '\n\n  3) Finding any overlaps with current parcels and historic parcels:'
 
     # Check to see if any parcels came from PARCELS_HISTORICAL, no need to check
@@ -960,31 +978,45 @@ def QA_QC(csv_table, from_parcels_all_fc, from_parcels_hist_fc, apns_from_import
                         if apn_2 in apns_found_in_parcels_all:
                             current_apn = apn_2
 
-                        # Get the Record ID(s) associated with the historic APN
+                        # Get the Record ID(s) and GP codes associated with the historic APN
                         record_ids_historic = []
-                        fields = [apn_fld, record_id_fld]
+                        gp_codes_historic   = []
+                        fields = [apn_fld, record_id_fld, gp_code_fld]
                         where_clause = "{} = '{}'".format(apn_fld, historic_apn)
                         with arcpy.da.SearchCursor(csv_table, fields, where_clause) as csv_cursor:
                             for row in csv_cursor:
                                 record_ids_historic.append(row[1])
+                                gp_codes_historic.append(row[2])
                         del csv_cursor
 
-                        # Get the Record ID(s) associated with the current APN
+                        # Get the Record ID(s) and GP codes associated with the current APN
                         record_ids_current = []
+                        gp_codes_current   = []
                         fields = [apn_fld, record_id_fld]
                         where_clause = "{} = '{}'".format(apn_fld, current_apn)
                         with arcpy.da.SearchCursor(csv_table, fields, where_clause) as csv_cursor:
                             for row in csv_cursor:
                                 record_ids_current.append(row[1])
+                                gp_codes_current.append(row[2])
                         del csv_cursor
 
-                        # If the apn of the current and the apn of the historic overlapping parcels
-                        # are each only in one project, and if the project is the same project,
-                        # then the dissolve that happens below will remove any double-counting
-                        if (len(record_ids_current) == 1) and (len(record_ids_historic) == 1) and (record_ids_current[0] == record_ids_historic[0]):
+                        #-------------------------------------------------------
+                        #      Decide if the overlap may cause double counting
+
+
+                        # For the two overlapping areas:
+                        # If the apn of the current parcel is only in one project,
+                        #   and the apn of the historic parcel is only in one project,
+                        #   and if the project is the same project (same record id),
+                        #   and if the GP codes are the same,
+                        # Then the dissolve that happens below will remove any double-counting
+                        # So no need to raise a warning
+                        if (len(record_ids_current) == 1) and (len(record_ids_historic) == 1) and (record_ids_current[0] == record_ids_historic[0]) and (gp_codes_current[0] == gp_codes_historic[0]):
                                 print '      There is overlap between CURRENT parcel "{}" and HISTORIC parcel "{}"'.format(current_apn, historic_apn)
                                 print '      But as both are from the same project: "{}", there will be no overlap when the data is dissolved'.format(record_ids_current[0])
                                 print '      No need for human analysis, but PDS may want to know that they should update the historic apn in the above project\n'
+
+                        # Then a warning needs to be raised
                         else:
                             data_pass_QAQC_tests = False
                             print '      WARNING!  The overlap between CURRENT parcel "{}" and HISTORIC parcel "{}" may cause double counting'.format(current_apn, historic_apn)
@@ -1101,7 +1133,7 @@ def QA_QC(csv_table, from_parcels_all_fc, from_parcels_hist_fc, apns_from_import
     print '\n  ----------------------------------------------------------------'
     print '  Data Passed all QA/QC tests = {}\n'.format(data_pass_QAQC_tests)
 
-    print 'Finished QA_QC()'
+    print 'Finished QA_QC_Map_08_B()'
 
     return data_pass_QAQC_tests
 
@@ -1165,19 +1197,24 @@ def Remove_FieldName_Prefix(fc_or_table, prefix_to_remove):
 
 #-------------------------------------------------------------------------------
 #-------------------------------------------------------------------------------
-def Get_DENSITY_Per_Project_w_GP_CD(parcels_joined_fc, PDS_HOUSING_MODEL_CONSTRAINTS, record_id_fld, gp_code_fld, unconstrained_density_fld, density_fld, gen_plan_dict):
+def Get_DENSITY_Per_Project_Map_08_B(fc_to_process, MODEL_CONSTRAINTS, record_id_fld, gp_code_fld, gen_plan_dict):
     """
     The main goal of this function is to find the DENSITY of each project using
     the Area and the dictionary "gen_plan_dict" to relate the GP code and the
     amound of dwelling units allowed per acre
     """
     print '\n------------------------------------------------------------------'
-    print 'Starting Get_DENSITY_Per_Project_w_GP_CD()'
+    print 'Starting Get_DENSITY_Per_Project_Map_08_B()'
 
     # Set variables
-    wkg_fgdb = os.path.dirname(parcels_joined_fc)
+    wkg_fgdb = os.path.dirname(fc_to_process)
+
+    # Set field names
+    density_fld   = 'DENSITY'
+    unconstrained_density_fld = 'Unconstrained_DENSITY'
 
 
+    print('  Processing FC at:\n    {}'.format(fc_to_process))
 
     #---------------------------------------------------------------------------
     #              Add field to hold UNCONSTRAINED DENSITY
@@ -1185,7 +1222,7 @@ def Get_DENSITY_Per_Project_w_GP_CD(parcels_joined_fc, PDS_HOUSING_MODEL_CONSTRA
     field_name = unconstrained_density_fld
     field_type = 'DOUBLE'
     print '    [{}] as a:  {}'.format(field_name, field_type)
-    arcpy.AddField_management(parcels_joined_fc, field_name, field_type)
+    arcpy.AddField_management(fc_to_process, field_name, field_type)
 
 
     #---------------------------------------------------------------------------
@@ -1193,7 +1230,7 @@ def Get_DENSITY_Per_Project_w_GP_CD(parcels_joined_fc, PDS_HOUSING_MODEL_CONSTRA
     # Get the code from the FC and then get the correct value from the dictionary
     print '\n  Calculating [{}] field based on the GP Dictionary provided at the beginning of this script'.format(unconstrained_density_fld)
     fields = [gp_code_fld, unconstrained_density_fld]
-    with arcpy.da.UpdateCursor(parcels_joined_fc, fields) as cursor:
+    with arcpy.da.UpdateCursor(fc_to_process, fields) as cursor:
         for row in cursor:
             gp_code = row[0]  # GP Code from the FC
 
@@ -1215,11 +1252,11 @@ def Get_DENSITY_Per_Project_w_GP_CD(parcels_joined_fc, PDS_HOUSING_MODEL_CONSTRA
     dissolve_fields = [record_id_fld, gp_code_fld, unconstrained_density_fld]
 
     dissolve_fc     = os.path.join(wkg_fgdb, 'Parcels_County_joined_diss')
-    print '\n  Dissolving FC:\n    {}\n  To:\n    {}\n  On Fields:'.format(parcels_joined_fc, dissolve_fc)
+    print '\n  Dissolving FC:\n    {}\n  To:\n    {}\n  On Fields:'.format(fc_to_process, dissolve_fc)
     for f in dissolve_fields:
         print '    {}'.format(f)
 
-    arcpy.Dissolve_management(parcels_joined_fc, dissolve_fc, dissolve_fields, '#', 'SINGLE_PART')
+    arcpy.Dissolve_management(fc_to_process, dissolve_fc, dissolve_fields, '#', 'SINGLE_PART')
 
 
     # Delete any records with -99 density
@@ -1243,8 +1280,15 @@ def Get_DENSITY_Per_Project_w_GP_CD(parcels_joined_fc, PDS_HOUSING_MODEL_CONSTRA
     print('\n  Intersecting Dissolved Data w/ Housing Model:')
 
     # Intersect the two FC's
-    in_features = [dissolve_fc, PDS_HOUSING_MODEL_CONSTRAINTS]
-    intersect_fc = os.path.join(wkg_fgdb, '{}_HOUSING_int'.format(os.path.basename(dissolve_fc)))
+    in_features = [dissolve_fc, MODEL_CONSTRAINTS]
+
+    # Set the name of the Intersected data based on which Model we are using
+    if MODEL_CONSTRAINTS.endswith('NO_FCI'):
+        intersect_fc = os.path.join(wkg_fgdb, '{}_HOUSING_NO_FCI_int'.format(os.path.basename(dissolve_fc)))
+    else:
+        intersect_fc = os.path.join(wkg_fgdb, '{}_HOUSING_int'.format(os.path.basename(dissolve_fc)))
+
+
     print '\n    Intersecting:'
     for fc in in_features:
         print '      {}'.format(fc)
@@ -1257,7 +1301,7 @@ def Get_DENSITY_Per_Project_w_GP_CD(parcels_joined_fc, PDS_HOUSING_MODEL_CONSTRA
     #---------------------------------------------------------------------------
     #              Get a list of fields we want to dissolve on
 
-    # Get a list of the 'GPMAX' fields from PDS_HOUSING_MODEL_CONSTRAINTS
+    # Get a list of the 'GPMAX' fields from MODEL_CONSTRAINTS
     dissolve_fields = [f.name for f in arcpy.ListFields(intersect_fc, 'GPMAX*')]
 
     # Add the fields from the County Extract we want to keep
@@ -1289,7 +1333,7 @@ def Get_DENSITY_Per_Project_w_GP_CD(parcels_joined_fc, PDS_HOUSING_MODEL_CONSTRA
 
     print ('\n  Calculating DENSITY Field in FC:\n    {}\n'.format(FINAL_fc))
 
-    # Get a list of the 'GPMAX' fields from PDS_HOUSING_MODEL_CONSTRAINTS
+    # Get a list of the 'GPMAX' fields from MODEL_CONSTRAINTS
     gp_max_fields = [f.name for f in arcpy.ListFields(FINAL_fc, 'GPMAX*')]
 
     # Get a list of GPCODE values from the dictionary gen_plan_dict
@@ -1325,7 +1369,8 @@ def Get_DENSITY_Per_Project_w_GP_CD(parcels_joined_fc, PDS_HOUSING_MODEL_CONSTRA
     arcpy.DeleteField_management(FINAL_fc, gp_max_fields)  # Comment this out if need to QA/QC manually
 
 
-    print('\nFinished Get_DENSITY_Per_Project_w_GP_CD()')
+    #---------------------------------------------------------------------------
+    print('\nFinished Get_DENSITY_Per_Project_Map_08_B()')
     return
 
 

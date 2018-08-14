@@ -68,9 +68,10 @@ def main():
 
 
     # Set field names
-    apn_fld           = 'PARCEL_NBR'
-    record_id_fld     = 'RECORD_ID'
-    du_fld            = 'DWP'
+    apn_fld       = 'PARCEL_NBR'
+    record_id_fld = 'RECORD_ID'
+    proj_name_fld = 'PROJECT_NAME'
+    du_fld        = 'DWP'
 
 
     # Misc variables
@@ -286,7 +287,7 @@ def main():
     #---------------------------------------------------------------------------
     if success == True:
         try:
-            Get_DENSITY_Per_Project(parcels_joined_fc, record_id_fld, du_fld)
+            Get_DENSITY_Per_Project(parcels_joined_fc, record_id_fld, proj_name_fld, du_fld)
 
         except Exception as e:
             success = False
@@ -923,116 +924,54 @@ def Remove_FieldName_Prefix(fc_or_table, prefix_to_remove):
 
 #-------------------------------------------------------------------------------
 #-------------------------------------------------------------------------------
-def Get_DENSITY_Per_Project(fc_to_process, record_id_fld, du_fld):
+def Get_DENSITY_Per_Project(fc_to_process, record_id_fld, proj_name_fld, du_fld):
     """
     The main goal of this function is to find the DENSITY of each project
 
     This function:
-      Adds fields
-      Calculates them to find the field [DENSITY]
-      Dissolves to the Project level (record_id_fld)
-      Cleans up the data
+
+      Dissolves the fc_to_process to the wkg_fgdb (This gets rid of any stacked
+        parcels or PARCELS_ALL and PARCELS_HISTORICAL overlap in the same project)
+
+      Cleans up the dissolve_fc if there are any nulls in the DU or RECORD_ID
+        fields
+
+      Add fields
+
+      Calculate fields
+
+      Explode to single-part
     """
+
     print '\n------------------------------------------------------------------'
     print 'Starting Get_DENSITY_Per_Project()'
     print '  Processing FC at:\n    {}\n'.format(fc_to_process)
 
+    # Get the working FGDB based off of the path for 'fc_to_process'
     wkg_fgdb = os.path.dirname(fc_to_process)
 
     # Set the names of the fields to be added
-    parcel_acres_fld    = 'Parcel_Acres'
-    project_acres_fld   = 'Project_Acres'
-    density_fld         = 'DENSITY'
-
-
-    #---------------------------------------------------------------------------
-    #                  Get a list of unique RECORD_IDs
-    print '  Getting list of all RECORD_IDs:'
-    project_ids = []
-    with arcpy.da.SearchCursor(fc_to_process, [record_id_fld]) as cursor:
-        for row in cursor:
-            project_ids.append(row[0])
-    del cursor
-
-    # Get a list of all the UNIQUE ID's
-    # set() returns a list of only unique values
-    unique_project_ids = sorted(set(project_ids))
-    print '    There are "{}" unique Record IDs\n'.format(len(unique_project_ids))
-
-
-    #---------------------------------------------------------------------------
-    #                  Add fields to hold calculations
-    print '  Adding fields:'
-
-    fields_to_add = [parcel_acres_fld, project_acres_fld, density_fld]
-
-    for field_name in fields_to_add:
-        field_type = 'DOUBLE'
-        print '    [{}] as a:  {}'.format(field_name, field_type)
-        arcpy.AddField_management(fc_to_process, field_name, field_type)
-
-
-    #---------------------------------------------------------------------------
-    #                  Calculate fields to find DENSITY
-
-    # Repair geometry to ensure correct geometry calculation below
-    print '\n  Repairing Geometry before performing area calculations below'
-    arcpy.RepairGeometry_management(fc_to_process)
-
-
-    # Calc Acres for each Parcel
-    expression      = '!shape.area@acres!'
-    expression_type = 'PYTHON_9.3'
-
-    print '\n  Calculating field:\n    [{}] = {}\n'.format(parcel_acres_fld, expression)
-    arcpy.CalculateField_management(fc_to_process, parcel_acres_fld, expression, expression_type)
-
-
-    # Calc Total Project Acres for each Project
-    print '  Calculating field [{}] to equal the total acreage of each project'.format(project_acres_fld)
-    for project in unique_project_ids:
-
-        ##print '  Calculating total acreage of project:  {}'.format(project)  # For testing
-
-        # Get the acreage of the project
-        total_project_acres = 0
-
-        where_clause = "{} = '{}'".format(record_id_fld, project)
-        fields       = [record_id_fld, parcel_acres_fld, project_acres_fld]
-        with arcpy.da.SearchCursor(fc_to_process, fields, where_clause) as cursor:
-            for row in cursor:
-                acres = row[1]
-                total_project_acres = (total_project_acres + acres)
-
-        ##print '    Total Project Acres:  {}\n'.format(total_project_acres)  # For testing
-        del cursor
-
-        # Set the acreage of the project into the fc
-        where_clause = "{} = '{}'".format(record_id_fld, project)
-        fields       = [record_id_fld, project_acres_fld]
-        with arcpy.da.UpdateCursor(fc_to_process, fields, where_clause) as cursor:
-            for row in cursor:
-                row[1] = total_project_acres
-                cursor.updateRow(row)
-        del cursor
-
-
-    # Calc DENSITY designation for each Project
-    expression = "!{}!/!{}!".format(du_fld, project_acres_fld)
-    print '\n  Calculating field:\n    [{}] = {}\n'.format(density_fld, expression)
-    arcpy.CalculateField_management(fc_to_process, density_fld, expression, expression_type)
+    project_acres_fld = 'Project_Acres'
+    density_fld       = 'DENSITY'
 
 
     #---------------------------------------------------------------------------
     #                  Dissolve to the project level
-    dissolve_fields = [record_id_fld, du_fld, project_acres_fld, density_fld]
-    dissolve_fc     = os.path.join(wkg_fgdb, 'Parcels_Applicant_joined_diss_READY2MERGE')
+    # We want one row per project for the density calculation, so we want 'MULTI_PART'
+
+    dissolve_fields = [record_id_fld, proj_name_fld, du_fld]
+    dissolve_fc     = os.path.join(wkg_fgdb, 'Parcels_Applicant_joined_diss')
     print '\n  Dissolving FC:\n    {}\n  On Fields:'.format(fc_to_process)
     for f in dissolve_fields:
         print '    {}'.format(f)
     print '  To create FC:\n    {}'.format(dissolve_fc)
 
-    arcpy.Dissolve_management(fc_to_process, dissolve_fc, dissolve_fields, '#', 'SINGLE_PART')
+    arcpy.Dissolve_management(fc_to_process, dissolve_fc, dissolve_fields, '#', 'MULTI_PART')
+
+
+    # Repair geometry to ensure correct geometry calculation below
+    print '\n  Repairing Geometry before performing area calculations below'
+    arcpy.RepairGeometry_management(dissolve_fc)
 
 
     #---------------------------------------------------------------------------
@@ -1072,7 +1011,52 @@ def Get_DENSITY_Per_Project(fc_to_process, record_id_fld, du_fld):
         print '    OK! No records missing a value in the Record ID field'
     arcpy.Delete_management(missing_record_id_lyr)
 
+
+    #---------------------------------------------------------------------------
+    #                  Add fields to hold calculations
+    print '\n\n  Adding fields:'
+
+    fields_to_add = [project_acres_fld, density_fld]
+
+    for field_name in fields_to_add:
+        field_type = 'DOUBLE'
+        print '    [{}] as a:  {}'.format(field_name, field_type)
+        arcpy.AddField_management(dissolve_fc, field_name, field_type)
+
+
+    #---------------------------------------------------------------------------
+    #                  Calculate fields to find DENSITY
+
+    # Calc Acres for each row
+    expression      = '!shape.area@acres!'
+    expression_type = 'PYTHON_9.3'
+
+    print '\n  Calculating field:\n    [{}] = {}\n'.format(project_acres_fld, expression)
+    arcpy.CalculateField_management(dissolve_fc, project_acres_fld, expression, expression_type)
+
+
+    # Calc DENSITY designation for each Project
+    expression = "!{}!/!{}!".format(du_fld, project_acres_fld)
+    print '\n  Calculating field:\n    [{}] = {}\n'.format(density_fld, expression)
+    arcpy.CalculateField_management(dissolve_fc, density_fld, expression, expression_type)
+
+
+    #---------------------------------------------------------------------------
+    #            Explode MULTI_PART to SINGLE_PART (for binning script)
+
+    # Explode multipart to singlepart
+    diss_single_part_fc = '{}_expld_READY2MERGE'.format(dissolve_fc)
+    print '  Exploding multipart to single part from:\n    {}\n  To:\n    {}\n'.format(dissolve_fc, diss_single_part_fc)
+    arcpy.MultipartToSinglepart_management(dissolve_fc, diss_single_part_fc)
+
+    # Repair the geometry
+    print '  Repairing geometry at:\n    {}\n'.format(diss_single_part_fc)
+    arcpy.RepairGeometry_management(diss_single_part_fc)
+
+
+    #---------------------------------------------------------------------------
     print '\nFinished Get_DENSITY_Per_Project()'
+    return
 
 
 #-------------------------------------------------------------------------------

@@ -30,10 +30,10 @@ def main():
 
     wkg_fgdb             = '{}\{}'.format(data_folder, 'Bin_Processed_Data.gdb')
 
+
+    # Success / Error file info
     success_error_folder = '{}\Scripts\Source_Code\Success_Error'.format(root_folder)
-
     success_file = '{}\SUCCESS_running_{}.txt'.format(success_error_folder, name_of_script.split('.')[0])
-
     error_file   = '{}\ERROR_running_{}.txt'.format(success_error_folder, name_of_script.split('.')[0])
 
 
@@ -157,26 +157,34 @@ def main():
                             #---------------------------------------------------
                             #                Bin Polygons with a Density Field
                             #---------------------------------------------------
-                            try:
-                                Bin_Polys_w_Density(wkg_fgdb, fc_to_process, prod_binned_fc, GRID_HEX_060_ACRES, shorthand_name, density_fld)
-                                pass
+                            if prod_binned_fc.upper() == 'N/A':  # Don't try to bin if there is "N/A" in the CONTROL_TABLE
+                                print 'INFO. Not Binning this FC because the value in the CONTROL_TABLE is "N/A"'
 
-                            except Exception as e:
-                                success = False
-                                print '\n*** ERROR with Bin_Polys_w_Density() ***'
-                                print str(e)
+                            else:
+                                try:
+                                    Bin_Polys_w_Density(wkg_fgdb, fc_to_process, prod_binned_fc, GRID_HEX_060_ACRES, shorthand_name, density_fld)
+                                    pass
+
+                                except Exception as e:
+                                    success = False
+                                    print '\n*** ERROR with Bin_Polys_w_Density() ***'
+                                    print str(e)
 
 
                             #---------------------------------------------------
                             #       Create CPASG table for Polygons with a Density Field
-                            #---------------------------------------------------
-                            try:
-                                CPASG_Polys_w_Density(wkg_fgdb, fc_to_process, prod_cpasg_tbl, CMTY_PLAN_CN, shorthand_name, density_fld)
+                            #--------------------------------------------------
+                            if prod_cpasg_tbl.upper() == 'N/A':  # Don't try to bin if there is "N/A" in the CONTROL_TABLE
+                                print 'INFO. Not CPASGing this FC because the value in the CONTROL_TABLE is "N/A"'
 
-                            except Exception as e:
-                                success = False
-                                print '\n*** ERROR with CPASG_Polys_w_Density() ***'
-                                print str(e)
+                            else:
+                                try:
+                                    CPASG_Polys_w_Density(wkg_fgdb, fc_to_process, prod_cpasg_tbl, CMTY_PLAN_CN, shorthand_name, density_fld)
+
+                                except Exception as e:
+                                    success = False
+                                    print '\n*** ERROR with CPASG_Polys_w_Density() ***'
+                                    print str(e)
 
 
                     #-----------------------------------------------------------
@@ -205,25 +213,33 @@ def main():
                             #---------------------------------------------------
                             #                Bin Points with a Unit Count Field
                             #---------------------------------------------------
-                            try:
-                                Bin_Points_w_UnitCount(wkg_fgdb, fc_to_process, prod_binned_fc, GRID_HEX_060_ACRES, shorthand_name, unit_count_fld)
+                            if prod_binned_fc.upper() == 'N/A':  # Don't try to bin if there is "N/A" in the CONTROL_TABLE
+                                print 'INFO. Not Binning this FC because the value in the CONTROL_TABLE is "N/A"'
 
-                            except Exception as e:
-                                success = False
-                                print '\n*** ERROR with Bin_Points_w_UnitCount() ***'
-                                print str(e)
+                            else:
+                                try:
+                                    Bin_Points_w_UnitCount(wkg_fgdb, fc_to_process, prod_binned_fc, GRID_HEX_060_ACRES, shorthand_name, unit_count_fld)
+
+                                except Exception as e:
+                                    success = False
+                                    print '\n*** ERROR with Bin_Points_w_UnitCount() ***'
+                                    print str(e)
 
 
                             #---------------------------------------------------
                             #    Create CPASG table for Points with a Unit Count Field
                             #---------------------------------------------------
-                            try:
-                                CPASG_Points_w_UnitCount(wkg_fgdb, fc_to_process, prod_cpasg_tbl, CMTY_PLAN_CN, shorthand_name, unit_count_fld)
+                            if prod_cpasg_tbl.upper() == 'N/A':  # Don't try to bin if there is "N/A" in the CONTROL_TABLE
+                                print 'INFO. Not CPASGing this FC because the value in the CONTROL_TABLE is "N/A"'
 
-                            except Exception as e:
-                                success = False
-                                print '\n*** ERROR with CPASG_Points_w_UnitCount() ***'
-                                print str(e)
+                            else:
+                                try:
+                                    CPASG_Points_w_UnitCount(wkg_fgdb, fc_to_process, prod_cpasg_tbl, CMTY_PLAN_CN, shorthand_name, unit_count_fld)
+
+                                except Exception as e:
+                                    success = False
+                                    print '\n*** ERROR with CPASG_Points_w_UnitCount() ***'
+                                    print str(e)
 
                 print '\n\n----------------------------------------------------'
                 print '----------------------------------------------------'
@@ -523,7 +539,7 @@ def Bin_Polys_w_Density(wkg_fgdb, fc_to_bin, prod_binned_fc, GRID_HEX_060_ACRES,
     #---------------------------------------------------------------------------
     #         Delete the prod data and append the working data to prod
 
-    print '  Get working data to prod:'
+    print '\n  Get working data to prod:'
 
     print '\n    Deleting features at:\n      {}'.format(prod_binned_fc)
     arcpy.DeleteFeatures_management(prod_binned_fc)
@@ -711,7 +727,7 @@ def CPASG_Polys_w_Density(wkg_fgdb, fc_to_make_cpasg_tbl, prod_cpasg_tbl, CMTY_P
     #---------------------------------------------------------------------------
     #         Delete the prod data and append the working data to prod
 
-    print '  Get working data to prod:'
+    print '\n  Get working data to prod:'
 
     print '\n    Deleting rows at:\n      {}'.format(prod_cpasg_tbl)
     arcpy.DeleteRows_management(prod_cpasg_tbl)
