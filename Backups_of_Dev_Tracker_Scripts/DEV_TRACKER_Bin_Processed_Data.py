@@ -63,13 +63,13 @@ def main():
         os.mkdir(log_file_folder)
 
     # Turn all 'print' statements into a log-writing object
-    try:
-        log_file = r'{}\{}'.format(log_file_folder, name_of_script.split('.')[0])
-        orig_stdout, log_file_date, dt_to_append = Write_Print_To_Log(log_file, name_of_script)
-    except Exception as e:
-        success = False
-        print '\n*** ERROR with Write_Print_To_Log() ***'
-        print str(e)
+##    try:
+##        log_file = r'{}\{}'.format(log_file_folder, name_of_script.split('.')[0])
+##        orig_stdout, log_file_date, dt_to_append = Write_Print_To_Log(log_file, name_of_script)
+##    except Exception as e:
+##        success = False
+##        print '\n*** ERROR with Write_Print_To_Log() ***'
+##        print str(e)
 
 
     #---------------------------------------------------------------------------
@@ -280,7 +280,7 @@ def main():
     # End of script reporting
     print 'Successfully ran script = {}'.format(success)
     time.sleep(3)
-    sys.stdout = orig_stdout
+##    sys.stdout = orig_stdout
     sys.stdout.flush()
 
     if success == True:
@@ -288,7 +288,7 @@ def main():
     else:
         print '\n*** ERROR with {} ***'.format(name_of_script)
 
-    print 'Please find log file at:\n  {}\n'.format(log_file_date)
+##    print 'Please find log file at:\n  {}\n'.format(log_file_date)
     print '\nSuccess = {}'.format(success)
 
 

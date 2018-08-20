@@ -5,9 +5,9 @@
 POLYGONS/DENSITY Data Processing
 
 To merge the data from the following scripts:
-  ...Map_08_A.py (Applicant Initiated, In Process GPAs)
+  DEV_TRACKER_Process_Approved_DU_Map_04.py
 and
-  ...Map_08_B.py (County Initiated, In Process GPAs)
+  DEV_TRACKER_Process_In_Process_DU_Map_07.py
 
 then find the delta between:
   The merged data
@@ -36,7 +36,7 @@ def main():
     #---------------------------------------------------------------------------
 
     # Set name to give outputs for this script
-    shorthand_name    = 'In_Process_GPA_Map_08_C'
+    shorthand_name    = 'GP_Delta_Map_09'
 
 
     # Name of this script
@@ -44,19 +44,17 @@ def main():
 
 
     # Paths to folders and local FGDBs
-    root_folder       = r'P:\20180510_development_tracker\DEV'
+    root_folder          = r'P:\20180510_development_tracker\DEV'
 
-    log_file_folder   = '{}\{}\{}'.format(root_folder, 'Scripts', 'Logs')
+    log_file_folder      = '{}\{}\{}'.format(root_folder, 'Scripts', 'Logs')
 
-    data_folder       = '{}\{}'.format(root_folder, 'Data')
+    data_folder          = '{}\{}'.format(root_folder, 'Data')
 
-    wkg_fgdb          = '{}\{}'.format(data_folder, '{}.gdb'.format(shorthand_name))
+    wkg_fgdb             = '{}\{}'.format(data_folder, '{}.gdb'.format(shorthand_name))
 
-    applicant_GPAs_fc     = '{}\{}\{}'.format(data_folder, 'In_Process_GPA_Map_08_A.gdb', 'Parcels_Applicant_joined_diss_expld_READY2MERGE')
+    approved_DU_Map_04   = '{}\{}\{}'.format(data_folder, 'Approved_DU_Map_04.gdb', 'Parcels_joined_diss_expld_READY2BIN')
 
-    county_GPAs_w_FCI_fc  = '{}\{}\{}'.format(data_folder, 'In_Process_GPA_Map_08_B.gdb', 'Parcels_County_joined_diss_HOUSING_int_diss_READY2MERGE')
-
-    county_GPAs_NO_FCI_fc = '{}\{}\{}'.format(data_folder, 'In_Process_GPA_Map_08_B.gdb', 'Parcels_County_joined_diss_HOUSING_NO_FCI_int_diss_READY2MERGE')
+    in_process_DU_Map_07 = '{}\{}\{}'.format(data_folder, 'In_Process_DU_Map_07.gdb', 'Parcels_joined_diss_expld_READY2BIN')
 
 
     # Success / Error file info
@@ -67,12 +65,11 @@ def main():
 
     # Paths to SDE Feature Classes
     sde_connection_file = r'P:\20180510_development_tracker\DEV\Scripts\Connection_Files\AD@ATLANTIC@SDE.sde'
-    MODEL_OUTPUT_w_FCI       = r'{}\SDE.SANGIS.PDS_HOUSING_MODEL_OUTPUT_2011'.format(sde_connection_file)
-    MODEL_OUTPUT_NO_FCI      = r'{}\SDE.SANGIS.PDS_HOUSING_MODEL_OUTPUT_2011_NO_FCI'.format(sde_connection_file)
+    MODEL_OUTPUT        = r'{}\SDE.SANGIS.PDS_HOUSING_MODEL_OUTPUT_2011'.format(sde_connection_file)
+
 
     # Set field names
     record_id_fld = 'RECORD_ID'
-    gp_code_fld   = 'GPCODE95'
     density_fld   = 'DENSITY'
     housing_model_density_fld = 'EFFECTIVE_DENSITY'
 
@@ -98,14 +95,14 @@ def main():
         print 'NOTICE, log file folder does not exist, creating it now\n'
         os.mkdir(log_file_folder)
 
-    # Turn all 'print' statements into a log-writing object
-    try:
-        log_file = r'{}\{}'.format(log_file_folder, name_of_script.split('.')[0])
-        orig_stdout, log_file_date, dt_to_append = Write_Print_To_Log(log_file, name_of_script)
-    except Exception as e:
-        success = False
-        print '\n*** ERROR with Write_Print_To_Log() ***'
-        print str(e)
+##    # Turn all 'print' statements into a log-writing object
+##    try:
+##        log_file = r'{}\{}'.format(log_file_folder, name_of_script.split('.')[0])
+##        orig_stdout, log_file_date, dt_to_append = Write_Print_To_Log(log_file, name_of_script)
+##    except Exception as e:
+##        success = False
+##        print '\n*** ERROR with Write_Print_To_Log() ***'
+##        print str(e)
 
 
     #---------------------------------------------------------------------------
@@ -141,12 +138,11 @@ def main():
 
 
     #---------------------------------------------------------------------------
-    #       Find any Overlaps between the Applicant GPA and County GPA
-    # (No need to test both County FC's (w/ FCI and NO FCI) b/c they are the same footprint)
+    #       Find any Overlaps between the Approved and In Process DU's
     #---------------------------------------------------------------------------
     if success == True:
         try:
-            data_pass_QAQC_tests = Find_Overlaps(wkg_fgdb, applicant_GPAs_fc, county_GPAs_w_FCI_fc, record_id_fld)
+            data_pass_QAQC_tests = Find_Overlaps(wkg_fgdb, approved_DU_Map_04, in_process_DU_Map_07, record_id_fld)
 
         except Exception as e:
             success = False
@@ -155,20 +151,13 @@ def main():
 
 
     #---------------------------------------------------------------------------
-    #---------------------------------------------------------------------------
-    #                     PROCESS WITH FCI CONSTRAINTS
-    #---------------------------------------------------------------------------
-    #---------------------------------------------------------------------------
-    print('\nProcessing with FCI constraints')
-
-    #---------------------------------------------------------------------------
-    #               Merge the Applicant and County GPAs
+    #               Merge the Approved and In Process DU's
     #---------------------------------------------------------------------------
     if success == True:
         try:
             # Merge the Applicant GPA and County GPA
-            in_features = [applicant_GPAs_fc, county_GPAs_w_FCI_fc]
-            merged_fc = os.path.join(wkg_fgdb, 'In_Process_ALL_GPAs_w_FCI')
+            in_features = [approved_DU_Map_04, in_process_DU_Map_07]
+            merged_fc = os.path.join(wkg_fgdb, 'Aprovd_InProces_merge')
             print('\n---------------------------------------------------------')
             print 'Merging:'
             for f in in_features:
@@ -183,54 +172,12 @@ def main():
 
 
     #---------------------------------------------------------------------------
-    #           Intersect the Merged GPAs with the Housing Model Output
+    #           Intersect the Merged DUs with the Housing Model Output
     #---------------------------------------------------------------------------
     if success == True:
         try:
             int_fc_name = '{}_HOUSING_OUTPUT_int'.format(os.path.basename(merged_fc))
-            Find_Density_Delta(merged_fc, density_fld, MODEL_OUTPUT_w_FCI, housing_model_density_fld, int_fc_name, record_id_fld)
-
-        except Exception as e:
-            success = False
-            print '\n*** ERROR with Find_Density_Delta() ***'
-            print str(e)
-
-
-    #---------------------------------------------------------------------------
-    #---------------------------------------------------------------------------
-    #                     PROCESS WITH NO FCI CONSTRAINTS
-    #---------------------------------------------------------------------------
-    #---------------------------------------------------------------------------
-    print('\nProcessing with NO FCI constraints')
-
-    #---------------------------------------------------------------------------
-    #               Merge the Applicant and County GPAs
-    #---------------------------------------------------------------------------
-    if success == True:
-        try:
-            # Merge the Applicant GPA and County GPA
-            in_features = [applicant_GPAs_fc, county_GPAs_NO_FCI_fc]
-            merged_fc = os.path.join(wkg_fgdb, 'In_Process_ALL_GPAs_NO_FCI')
-            print('\n---------------------------------------------------------')
-            print 'Merging:'
-            for f in in_features:
-                print '  {}'.format(f)
-            print 'To create:\n  {}\n'.format(merged_fc)
-            arcpy.Merge_management(in_features, merged_fc)
-
-        except Exception as e:
-            success = False
-            print '\n*** ERROR with Merging FCs ***'
-            print str(e)
-
-
-    #---------------------------------------------------------------------------
-    #           Intersect the Merged GPAs with the Housing Model Output
-    #---------------------------------------------------------------------------
-    if success == True:
-        try:
-            int_fc_name = '{}_HOUSING_OUTPUT_int'.format(os.path.basename(merged_fc))
-            Find_Density_Delta(merged_fc, density_fld, MODEL_OUTPUT_w_FCI, housing_model_density_fld, int_fc_name, record_id_fld)
+            Find_Density_Delta(merged_fc, density_fld, MODEL_OUTPUT, housing_model_density_fld, int_fc_name, record_id_fld)
 
         except Exception as e:
             success = False
@@ -275,7 +222,7 @@ def main():
     print 'Data passed QA/QC tests = {}'.format(data_pass_QAQC_tests)
     print 'Successfully ran script = {}'.format(success)
     time.sleep(3)
-    sys.stdout = orig_stdout
+##    sys.stdout = orig_stdout
     sys.stdout.flush()
 
     if success == True:
@@ -283,7 +230,7 @@ def main():
     else:
         print '\n*** ERROR with {} ***'.format(name_of_script)
 
-    print 'Please find log file at:\n  {}\n'.format(log_file_date)
+##    print 'Please find log file at:\n  {}\n'.format(log_file_date)
     print '\nSuccess = {}'.format(success)
 
 
@@ -391,7 +338,7 @@ def Find_Overlaps(wkg_fgdb, fc_1, fc_2, record_id_fld):
     # Intersect the two FC's to see if there are any overlaps
     print('  Intersect two FCs to see if there are any overlaps:')
     in_features = [fc_1, fc_2]
-    intersect_fc = os.path.join(wkg_fgdb, 'Applicant_County_int')
+    intersect_fc = os.path.join(wkg_fgdb, 'Aprovd_InProces_int')
     print '\n    Intersecting:'
     for fc in in_features:
         print '      {}'.format(fc)

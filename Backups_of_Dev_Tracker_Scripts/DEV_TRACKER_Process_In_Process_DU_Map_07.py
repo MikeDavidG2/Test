@@ -59,10 +59,10 @@ def main():
 
     wkg_fgdb          = '{}\{}'.format(data_folder, '{}.gdb'.format(shorthand_name))
 
+
+    # Success / Error file info
     success_error_folder = '{}\Scripts\Source_Code\Success_Error'.format(root_folder)
-
     success_file = '{}\SUCCESS_running_{}.txt'.format(success_error_folder, name_of_script.split('.')[0])
-
     error_file   = '{}\ERROR_running_{}.txt'.format(success_error_folder, name_of_script.split('.')[0])
 
 
