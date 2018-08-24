@@ -14,6 +14,13 @@ then find the delta between:
 with
   The original housing model (From Map 01)
 
+Intent to show the Approved and In Process DU's above/below the estimated capacity
+(HOUSING_MODEL_OUTPUT).
+
+This script uses the 'READY2BIN' data from both the Map 04 script and the Map 07 script
+Therefore this script should only be run if map 04 and 07 have been sucessfully
+run.
+
 
 The output should be polygons with a density field named [DENSITY]
 """
@@ -95,14 +102,14 @@ def main():
         print 'NOTICE, log file folder does not exist, creating it now\n'
         os.mkdir(log_file_folder)
 
-##    # Turn all 'print' statements into a log-writing object
-##    try:
-##        log_file = r'{}\{}'.format(log_file_folder, name_of_script.split('.')[0])
-##        orig_stdout, log_file_date, dt_to_append = Write_Print_To_Log(log_file, name_of_script)
-##    except Exception as e:
-##        success = False
-##        print '\n*** ERROR with Write_Print_To_Log() ***'
-##        print str(e)
+    # Turn all 'print' statements into a log-writing object
+    try:
+        log_file = r'{}\{}'.format(log_file_folder, name_of_script.split('.')[0])
+        orig_stdout, log_file_date, dt_to_append = Write_Print_To_Log(log_file, name_of_script)
+    except Exception as e:
+        success = False
+        print '\n*** ERROR with Write_Print_To_Log() ***'
+        print str(e)
 
 
     #---------------------------------------------------------------------------
@@ -222,7 +229,7 @@ def main():
     print 'Data passed QA/QC tests = {}'.format(data_pass_QAQC_tests)
     print 'Successfully ran script = {}'.format(success)
     time.sleep(3)
-##    sys.stdout = orig_stdout
+    sys.stdout = orig_stdout
     sys.stdout.flush()
 
     if success == True:
@@ -230,7 +237,7 @@ def main():
     else:
         print '\n*** ERROR with {} ***'.format(name_of_script)
 
-##    print 'Please find log file at:\n  {}\n'.format(log_file_date)
+    print 'Please find log file at:\n  {}\n'.format(log_file_date)
     print '\nSuccess = {}'.format(success)
 
 

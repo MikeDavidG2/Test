@@ -5,9 +5,9 @@
 POLYGONS/DENSITY Data Processing
 
 To merge the data from the following scripts:
-  ...Map_08_A.py (Applicant Initiated, In Process GPAs)
+  ...Map_08_A.py (Applicant Initiated, In Process GPA)
 and
-  ...Map_08_B.py (County Initiated, In Process GPAs)
+  ...Map_08_B.py (County Initiated, In Process GPA)
 
 then find the delta between:
   The merged data
@@ -52,11 +52,11 @@ def main():
 
     wkg_fgdb          = '{}\{}'.format(data_folder, '{}.gdb'.format(shorthand_name))
 
-    applicant_GPAs_fc     = '{}\{}\{}'.format(data_folder, 'In_Process_GPA_Map_08_A.gdb', 'Parcels_Applicant_joined_diss_expld_READY2MERGE')
+    applicant_GPA_fc     = '{}\{}\{}'.format(data_folder, 'In_Process_GPA_Map_08_A.gdb', 'Parcels_Applicant_joined_diss_expld_READY2MERGE')
 
-    county_GPAs_w_FCI_fc  = '{}\{}\{}'.format(data_folder, 'In_Process_GPA_Map_08_B.gdb', 'Parcels_County_joined_diss_HOUSING_int_diss_READY2MERGE')
+    county_GPA_w_FCI_fc  = '{}\{}\{}'.format(data_folder, 'In_Process_GPA_Map_08_B.gdb', 'Parcels_County_joined_diss_HOUSING_int_diss_READY2MERGE')
 
-    county_GPAs_NO_FCI_fc = '{}\{}\{}'.format(data_folder, 'In_Process_GPA_Map_08_B.gdb', 'Parcels_County_joined_diss_HOUSING_NO_FCI_int_diss_READY2MERGE')
+    county_GPA_NO_FCI_fc = '{}\{}\{}'.format(data_folder, 'In_Process_GPA_Map_08_B.gdb', 'Parcels_County_joined_diss_HOUSING_NO_FCI_int_diss_READY2MERGE')
 
 
     # Success / Error file info
@@ -146,7 +146,7 @@ def main():
     #---------------------------------------------------------------------------
     if success == True:
         try:
-            data_pass_QAQC_tests = Find_Overlaps(wkg_fgdb, applicant_GPAs_fc, county_GPAs_w_FCI_fc, record_id_fld)
+            data_pass_QAQC_tests = Find_Overlaps(wkg_fgdb, applicant_GPA_fc, county_GPA_w_FCI_fc, record_id_fld)
 
         except Exception as e:
             success = False
@@ -162,13 +162,13 @@ def main():
     print('\nProcessing with FCI constraints')
 
     #---------------------------------------------------------------------------
-    #               Merge the Applicant and County GPAs
+    #               Merge the Applicant and County GPA
     #---------------------------------------------------------------------------
     if success == True:
         try:
             # Merge the Applicant GPA and County GPA
-            in_features = [applicant_GPAs_fc, county_GPAs_w_FCI_fc]
-            merged_fc = os.path.join(wkg_fgdb, 'In_Process_ALL_GPAs_w_FCI')
+            in_features = [applicant_GPA_fc, county_GPA_w_FCI_fc]
+            merged_fc = os.path.join(wkg_fgdb, 'In_Process_ALL_GPA_w_FCI')
             print('\n---------------------------------------------------------')
             print 'Merging:'
             for f in in_features:
@@ -183,7 +183,7 @@ def main():
 
 
     #---------------------------------------------------------------------------
-    #           Intersect the Merged GPAs with the Housing Model Output
+    #           Intersect the Merged GPA with the Housing Model Output
     #---------------------------------------------------------------------------
     if success == True:
         try:
@@ -204,13 +204,13 @@ def main():
     print('\nProcessing with NO FCI constraints')
 
     #---------------------------------------------------------------------------
-    #               Merge the Applicant and County GPAs
+    #               Merge the Applicant and County GPA
     #---------------------------------------------------------------------------
     if success == True:
         try:
             # Merge the Applicant GPA and County GPA
-            in_features = [applicant_GPAs_fc, county_GPAs_NO_FCI_fc]
-            merged_fc = os.path.join(wkg_fgdb, 'In_Process_ALL_GPAs_NO_FCI')
+            in_features = [applicant_GPA_fc, county_GPA_NO_FCI_fc]
+            merged_fc = os.path.join(wkg_fgdb, 'In_Process_ALL_GPA_NO_FCI')
             print('\n---------------------------------------------------------')
             print 'Merging:'
             for f in in_features:
@@ -225,7 +225,7 @@ def main():
 
 
     #---------------------------------------------------------------------------
-    #           Intersect the Merged GPAs with the Housing Model Output
+    #           Intersect the Merged GPA with the Housing Model Output
     #---------------------------------------------------------------------------
     if success == True:
         try:

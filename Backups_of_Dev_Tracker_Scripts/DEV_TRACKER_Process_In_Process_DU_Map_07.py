@@ -187,15 +187,22 @@ def main():
 
     #---------------------------------------------------------------------------
     #          Do not process any rows where [INACTIVE] = 'Y'
+    if success == True:
+        try:
+            print '------------------------------------------------------------'
+            # Create a Feature Layer with the where_clause
+            where_clause = "INACTIVE = 'Y'"
+            print('\nDeleting rows where: "{}" in FC:\n  {}\n'.format(where_clause, csv_table))
+            arcpy.MakeTableView_management(csv_table, 'lyr', where_clause)
 
-    # Create a Feature Layer with the where_clause
-    where_clause = "INACTIVE = 'Y'"
-    print('Deleting rows where: "{}" in FC:\n  {}\n'.format(where_clause, csv_table))
-    arcpy.MakeFeatureLayer_management(csv_table, 'lyr', where_clause)
+            arcpy.DeleteRows_management('lyr')  # Delete the rows
 
-    arcpy.DeleteRows_management('lyr')  # Delete the rows
+            arcpy.Delete_management('lyr')  # Delete the layer
 
-    arcpy.Delete_management('lyr')  # Delete the layer
+        except Exception as e:
+            success = False
+            print '\n*** ERROR with Deleting rows ***'
+            print str(e)
 
 
     #---------------------------------------------------------------------------
