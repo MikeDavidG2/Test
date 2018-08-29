@@ -20,7 +20,7 @@ The output should be points with a quantity field named [UNIT_COUNT]
 # Licence:     <your licence>
 #-------------------------------------------------------------------------------
 
-import arcpy, os, datetime, shutil
+import arcpy, os, datetime, shutil, ConfigParser, time, sys
 
 arcpy.env.overwriteOutput = True
 
@@ -39,13 +39,46 @@ def main():
     name_of_script = 'DEV_TRACKER_Process_{}.py'.format(shorthand_name)
 
 
+    #---------------------------------------------------------------------------
+    #---------------------------------------------------------------------------
+    #                   Use cfgFile to set the below variables
+
+    # Find a connection to the config file
+    # You can set multiple config files (to easily move this script to another network)
+    # Recommended (A = BLUE network) and (B = COUNTY network)
+    cfgFile_A     = r"P:\20180510_development_tracker\DEV\Scripts\Config_Files\DEV_TRACKER_Main_Config_File.ini"
+    cfgFile_B     = r"D:\DEV_TRACKER\PROD\Scripts\Config_Files\DEV_TRACKER_Main_Config_File.ini"
+
+    if os.path.exists(cfgFile_A):
+        cfgFile = cfgFile_A  # Use config file A
+
+    elif os.path.exists(cfgFile_B):
+        cfgFile = cfgFile_B  # Use config file B
+
+    else:
+        print("*** ERROR! cannot find valid INI file ***\nMake sure a valid INI file exists at:\n  {}\nOR:\n  {}".format(cfgFile_A, cfgFile_B))
+        print 'You may have to change the name/location of the INI file,\nOR change the variable in this script.'
+        success = False
+        time.sleep(10)
+        return  # Stop the script
+
+    if os.path.isfile(cfgFile):
+        print 'Using INI file found at:\n  {}\n'.format(cfgFile)
+        config = ConfigParser.ConfigParser()
+        config.read(cfgFile)
+
+
+    # Get variables from .ini file
+    root_folder                = config.get('Paths_Local',   'Root_Folder')
+    folder_with_formatted_csvs = config.get('Paths_Local',   'Folder_With_Formatted_CSVs')
+    prod_SDE_conn_file         = config.get('Prod_SDE_Info', 'Prod_SDE_Conn_File')
+    prod_SDE_prefix            = config.get('Prod_SDE_Info', 'Prod_SDE_Prefix')
+
+
+    #---------------------------------------------------------------------------
     # Paths to folders and local FGDBs
-    folder_with_csvs  = r"P:\20180510_development_tracker\tables\CSV_Extract_20180726"
     name_of_csv       = 'Existing Dwelling Units (2011 General Plan Forward) (Map 3 & Map 11).csv'
-    path_to_csv       = os.path.join(folder_with_csvs, name_of_csv)
-
-
-    root_folder       = r'P:\20180510_development_tracker\DEV'
+    path_to_csv       = os.path.join(folder_with_formatted_csvs, name_of_csv)
 
     log_file_folder   = '{}\{}\{}'.format(root_folder, 'Scripts', 'Logs')
 
@@ -55,16 +88,16 @@ def main():
 
     wkg_fgdb          = '{}\{}'.format(data_folder, '{}.gdb'.format(shorthand_name))
 
+
+    # Success / Error file info
     success_error_folder = '{}\Scripts\Source_Code\Success_Error'.format(root_folder)
-
     success_file = '{}\SUCCESS_running_{}.txt'.format(success_error_folder, name_of_script.split('.')[0])
-
     error_file   = '{}\ERROR_running_{}.txt'.format(success_error_folder, name_of_script.split('.')[0])
 
 
     # Paths to SDE Feature Classes
-    PARCELS_HISTORICAL = r'P:\20180510_development_tracker\DEV\Scripts\Connection_Files\AD@ATLANTIC@SDE.sde\SDE.SANGIS.PARCEL_HISTORICAL'
-    PARCELS_ALL        = r'P:\20180510_development_tracker\DEV\Scripts\Connection_Files\AD@ATLANTIC@SDE.sde\SDE.SANGIS.PARCELS_ALL'
+    PARCELS_ALL       = os.path.join(prod_SDE_conn_file, prod_SDE_prefix + 'PARCELS_ALL')
+    PARCEL_HISTORICAL = os.path.join(prod_SDE_conn_file, prod_SDE_prefix + 'PARCEL_HISTORICAL')
 
 
     # Set Field names from the CSV
@@ -165,7 +198,7 @@ def main():
     #-------------------------------------------------------------------
 
     try:
-        Find_And_Fix_Invalid_XYs(csv_table, wkg_fgdb, PARCELS_HISTORICAL, PARCELS_ALL, apn_fld, x_fld, y_fld)
+        Find_And_Fix_Invalid_XYs(csv_table, wkg_fgdb, PARCEL_HISTORICAL, PARCELS_ALL, apn_fld, x_fld, y_fld)
 
     except Exception as e:
         success = False
@@ -359,18 +392,18 @@ def Get_DT_To_Append():
 #-------------------------------------------------------------------------------
 #-------------------------------------------------------------------------------
 #                             FUNCTION: Find_And_Fix_Invalid_XYs()
-def Find_And_Fix_Invalid_XYs(csv_table, wkg_fgdb, PARCELS_HISTORICAL, PARCELS_ALL, apn_fld, x_fld, y_fld):
+def Find_And_Fix_Invalid_XYs(csv_table, wkg_fgdb, PARCEL_HISTORICAL, PARCELS_ALL, apn_fld, x_fld, y_fld):
     """
       csv_table (str): Full path to the table with the XY fields to be validated
         and populated if invalid.
       wkg_fgdb (str): Full path to the working FGDB.
-      PARCELS_HISTORICAL (str): Full path to the PARCELS_HISTORICAL FC in SDE.
+      PARCEL_HISTORICAL (str): Full path to the PARCEL_HISTORICAL FC in SDE.
       PARCELS_ALL (str): Full path to the PARCELS_ALL FC (This may be a subset
         of the SDE FC in order to increase performance).
       apn_fld (str): Name of the field with the APN values.  This field
         MUST BE A STRING FIELD. If this field has dashes "-", it is OK because
         this function will strip them out so that they can be joined
-        to the PARCELS_HISTORICAL, and PARCELS_ALL Feature Classes.
+        to the PARCEL_HISTORICAL, and PARCELS_ALL Feature Classes.
       x_fld (str): Name of the field with the X values.
       y_fld (str): Name of the field with the Y values.
 
@@ -422,14 +455,14 @@ def Find_And_Fix_Invalid_XYs(csv_table, wkg_fgdb, PARCELS_HISTORICAL, PARCELS_AL
         arcpy.CreateFeatureclass_management(wkg_fgdb, out_name, 'POLYGON', PARCELS_ALL, '', '', spatial_reference)
 
         #-----------------------------------------------------------------------
-        #         First try to find the missing XYs in PARCELS_HISTORICAL
+        #         First try to find the missing XYs in PARCEL_HISTORICAL
         print '\n  ------------------------------------------------------------'
-        print '  Finding any APNs with invalid XY in PARCELS_HISTORICAL:'
+        print '  Finding any APNs with invalid XY in PARCEL_HISTORICAL:'
 
         # Make layer to make selections
-        arcpy.MakeFeatureLayer_management(PARCELS_HISTORICAL, 'par_hist_lyr')
+        arcpy.MakeFeatureLayer_management(PARCEL_HISTORICAL, 'par_hist_lyr')
 
-        # Loop through all APNs with invalid XYs, select them in PARCELS_HISTORICAL and append to missing_xy_fc
+        # Loop through all APNs with invalid XYs, select them in PARCEL_HISTORICAL and append to missing_xy_fc
         for apn in apns_w_invalid_xy:
             where_clause = "APN = '{}'".format(apn)
             arcpy.SelectLayerByAttribute_management('par_hist_lyr', 'ADD_TO_SELECTION', where_clause)
@@ -437,9 +470,9 @@ def Find_And_Fix_Invalid_XYs(csv_table, wkg_fgdb, PARCELS_HISTORICAL, PARCELS_AL
         count = Get_Count_Selected('par_hist_lyr')
 
         if count == 0:
-            print '    There were 0 APNs found in PARCELS_HISTORICAL, nothing to append'
+            print '    There were 0 APNs found in PARCEL_HISTORICAL, nothing to append'
         else:
-            print '    Appending "{}" records from PARCELS_HISTORICAL to:\n      {}'.format(count, missing_xy_fc)
+            print '    Appending "{}" records from PARCEL_HISTORICAL to:\n      {}'.format(count, missing_xy_fc)
             arcpy.Append_management('par_hist_lyr', missing_xy_fc, 'NO_TEST')
 
 
@@ -507,7 +540,7 @@ def QA_QC(csv_table, record_id_fld, apn_fld, x_fld, y_fld):
     data_pass_QAQC_tests = True
 
     #---------------------------------------------------------------------------
-    # 1)  Which APNs from the CSV were not found in PARCELS_ALL or PARCELS_HISTORICAL?
+    # 1)  Which APNs from the CSV were not found in PARCELS_ALL or PARCEL_HISTORICAL?
     print '\n  1) Finding which APNs still have invalid XYs:\n'
 
     # Get list of any parcels that do not have a valid XY in the Imported Table
@@ -542,7 +575,7 @@ def QA_QC(csv_table, record_id_fld, apn_fld, x_fld, y_fld):
     else:
         data_pass_QAQC_tests = False
         print '    WARNING! There were still "{}" APNs with invalid XYs'.format(len(apns_w_invalid_xy))
-        print '    These APNs do not have XY information, and are not found in PARCELS_ALL or PARCELS_HISTORICAL'
+        print '    These APNs do not have XY information, and are not found in PARCELS_ALL or PARCEL_HISTORICAL'
         print '    These APNs cannot-therefore-be mapped and will not appear in the point Feature Class'
         print '    See below for list of records with invalid XYs:'
 

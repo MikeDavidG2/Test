@@ -23,7 +23,7 @@ any "In-Process" DU's)
 # Copyright:   (c) mgrue 2018
 # Licence:     <your licence>
 #-------------------------------------------------------------------------------
-import arcpy, os, math, datetime
+import arcpy, os, math, datetime, ConfigParser, sys, time
 
 arcpy.env.overwriteOutput = True
 
@@ -41,9 +41,47 @@ def main():
     name_of_script = 'DEV_TRACKER_Process_{}.py'.format(shorthand_name)
 
 
-    # Paths to folders and local FGDBs
-    root_folder       = r'P:\20180510_development_tracker\DEV'
+    #---------------------------------------------------------------------------
+    #---------------------------------------------------------------------------
+    #                   Use cfgFile to set the below variables
 
+    # Find a connection to the config file
+    # You can set multiple config files (to easily move this script to another network)
+    # Recommended (A = BLUE network) and (B = COUNTY network)
+    cfgFile_A     = r"P:\20180510_development_tracker\DEV\Scripts\Config_Files\DEV_TRACKER_Main_Config_File.ini"
+    cfgFile_B     = r"D:\DEV_TRACKER\PROD\Scripts\Config_Files\DEV_TRACKER_Main_Config_File.ini"
+
+    if os.path.exists(cfgFile_A):
+        cfgFile = cfgFile_A  # Use config file A
+
+    elif os.path.exists(cfgFile_B):
+        cfgFile = cfgFile_B  # Use config file B
+
+    else:
+        print("*** ERROR! cannot find valid INI file ***\nMake sure a valid INI file exists at:\n  {}\nOR:\n  {}".format(cfgFile_A, cfgFile_B))
+        print 'You may have to change the name/location of the INI file,\nOR change the variable in this script.'
+        success = False
+        time.sleep(10)
+        return  # Stop the script
+
+    if os.path.isfile(cfgFile):
+        print 'Using INI file found at:\n  {}\n'.format(cfgFile)
+        config = ConfigParser.ConfigParser()
+        config.read(cfgFile)
+
+
+    # Get variables from .ini file
+    root_folder                = config.get('Paths_Local',   'Root_Folder')
+    folder_with_formatted_csvs = config.get('Paths_Local',   'Folder_With_Formatted_CSVs')
+    prod_SDE_conn_file         = config.get('Prod_SDE_Info', 'Prod_SDE_Conn_File')
+    prod_SDE_prefix            = config.get('Prod_SDE_Info', 'Prod_SDE_Prefix')
+    edit_SDE_conn_File         = config.get('Edit_SDE_Info', 'Edit_SDE_Conn_File')
+    edit_SDE_prefix            = config.get('Edit_SDE_Info', 'Edit_SDE_Prefix')
+    edit_SDE_fds               = config.get('Edit_SDE_Info', 'Edit_SDE_FDS')
+
+
+    #---------------------------------------------------------------------------
+    # Paths to folders and local FGDBs
     log_file_folder   = '{}\{}\{}'.format(root_folder, 'Scripts', 'Logs')
 
     data_folder       = '{}\{}'.format(root_folder, 'Data')
@@ -77,52 +115,50 @@ def main():
     #                         Set HEXBIN Variables
 
     # Paths to SDE Feature Classes
-    GRID_HEX_060_ACRES               = r'P:\20180510_development_tracker\DEV\Scripts\Connection_Files\AD@ATLANTIC@SDE.sde\SDE.SANGIS.GRID_HEX_060_ACRES'
-    gp_allowed_map_01_hex_fc         = r'P:\20180510_development_tracker\DEV\Scripts\Connection_Files\AD@ATLANTIC@SDW.sde\SDW.PDS.PDS_DEV_TRACKER\SDW.PDS.PDS_DEV_TRACKER_GP_Allowed_2011_HEXBIN'
-    approved_gpa_map_02_hex_fc       = r'P:\20180510_development_tracker\DEV\Scripts\Connection_Files\AD@ATLANTIC@SDW.sde\SDW.PDS.PDS_DEV_TRACKER\SDW.PDS.PDS_DEV_TRACKER_APPROVED_GPA_HEXBIN'
-    annex_aquitns_map_12_hex_fc      = r'P:\20180510_development_tracker\DEV\Scripts\Connection_Files\AD@ATLANTIC@SDW.sde\SDW.PDS.PDS_DEV_TRACKER\SDW.PDS.PDS_DEV_TRACKER_Annexation_Acquisitions_HEXBIN'
-    existing_du_map_03_hex_fc        = r'P:\20180510_development_tracker\DEV\Scripts\Connection_Files\AD@ATLANTIC@SDW.sde\SDW.PDS.PDS_DEV_TRACKER\SDW.PDS.PDS_DEV_TRACKER_Existing_DU_Map_03_HEXBIN'
-    approved_du_map_04_hex_fc        = r'P:\20180510_development_tracker\DEV\Scripts\Connection_Files\AD@ATLANTIC@SDW.sde\SDW.PDS.PDS_DEV_TRACKER\SDW.PDS.PDS_DEV_TRACKER_Approved_DU_Map_04_HEXBIN'
+    GRID_HEX_060_ACRES               = os.path.join(prod_SDE_conn_file, prod_SDE_prefix + 'GRID_HEX_060_ACRES')
+    gp_allowed_map_01_hex_fc         = os.path.join(edit_SDE_conn_File, edit_SDE_prefix + edit_SDE_fds, edit_SDE_prefix + 'PDS_DEV_TRACKER_Map_01_GP_Allowed_2011_HEXBIN')
+    approved_gpa_map_02_hex_fc       = os.path.join(edit_SDE_conn_File, edit_SDE_prefix + edit_SDE_fds, edit_SDE_prefix + 'PDS_DEV_TRACKER_Map_02_Approved_GPA_HEXBIN')
+    annex_aquitns_map_12_hex_fc      = os.path.join(edit_SDE_conn_File, edit_SDE_prefix + edit_SDE_fds, edit_SDE_prefix + 'PDS_DEV_TRACKER_Map_12_Annex_Aquitns_HEXBIN')
+    existing_du_map_03_hex_fc        = os.path.join(edit_SDE_conn_File, edit_SDE_prefix + edit_SDE_fds, edit_SDE_prefix + 'PDS_DEV_TRACKER_Map_03_Existing_DU_HEXBIN')
+    approved_du_map_04_hex_fc        = os.path.join(edit_SDE_conn_File, edit_SDE_prefix + edit_SDE_fds, edit_SDE_prefix + 'PDS_DEV_TRACKER_Map_04_Approved_DU_HEXBIN')
 
 
     # Set field names of existing data (exst)
     hexbin_id_exst_fld                     = 'HEXAGONID'
     gp_allowed_map_01_exst_hex_fld         = 'TOTAL_2011_UNITS'
-    approved_gpa_map_02_exst_hex_fld       = 'FUTURE_UNITS_DELTA'
-    annex_aquitns_map_12_exst_hex_fld      = 'DELTA_UNITS'
+    approved_gpa_map_02_exst_hex_fld       = 'VALUE_Approved_GPA_Map_02'
+    annex_aquitns_map_12_exst_hex_fld      = 'VALUE_Annex_Aquitns_Map_12'
     existing_du_map_03_exst_hex_fld        = 'VALUE_Existing_DU_Map_03'
     approved_du_map_04_exst_hex_fld        = 'VALUE_Approved_DU_Map_04'
 
 
     # SDE HEXBIN FC to be updated
-    prod_binned_fc                   = r'P:\20180510_development_tracker\DEV\Scripts\Connection_Files\AD@ATLANTIC@SDW.sde\SDW.PDS.PDS_DEV_TRACKER\SDW.PDS.PDS_DEV_TRACKER_Curnt_Dev_Potentl_Map_06_HEXBIN'
+    prod_binned_fc                   = os.path.join(edit_SDE_conn_File, edit_SDE_prefix + edit_SDE_fds, edit_SDE_prefix + 'PDS_DEV_TRACKER_Map_06_Curnt_Dev_Potentl_HEXBIN')
 
     #---------------------------------------------------------------------------
     #                         Set CPASG Variables
 
     # Paths to SDE Tables
-    CMTY_PLAN_CN                        = r'P:\20180510_development_tracker\DEV\Scripts\Connection_Files\AD@ATLANTIC@SDE.sde\SDE.SANGIS.CMTY_PLAN_CN'
-    gp_allowed_map_01_cpasg_tbl         = r'P:\20180510_development_tracker\DEV\Scripts\Connection_Files\AD@ATLANTIC@SDW.sde\SDW.PDS.PDS_DEV_TRACKER_GP_Allowed_2011_CPASG'
-    approved_gpa_map_02_cpasg_tbl       = r'P:\20180510_development_tracker\DEV\Scripts\Connection_Files\AD@ATLANTIC@SDW.sde\SDW.PDS.PDS_DEV_TRACKER_Approved_GPAs_CPASG'
-    annex_aquitns_map_12_cpasg_tbl      = r'P:\20180510_development_tracker\DEV\Scripts\Connection_Files\AD@ATLANTIC@SDW.sde\SDW.PDS.PDS_DEV_TRACKER_Annexation_Acquisitions_CPASG'
-    existing_du_map_03_cpasg_tbl        = r'P:\20180510_development_tracker\DEV\Scripts\Connection_Files\AD@ATLANTIC@SDW.sde\SDW.PDS.PDS_DEV_TRACKER_Existing_DU_Map_03_CPASG'
-    approved_du_map_04_cpasg_tbl        = r'P:\20180510_development_tracker\DEV\Scripts\Connection_Files\AD@ATLANTIC@SDW.sde\SDW.PDS.PDS_DEV_TRACKER_Approved_DU_Map_04_CPASG'
-    cmpltd_bld_permits_map_11_cpasg_tbl = r'P:\20180510_development_tracker\DEV\Scripts\Connection_Files\AD@ATLANTIC@SDW.sde\SDW.PDS.PDS_DEV_TRACKER_Cmpltd_Bld_Permits_Map_11_CPASG'
+    CMTY_PLAN_CN_2011                   = os.path.join(prod_SDE_conn_file, prod_SDE_prefix + 'CMTY_PLAN_CN_2011')
+    gp_allowed_map_01_cpasg_tbl         = os.path.join(edit_SDE_conn_File, edit_SDE_prefix + 'PDS_DEV_TRACKER_Map_01_GP_Allowed_2011_CPASG')
+    approved_gpa_map_02_cpasg_tbl       = os.path.join(edit_SDE_conn_File, edit_SDE_prefix + 'PDS_DEV_TRACKER_Map_02_Approved_GPA_CPASG')
+    annex_aquitns_map_12_cpasg_tbl      = os.path.join(edit_SDE_conn_File, edit_SDE_prefix + 'PDS_DEV_TRACKER_Map_12_Annex_Aquitns_CPASG')
+    existing_du_map_03_cpasg_tbl        = os.path.join(edit_SDE_conn_File, edit_SDE_prefix + 'PDS_DEV_TRACKER_Map_03_Existing_DU_CPASG')
+    approved_du_map_04_cpasg_tbl        = os.path.join(edit_SDE_conn_File, edit_SDE_prefix + 'PDS_DEV_TRACKER_Map_04_Approved_DU_CPASG')
 
 
     # Set field names of existing data (exst)
     cmty_plan_id_exst_fld                    = 'CPASG'
-    cmty_plan_label_exst_fld                 = 'CPASG_LABE'
+    cmty_plan_label_exst_fld                 = 'CPASG_LABEL'
     gp_allowed_map_01_exst_cpasg_fld         = 'TOTAL_2011_UNITS'
-    approved_gpa_map_02_exst_cpasg_fld       = 'Value_Approved_GPAs'
-    annex_aquitns_map_12_exst_cpasg_fld      = 'Value_Annexations_Acquisitions'
+    approved_gpa_map_02_exst_cpasg_fld       = 'VALUE_Approved_GPA_Map_02'
+    annex_aquitns_map_12_exst_cpasg_fld      = 'VALUE_Annex_Aquitns_Map_12'
     existing_du_map_03_exst_cpasg_fld        = 'VALUE_Existing_DU_Map_03'
     approved_du_map_04_exst_cpasg_fld        = 'VALUE_Approved_DU_Map_04'
-    cmpltd_bld_permits_map_11_exst_cpasg_fld = 'VALUE_Cmpltd_Bld_Permits_Map_11'
 
 
     # SDE CPASG Table to be updated
-    prod_cpasg_tbl                      = r'P:\20180510_development_tracker\DEV\Scripts\Connection_Files\AD@ATLANTIC@SDW.sde\SDW.PDS.PDS_DEV_TRACKER_Curnt_Dev_Potentl_Map_06_CPASG'
+    prod_cpasg_tbl                      = os.path.join(edit_SDE_conn_File, edit_SDE_prefix + 'PDS_DEV_TRACKER_Map_06_Curnt_Dev_Potentl_CPASG')
 
 
     #---------------------------------------------------------------------------
@@ -325,14 +361,14 @@ def main():
             # Set the path to the hexbin table to be created
             cpasg_tbl = os.path.join(wkg_fgdb, 'CPASG_Table')
 
-            freq_fields = ['CPASG_LABE', 'CPASG']
+            freq_fields = [cmty_plan_label_exst_fld, cmty_plan_id_exst_fld]
 
-            print '\n  Performing Frequency Analysis on FC:\n      {}'.format(CMTY_PLAN_CN)
+            print '\n  Performing Frequency Analysis on FC:\n      {}'.format(CMTY_PLAN_CN_2011)
             print '    Frequency Fields:'
             for f in freq_fields:
                 print '      {}'.format(f)
             print '    To create FC at:\n      {}'.format(cpasg_tbl)
-            arcpy.Frequency_analysis(CMTY_PLAN_CN, cpasg_tbl, freq_fields)
+            arcpy.Frequency_analysis(CMTY_PLAN_CN_2011, cpasg_tbl, freq_fields)
 
 
             # Add the 'Countywide' feature
@@ -343,7 +379,7 @@ def main():
             del cursor
 
 
-            # Change the CPASG_LABE to CPASG_NAME to be consistent with other scripts
+            # Change the CPASG_LABEL to CPASG_NAME to be consistent with other scripts
             old_name = cmty_plan_label_exst_fld
             new_name = 'CPASG_NAME'
             print '\n  Changing Field: "{}"\n  To:  "{}"'.format(old_name, new_name)  # For testing purposes

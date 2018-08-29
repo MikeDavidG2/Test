@@ -15,7 +15,7 @@ with
   The original housing model (From Map 01)
 
 Intent to show the Approved and In Process DU's above/below the estimated capacity
-(HOUSING_MODEL_OUTPUT).
+(PDS_HOUSING_MODEL_OUTPUT_2011).
 
 This script uses the 'READY2BIN' data from both the Map 04 script and the Map 07 script
 Therefore this script should only be run if map 04 and 07 have been sucessfully
@@ -32,7 +32,7 @@ The output should be polygons with a density field named [DENSITY]
 # Licence:     <your licence>
 #-------------------------------------------------------------------------------
 
-import arcpy, os, math, datetime
+import arcpy, os, math, datetime, ConfigParser, sys, time
 
 arcpy.env.overwriteOutput = True
 
@@ -50,9 +50,44 @@ def main():
     name_of_script = 'DEV_TRACKER_Process_{}.py'.format(shorthand_name)
 
 
-    # Paths to folders and local FGDBs
-    root_folder          = r'P:\20180510_development_tracker\DEV'
+    #---------------------------------------------------------------------------
+    #---------------------------------------------------------------------------
+    #                   Use cfgFile to set the below variables
 
+    # Find a connection to the config file
+    # You can set multiple config files (to easily move this script to another network)
+    # Recommended (A = BLUE network) and (B = COUNTY network)
+    cfgFile_A     = r"P:\20180510_development_tracker\DEV\Scripts\Config_Files\DEV_TRACKER_Main_Config_File.ini"
+    cfgFile_B     = r"D:\DEV_TRACKER\PROD\Scripts\Config_Files\DEV_TRACKER_Main_Config_File.ini"
+
+    if os.path.exists(cfgFile_A):
+        cfgFile = cfgFile_A  # Use config file A
+
+    elif os.path.exists(cfgFile_B):
+        cfgFile = cfgFile_B  # Use config file B
+
+    else:
+        print("*** ERROR! cannot find valid INI file ***\nMake sure a valid INI file exists at:\n  {}\nOR:\n  {}".format(cfgFile_A, cfgFile_B))
+        print 'You may have to change the name/location of the INI file,\nOR change the variable in this script.'
+        success = False
+        time.sleep(10)
+        return  # Stop the script
+
+    if os.path.isfile(cfgFile):
+        print 'Using INI file found at:\n  {}\n'.format(cfgFile)
+        config = ConfigParser.ConfigParser()
+        config.read(cfgFile)
+
+
+    # Get variables from .ini file
+    root_folder                = config.get('Paths_Local',   'Root_Folder')
+    folder_with_formatted_csvs = config.get('Paths_Local',   'Folder_With_Formatted_CSVs')
+    prod_SDE_conn_file         = config.get('Prod_SDE_Info', 'Prod_SDE_Conn_File')
+    prod_SDE_prefix            = config.get('Prod_SDE_Info', 'Prod_SDE_Prefix')
+
+
+    #---------------------------------------------------------------------------
+    # Paths to folders and local FGDBs
     log_file_folder      = '{}\{}\{}'.format(root_folder, 'Scripts', 'Logs')
 
     data_folder          = '{}\{}'.format(root_folder, 'Data')
@@ -71,8 +106,7 @@ def main():
 
 
     # Paths to SDE Feature Classes
-    sde_connection_file = r'P:\20180510_development_tracker\DEV\Scripts\Connection_Files\AD@ATLANTIC@SDE.sde'
-    MODEL_OUTPUT        = r'{}\SDE.SANGIS.PDS_HOUSING_MODEL_OUTPUT_2011'.format(sde_connection_file)
+    PDS_HOUSING_MODEL_OUTPUT_2011 = os.path.join(prod_SDE_conn_file, prod_SDE_prefix + 'PDS_HOUSING_MODEL_OUTPUT_2011')
 
 
     # Set field names
@@ -84,12 +118,6 @@ def main():
     # Misc variables
     success = True
     data_pass_QAQC_tests = True
-
-
-    # This is the acreage that an overlap
-    # from two different projects needs to be greater than in order for the
-    # script to flag it as needing human analysis
-    acreage_cutoff_for_overlap = 0.1
 
 
     #---------------------------------------------------------------------------
@@ -184,7 +212,7 @@ def main():
     if success == True:
         try:
             int_fc_name = '{}_HOUSING_OUTPUT_int'.format(os.path.basename(merged_fc))
-            Find_Density_Delta(merged_fc, density_fld, MODEL_OUTPUT, housing_model_density_fld, int_fc_name, record_id_fld)
+            Find_Density_Delta(merged_fc, density_fld, PDS_HOUSING_MODEL_OUTPUT_2011, housing_model_density_fld, int_fc_name, record_id_fld)
 
         except Exception as e:
             success = False

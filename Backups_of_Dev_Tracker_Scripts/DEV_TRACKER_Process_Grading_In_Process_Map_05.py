@@ -19,7 +19,7 @@ The output should be polygons with a density field named [DENSITY]
 # Licence:     <your licence>
 #-------------------------------------------------------------------------------
 
-import arcpy, os, math, datetime
+import arcpy, os, math, datetime, ConfigParser, sys, time
 
 arcpy.env.overwriteOutput = True
 
@@ -37,13 +37,47 @@ def main():
     name_of_script = 'DEV_TRACKER_Process_{}.py'.format(shorthand_name)
 
 
+    #---------------------------------------------------------------------------
+    #---------------------------------------------------------------------------
+    #                   Use cfgFile to set the below variables
+
+    # Find a connection to the config file
+    # You can set multiple config files (to easily move this script to another network)
+    # Recommended (A = BLUE network) and (B = COUNTY network)
+    cfgFile_A     = r"P:\20180510_development_tracker\DEV\Scripts\Config_Files\DEV_TRACKER_Main_Config_File.ini"
+    cfgFile_B     = r"D:\DEV_TRACKER\PROD\Scripts\Config_Files\DEV_TRACKER_Main_Config_File.ini"
+
+    if os.path.exists(cfgFile_A):
+        cfgFile = cfgFile_A  # Use config file A
+
+    elif os.path.exists(cfgFile_B):
+        cfgFile = cfgFile_B  # Use config file B
+
+    else:
+        print("*** ERROR! cannot find valid INI file ***\nMake sure a valid INI file exists at:\n  {}\nOR:\n  {}".format(cfgFile_A, cfgFile_B))
+        print 'You may have to change the name/location of the INI file,\nOR change the variable in this script.'
+        success = False
+        time.sleep(10)
+        return  # Stop the script
+
+    if os.path.isfile(cfgFile):
+        print 'Using INI file found at:\n  {}\n'.format(cfgFile)
+        config = ConfigParser.ConfigParser()
+        config.read(cfgFile)
+
+
+    # Get variables from .ini file
+    root_folder                = config.get('Paths_Local',   'Root_Folder')
+    folder_with_formatted_csvs = config.get('Paths_Local',   'Folder_With_Formatted_CSVs')
+    prod_SDE_conn_file         = config.get('Prod_SDE_Info', 'Prod_SDE_Conn_File')
+    prod_SDE_prefix            = config.get('Prod_SDE_Info', 'Prod_SDE_Prefix')
+
+
+    #---------------------------------------------------------------------------
+
     # Paths to folders and local FGDBs
-    folder_with_csvs  = r"P:\20180510_development_tracker\tables\CSV_Extract_20180726"
     name_of_csv       = 'Dwelling Units - Land Development Grading In-Process (Map 5).csv'
-    path_to_csv       = os.path.join(folder_with_csvs, name_of_csv)
-
-
-    root_folder       = r'P:\20180510_development_tracker\DEV'
+    path_to_csv       = os.path.join(folder_with_formatted_csvs, name_of_csv)
 
     log_file_folder   = '{}\{}\{}'.format(root_folder, 'Scripts', 'Logs')
 
@@ -61,8 +95,8 @@ def main():
 
 
     # Paths to SDE Feature Classes
-    PARCELS_HISTORICAL = r'P:\20180510_development_tracker\DEV\Scripts\Connection_Files\AD@ATLANTIC@SDE.sde\SDE.SANGIS.PARCEL_HISTORICAL'
-    PARCELS_ALL        = r'P:\20180510_development_tracker\DEV\Scripts\Connection_Files\AD@ATLANTIC@SDE.sde\SDE.SANGIS.PARCELS_ALL'
+    PARCELS_ALL       = os.path.join(prod_SDE_conn_file, prod_SDE_prefix + 'PARCELS_ALL')
+    PARCEL_HISTORICAL = os.path.join(prod_SDE_conn_file, prod_SDE_prefix + 'PARCEL_HISTORICAL')
 
 
     # Set field names
@@ -164,7 +198,7 @@ def main():
             print str(e)
 
     #---------------------------------------------------------------------------
-    #         Get the parcels from PARCELS_ALL and PARCELS_HISTORICAL
+    #         Get the parcels from PARCELS_ALL and PARCEL_HISTORICAL
     #---------------------------------------------------------------------------
     if success == True:
         # Get parcels
@@ -174,11 +208,11 @@ def main():
             out_name             = 'From_PARCELS_ALL'
             from_parcels_all_fc  = os.path.join(wkg_fgdb, out_name)
 
-            # Set path for the FC to be created from PARCELS_HISTORICAL
-            out_name             = 'From_PARCELS_HISTORICAL'
+            # Set path for the FC to be created from PARCEL_HISTORICAL
+            out_name             = 'From_PARCEL_HISTORICAL'
             from_parcels_hist_fc = os.path.join(wkg_fgdb, out_name)
 
-            Get_Parcels(csv_table, PARCELS_ALL, PARCELS_HISTORICAL, from_parcels_all_fc, from_parcels_hist_fc, apn_fld)
+            Get_Parcels(csv_table, PARCELS_ALL, PARCEL_HISTORICAL, from_parcels_all_fc, from_parcels_hist_fc, apn_fld)
 
         except Exception as e:
             success = False
@@ -214,17 +248,17 @@ def main():
 
     #---------------------------------------------------------------------------
     #                       Determine if we need to
-    #     merge the FC's 'From_PARCELS_ALL' and 'From_PARCELS_HISTORICAL'
+    #     merge the FC's 'From_PARCELS_ALL' and 'From_PARCEL_HISTORICAL'
     #           or if we only need to work with 'From_PARCELS_ALL'
     #---------------------------------------------------------------------------
     if success == True:
-        if not arcpy.Exists(from_parcels_hist_fc):  # Then there were no parcels from PARCELS_HISTORICAL (nothing to merge)
+        if not arcpy.Exists(from_parcels_hist_fc):  # Then there were no parcels from PARCEL_HISTORICAL (nothing to merge)
 
             # Set that we want to join to the 'From PARCELS_ALL FC' and set the name of the joined FC
             fc_to_be_joined = from_parcels_all_fc
             joined_name     = 'Parcels_ALL_joined'
 
-        else:  # Then there were parcels from PARCELS_HISTORICAL and we want to merge those with parcels from PARCELS_ALL
+        else:  # Then there were parcels from PARCEL_HISTORICAL and we want to merge those with parcels from PARCELS_ALL
 
             # Merge the current and historical parcels
             in_features = [from_parcels_all_fc, from_parcels_hist_fc]
@@ -433,9 +467,9 @@ def Get_DT_To_Append():
 
 #-------------------------------------------------------------------------------
 #-------------------------------------------------------------------------------
-def Get_Parcels(csv_table, PARCELS_ALL, PARCELS_HISTORICAL, from_parcels_all_fc, from_parcels_hist_fc, apn_fld):
+def Get_Parcels(csv_table, PARCELS_ALL, PARCEL_HISTORICAL, from_parcels_all_fc, from_parcels_hist_fc, apn_fld):
     """
-    Get the parcel footprint and tabular data from PARCELS_ALL and PARCELS_HISTORICAL
+    Get the parcel footprint and tabular data from PARCELS_ALL and PARCEL_HISTORICAL
     and select which parcels to export from the csv_table. Save the exports to
     "from_parcels_all_fc" and "from_parcels_hist_fc"
     """
@@ -518,32 +552,32 @@ def Get_Parcels(csv_table, PARCELS_ALL, PARCELS_HISTORICAL, from_parcels_all_fc,
         if apn not in apns_found_in_parcels_all:
             apns_not_found_in_parcels_all.append(apn)
 
-    # Determine if we need to search PARCELS_HISTORICAL
+    # Determine if we need to search PARCEL_HISTORICAL
     if len(apns_not_found_in_parcels_all) == 0:
         search_historic_parcels = False
-        print '    All APNs in table were found in PARCELS_ALL, no need to search PARCELS_HISTORICAL\n'
+        print '    All APNs in table were found in PARCELS_ALL, no need to search PARCEL_HISTORICAL\n'
 
     else:
         search_historic_parcels = True
-        print '    There were "{}" APNs not found in PARCELS_ALL, searching PARCELS_HISTORICAL\n'.format(len(apns_not_found_in_parcels_all))
+        print '    There were "{}" APNs not found in PARCELS_ALL, searching PARCEL_HISTORICAL\n'.format(len(apns_not_found_in_parcels_all))
 
 
     #---------------------------------------------------------------------------
     #---------------------------------------------------------------------------
-    #                           PARCELS_HISTORICAL
-    #          Select from PARCELS_HISTORICAL and export to local FGDB
+    #                           PARCEL_HISTORICAL
+    #          Select from PARCEL_HISTORICAL and export to local FGDB
 
     apns_found_in_parcels_hist = []
     apns_not_found_anywhere = []
 
     if search_historic_parcels == True:
 
-        # Make Feature Layer for PARCELS_HISTORICAL
-        arcpy.MakeFeatureLayer_management(PARCELS_HISTORICAL, 'parcels_historical_lyr')
+        # Make Feature Layer for PARCEL_HISTORICAL
+        arcpy.MakeFeatureLayer_management(PARCEL_HISTORICAL, 'parcels_historical_lyr')
 
-        # Select parcels from PARCELS_HISTORICAL that are in the APN table
+        # Select parcels from PARCEL_HISTORICAL that are in the APN table
         print '  ------------------------------------------------------------------'
-        print '  Selecting parcels from PARCELS_HISTORICAL that are in the APN table:'
+        print '  Selecting parcels from PARCEL_HISTORICAL that are in the APN table:'
         for apn in apns_not_found_in_parcels_all:
 
             where_clause = "APN = '{}'".format(apn)
@@ -556,10 +590,10 @@ def Get_Parcels(csv_table, PARCELS_ALL, PARCELS_HISTORICAL, from_parcels_all_fc,
         # Export the selected parcels (if any)
         if count != 0:
             out_path, out_name = os.path.split(from_parcels_hist_fc)
-            print '  Exporting "{}" selected parcels from PARCELS_HISTORICAL to:\n    {}\{}'.format(count, out_path, out_name)
+            print '  Exporting "{}" selected parcels from PARCEL_HISTORICAL to:\n    {}\{}'.format(count, out_path, out_name)
             arcpy.FeatureClassToFeatureClass_conversion('parcels_historical_lyr', out_path, out_name)
         else:
-            '  No features selected from PARCELS_HISTORICAL'
+            '  No features selected from PARCEL_HISTORICAL'
 
         # Delete the layer with the selection on it
         arcpy.Delete_management('parcels_historical_lyr')
@@ -574,7 +608,7 @@ def Get_APN_Lists(csv_table, from_parcels_all_fc, from_parcels_hist_fc, apn_fld)
     Get and Return lists of:
       All APN's that are in the csv_table
       Unique APN's that were found from PARCELS_ALL
-      Unique APN's that were found from PARCELS_HISTORICAL
+      Unique APN's that were found from PARCEL_HISTORICAL
       Unique APN's that were not found anywhere
     """
     print '\n--------------------------------------------------------------------'
@@ -614,7 +648,7 @@ def Get_APN_Lists(csv_table, from_parcels_all_fc, from_parcels_hist_fc, apn_fld)
     print '    There were "{}" unique parcels found from PARCELS_ALL\n'.format(len(apns_found_in_parcels_all))
 
 
-    # Find unique list of APNs from PARCELS_HISTORICAL
+    # Find unique list of APNs from PARCEL_HISTORICAL
     if arcpy.Exists(from_parcels_hist_fc):
         print '  Getting APNs from FC:\n    {}'.format(from_parcels_hist_fc)
         fields = ['APN']
@@ -625,11 +659,11 @@ def Get_APN_Lists(csv_table, from_parcels_all_fc, from_parcels_hist_fc, apn_fld)
                 if apn not in apns_found_in_parcels_hist:
                     apns_found_in_parcels_hist.append(apn)
         del cursor
-    print '    There were "{}" unique parcels found from PARCELS_HISTORICAL\n'.format(len(apns_found_in_parcels_hist))
+    print '    There were "{}" unique parcels found from PARCEL_HISTORICAL\n'.format(len(apns_found_in_parcels_hist))
 
 
     # Find unique list of APNs not found anywhere
-    print '  Getting APNs that were not found in PARCELS_ALL or PARCELS_HISTORICAL'
+    print '  Getting APNs that were not found in PARCELS_ALL or PARCEL_HISTORICAL'
     for csv_apn in apns_from_imported_csv:
         if (csv_apn not in apns_found_in_parcels_all) and (csv_apn not in apns_found_in_parcels_hist):
             if csv_apn not in apns_not_found_anywhere:
@@ -647,7 +681,7 @@ def Get_APN_Lists(csv_table, from_parcels_all_fc, from_parcels_hist_fc, apn_fld)
 def QA_QC(csv_table, from_parcels_all_fc, from_parcels_hist_fc, apns_from_imported_csv, apns_found_in_parcels_all, apns_found_in_parcels_hist, apns_not_found_anywhere, apn_fld, record_id_fld, du_fld, acreage_cutoff_for_overlap):
     """
     Perform QA/QC on the csv_table.  The below checks are performed:
-      1)  Which APNs from the CSV were not found in PARCELS_ALL or PARCELS_HISTORICAL?
+      1)  Which APNs from the CSV were not found in PARCELS_ALL or PARCEL_HISTORICAL?
       2)  Find if Parcels showed up more than one time in the CSV table
       3)  Is there an overlap with a current parcel and an historic parcel?
       4)  Check any critical fields to ensure there are no blank values
@@ -661,15 +695,15 @@ def QA_QC(csv_table, from_parcels_all_fc, from_parcels_hist_fc, apns_from_import
     data_pass_QAQC_tests = True
 
     #---------------------------------------------------------------------------
-    # 1)  Which APNs from the CSV were not found in PARCELS_ALL or PARCELS_HISTORICAL?
-    print '\n  1) Finding which APNs from the CSV were not found in PARCELS_ALL or PARCELS_HISTORICAL:\n'
+    # 1)  Which APNs from the CSV were not found in PARCELS_ALL or PARCEL_HISTORICAL?
+    print '\n  1) Finding which APNs from the CSV were not found in PARCELS_ALL or PARCEL_HISTORICAL:\n'
 
     if len(apns_not_found_anywhere) == 0:
-        print '\n    OK! All APNs were found in either PARCELS_ALL or PARCELS_HISTORICAL'
+        print '\n    OK! All APNs were found in either PARCELS_ALL or PARCEL_HISTORICAL'
 
     else:
         data_pass_QAQC_tests = False
-        print '    WARNING!  There are "{}" APNs that were not found in PARCELS_ALL or PARCELS_HISTORICAL:'.format(len(apns_not_found_anywhere))
+        print '    WARNING!  There are "{}" APNs that were not found in PARCELS_ALL or PARCEL_HISTORICAL:'.format(len(apns_not_found_anywhere))
         for apn in apns_not_found_anywhere:
             print '      APN:  {}'.format(apn)
 
@@ -721,10 +755,10 @@ def QA_QC(csv_table, from_parcels_all_fc, from_parcels_hist_fc, apns_from_import
     # 3)  Is there an overlap with a current parcel and an historic parcel?
     print '\n\n  3) Finding any overlaps with current parcels and historic parcels:\n'
 
-    # Check to see if any parcels came from PARCELS_HISTORICAL, no need to check
-    #   If there are no parcels from PARCELS_HISTORICAL
+    # Check to see if any parcels came from PARCEL_HISTORICAL, no need to check
+    #   If there are no parcels from PARCEL_HISTORICAL
     if not arcpy.Exists(from_parcels_hist_fc):
-        print '      OK! There were no parcels found in PARCELS_HISTORICAL'
+        print '      OK! There were no parcels found in PARCEL_HISTORICAL'
         print '      Therefore there can be no overlap'
 
     else:  # There might be an overlap, continue checking...
@@ -928,7 +962,7 @@ def Get_DENSITY_Per_Project(fc_to_process, record_id_fld, proj_name_fld, du_fld)
     This function:
 
       Dissolves the fc_to_process to the wkg_fgdb (This gets rid of any stacked
-        parcels or PARCELS_ALL and PARCELS_HISTORICAL overlap in the same project)
+        parcels or PARCELS_ALL and PARCEL_HISTORICAL overlap in the same project)
 
       Cleans up the dissolve_fc if there are any nulls in the DU or RECORD_ID
         fields

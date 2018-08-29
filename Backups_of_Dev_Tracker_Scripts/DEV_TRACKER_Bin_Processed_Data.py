@@ -8,7 +8,7 @@
 # Copyright:   (c) mgrue 2018
 # Licence:     <your licence>
 #-------------------------------------------------------------------------------
-import arcpy, os, math
+import arcpy, os, math, ConfigParser, time, sys
 arcpy.env.overwriteOutput = True
 
 def main():
@@ -21,14 +21,50 @@ def main():
     name_of_script = 'DEV_TRACKER_Bin_Processed_Data.py'
 
 
+    #---------------------------------------------------------------------------
+    #---------------------------------------------------------------------------
+    #                   Use cfgFile to set the below variables
+
+    # Find a connection to the config file
+    # You can set multiple config files (to easily move this script to another network)
+    # Recommended (A = BLUE network) and (B = COUNTY network)
+    cfgFile_A     = r"P:\20180510_development_tracker\DEV\Scripts\Config_Files\DEV_TRACKER_Main_Config_File.ini"
+    cfgFile_B     = r"D:\DEV_TRACKER\PROD\Scripts\Config_Files\DEV_TRACKER_Main_Config_File.ini"
+
+    if os.path.exists(cfgFile_A):
+        cfgFile = cfgFile_A  # Use config file A
+
+    elif os.path.exists(cfgFile_B):
+        cfgFile = cfgFile_B  # Use config file B
+
+    else:
+        print("*** ERROR! cannot find valid INI file ***\nMake sure a valid INI file exists at:\n  {}\nOR:\n  {}".format(cfgFile_A, cfgFile_B))
+        print 'You may have to change the name/location of the INI file,\nOR change the variable in this script.'
+        success = False
+        time.sleep(10)
+        return  # Stop the script
+
+    if os.path.isfile(cfgFile):
+        print 'Using INI file found at:\n  {}\n'.format(cfgFile)
+        config = ConfigParser.ConfigParser()
+        config.read(cfgFile)
+
+
+    # Get variables from .ini file
+    root_folder                = config.get('Paths_Local',   'Root_Folder')
+    folder_with_formatted_csvs = config.get('Paths_Local',   'Folder_With_Formatted_CSVs')
+    prod_SDE_conn_file         = config.get('Prod_SDE_Info', 'Prod_SDE_Conn_File')
+    prod_SDE_prefix            = config.get('Prod_SDE_Info', 'Prod_SDE_Prefix')
+    edit_SDE_conn_File         = config.get('Edit_SDE_Info', 'Edit_SDE_Conn_File')
+    edit_SDE_prefix            = config.get('Edit_SDE_Info', 'Edit_SDE_Prefix')
+
+    #---------------------------------------------------------------------------
     # Paths to folders and local FGDBs
-    root_folder          = r'P:\20180510_development_tracker\DEV'
+    log_file_folder = '{}\{}\{}'.format(root_folder, 'Scripts', 'Logs')
 
-    log_file_folder      = '{}\{}\{}'.format(root_folder, 'Scripts', 'Logs')
+    data_folder     = '{}\{}'.format(root_folder, 'Data')
 
-    data_folder          = '{}\{}'.format(root_folder, 'Data')
-
-    wkg_fgdb             = '{}\{}'.format(data_folder, 'Bin_Processed_Data.gdb')
+    wkg_fgdb        = '{}\{}'.format(data_folder, 'Bin_Processed_Data.gdb')
 
 
     # Success / Error file info
@@ -38,9 +74,9 @@ def main():
 
 
     # Paths to SDE Feature Classes
-    CONTROL_TABLE      = r'P:\20180510_development_tracker\DEV\Scripts\Connection_Files\AD@ATLANTIC@SDW.sde\SDW.PDS.PDS_DEV_TRACKER_BINNING_CONTROL_TABLE'
-    GRID_HEX_060_ACRES = r'P:\20180510_development_tracker\DEV\Scripts\Connection_Files\AD@ATLANTIC@SDE.sde\SDE.SANGIS.GRID_HEX_060_ACRES'
-    CMTY_PLAN_CN       = r'P:\20180510_development_tracker\DEV\Scripts\Connection_Files\AD@ATLANTIC@SDE.sde\SDE.SANGIS.CMTY_PLAN_CN'
+    BINNING_CONTROL_TABLE      = os.path.join(edit_SDE_conn_File, edit_SDE_prefix + 'PDS_DEV_TRACKER_BINNING_CONTROL_TABLE')
+    GRID_HEX_060_ACRES = os.path.join(prod_SDE_conn_file, prod_SDE_prefix + 'GRID_HEX_060_ACRES')
+    CMTY_PLAN_CN_2011       = os.path.join(prod_SDE_conn_file, prod_SDE_prefix + 'CMTY_PLAN_CN_2011')
 
 
     # Set Field names
@@ -103,146 +139,163 @@ def main():
         print str(e)
 
 
+    #---------------------------------------------------------------------------
+    #                 Bin / CPASG all FC's in BINNING_CONTROL_TABLE
+    #                   And deliver to correct FC in Edit SDE
+    #---------------------------------------------------------------------------
     if success == True:
-        #-----------------------------------------------------------------------
-        #                 Get Variables for each FC to Bin
-        #-----------------------------------------------------------------------
-        print '----------------------------------------------------------------'
-        print '----------------------------------------------------------------'
-        fields = ['PATH_TO_FC_TO_PROCESS', 'SHORTHAND_NAME', 'PROD_BINNED_FC', 'PROD_CPASG_TBL']
-        with arcpy.da.SearchCursor(CONTROL_TABLE, fields) as cursor:
-            for row in cursor:
-                fc_to_process  = row[0]
-                shorthand_name = row[1]
-                prod_binned_fc = row[2]
-                prod_cpasg_tbl = row[3]
-
-                print 'Processing: "{}"\n'.format(os.path.basename(fc_to_process))
-                print 'Path to FC to Bin:\n  {}'.format(fc_to_process)
-
-                if not arcpy.Exists(fc_to_process):
-                    success = False
-                    print '\nERROR! That FC does not exist\n'
-
-                else:
-                    # Find if the fc_to_process is a 'Polygon' or a 'Point'
-                    desc = arcpy.Describe(fc_to_process)
-                    shape_type = desc.shapeType
-                    print '\nShape type = "{}"\n'.format(shape_type)
+        try:
+            #-------------------------------------------------------------------
+            #                 Get Variables for each FC to Bin
+            #-------------------------------------------------------------------
+            print '------------------------------------------------------------'
+            print '------------------------------------------------------------'
+            print 'Get Variables for each FC to Bin from BINNING_CONTROL_TABLE at:\n  {}'.format(BINNING_CONTROL_TABLE)
+            fields = ['PROCESS', 'PATH_TO_FC_TO_PROCESS', 'SHORTHAND_NAME', 'PROD_BINNED_FC', 'PROD_CPASG_TBL']
+            with arcpy.da.SearchCursor(BINNING_CONTROL_TABLE, fields) as cursor:
+                for row in cursor:
+                    process        = (row[0]).capitalize()  # Make sure the value is capitalized for test later
+                    fc_to_process  = row[1]
+                    shorthand_name = row[2]
+                    prod_binned_fc = row[3]
+                    prod_cpasg_tbl = row[4]
 
 
-                    #-----------------------------------------------------------
-                    #-----------------------------------------------------------
-                    #                       Process if Polygon
-                    #-----------------------------------------------------------
-                    # If it is a 'Polygon' make sure that it has the density_fld field
-                    if shape_type == 'Polygon':
-                        print 'Confirming Polygon has field: [{}]'.format(density_fld)
+                    print '\n\n------------------------------------------------'
+                    print '------------------------------------------------'
+                    print 'Processing: "{}"'.format(os.path.basename(fc_to_process))
+                    print '\nPath to FC to Bin:\n  {}'.format(fc_to_process)
 
-                        field_names = [f.name for f in arcpy.ListFields(fc_to_process)]
+                    if not arcpy.Exists(fc_to_process):
+                        success = False
+                        print '\nERROR! That FC does not exist\n'
 
-                        if density_fld in field_names:
-                            valid_polygon = True
-                            print '  OK! Polygon has required field\n'
-                        else:
-                            valid_polygon = False
-                            success = False
-                            print '  ERROR!  This FC is a "{}", but it does not have the field: "{}'.format(shape_type, density_fld)
-                            print '  It cannot--therefore--be processed\n'
+                    elif process != 'Yes':
+                        print('\nINFO.  Not processing FC because the BINNING_CONTROL_TABLE has [PROCESS] = "{}".'.format(process))
+                        print('  Change this FCs value to "Yes" to process this FC')
+
+                    else:
+                        # Find if the fc_to_process is a 'Polygon' or a 'Point'
+                        desc = arcpy.Describe(fc_to_process)
+                        shape_type = desc.shapeType
+                        print '\nShape type = "{}"\n'.format(shape_type)
 
 
                         #-------------------------------------------------------
-                        # Process valid Polygons
-                        if valid_polygon == True:
-                            #---------------------------------------------------
-                            #                Bin Polygons with a Density Field
-                            #---------------------------------------------------
-                            if prod_binned_fc.upper() == 'N/A':  # Don't try to bin if there is "N/A" in the CONTROL_TABLE
-                                print 'INFO. Not Binning this FC because the value in the CONTROL_TABLE is "N/A"'
+                        #-------------------------------------------------------
+                        #                       Process if Polygon
+                        #-------------------------------------------------------
+                        # If it is a 'Polygon' make sure that it has the density_fld field
+                        if shape_type == 'Polygon':
+                            print 'Confirming Polygon has field: [{}]'.format(density_fld)
 
+                            field_names = [f.name for f in arcpy.ListFields(fc_to_process)]
+
+                            if density_fld in field_names:
+                                valid_polygon = True
+                                print '  OK! Polygon has required field\n'
                             else:
-                                try:
-                                    Bin_Polys_w_Density(wkg_fgdb, fc_to_process, prod_binned_fc, GRID_HEX_060_ACRES, shorthand_name, density_fld)
-                                    pass
-
-                                except Exception as e:
-                                    success = False
-                                    print '\n*** ERROR with Bin_Polys_w_Density() ***'
-                                    print str(e)
+                                valid_polygon = False
+                                success = False
+                                print '  ERROR!  This FC is a "{}", but it does not have the field: "{}'.format(shape_type, density_fld)
+                                print '  It cannot--therefore--be processed\n'
 
 
                             #---------------------------------------------------
-                            #       Create CPASG table for Polygons with a Density Field
-                            #--------------------------------------------------
-                            if prod_cpasg_tbl.upper() == 'N/A':  # Don't try to bin if there is "N/A" in the CONTROL_TABLE
-                                print 'INFO. Not CPASGing this FC because the value in the CONTROL_TABLE is "N/A"'
+                            # Process valid Polygons
+                            if valid_polygon == True:
+                                #-----------------------------------------------
+                                #                Bin Polygons with a Density Field
+                                #-----------------------------------------------
+                                if prod_binned_fc.upper() == 'N/A':  # Don't try to bin if there is "N/A" in the BINNING_CONTROL_TABLE
+                                    print 'INFO. Not Binning this FC because the value in the BINNING_CONTROL_TABLE is "N/A"'
 
-                            else:
-                                try:
-                                    CPASG_Polys_w_Density(wkg_fgdb, fc_to_process, prod_cpasg_tbl, CMTY_PLAN_CN, shorthand_name, density_fld)
+                                else:
+                                    try:
+                                        Bin_Polys_w_Density(wkg_fgdb, fc_to_process, prod_binned_fc, GRID_HEX_060_ACRES, shorthand_name, density_fld)
+                                        pass
 
-                                except Exception as e:
-                                    success = False
-                                    print '\n*** ERROR with CPASG_Polys_w_Density() ***'
-                                    print str(e)
+                                    except Exception as e:
+                                        success = False
+                                        print '\n*** ERROR with Bin_Polys_w_Density() ***'
+                                        print str(e)
 
 
-                    #-----------------------------------------------------------
-                    #-----------------------------------------------------------
-                    #                        Process if Point
-                    #-----------------------------------------------------------
-                    # If it is a 'Point' make sure that it has the unit_count_fld field
-                    if shape_type == 'Point':
-                        print 'Confirming Point has field: [{}]'.format(unit_count_fld)
+                                #-----------------------------------------------
+                                #       Create CPASG table for Polygons with a Density Field
+                                #-----------------------------------------------
+                                if prod_cpasg_tbl.upper() == 'N/A':  # Don't try to bin if there is "N/A" in the BINNING_CONTROL_TABLE
+                                    print 'INFO. Not CPASGing this FC because the value in the BINNING_CONTROL_TABLE is "N/A"'
 
-                        field_names = [f.name for f in arcpy.ListFields(fc_to_process)]
+                                else:
+                                    try:
+                                        CPASG_Polys_w_Density(wkg_fgdb, fc_to_process, prod_cpasg_tbl, CMTY_PLAN_CN_2011, shorthand_name, density_fld)
 
-                        if unit_count_fld in field_names:
-                            valid_point = True
-                            print '  OK! Point has required field\n'
-                        else:
-                            valid_point = False
-                            success = False
-                            print '  ERROR!  This FC is a "{}", but it does not have the field: "{}"'.format(shape_type, unit_count_fld)
-                            print '  It cannot--therefore--be processed\n'
+                                    except Exception as e:
+                                        success = False
+                                        print '\n*** ERROR with CPASG_Polys_w_Density() ***'
+                                        print str(e)
 
 
                         #-------------------------------------------------------
-                        # Process valid Points
-                        if valid_point == True:
-                            #---------------------------------------------------
-                            #                Bin Points with a Unit Count Field
-                            #---------------------------------------------------
-                            if prod_binned_fc.upper() == 'N/A':  # Don't try to bin if there is "N/A" in the CONTROL_TABLE
-                                print 'INFO. Not Binning this FC because the value in the CONTROL_TABLE is "N/A"'
+                        #-------------------------------------------------------
+                        #                        Process if Point
+                        #-------------------------------------------------------
+                        # If it is a 'Point' make sure that it has the unit_count_fld field
+                        if shape_type == 'Point':
+                            print 'Confirming Point has field: [{}]'.format(unit_count_fld)
 
+                            field_names = [f.name for f in arcpy.ListFields(fc_to_process)]
+
+                            if unit_count_fld in field_names:
+                                valid_point = True
+                                print '  OK! Point has required field\n'
                             else:
-                                try:
-                                    Bin_Points_w_UnitCount(wkg_fgdb, fc_to_process, prod_binned_fc, GRID_HEX_060_ACRES, shorthand_name, unit_count_fld)
-
-                                except Exception as e:
-                                    success = False
-                                    print '\n*** ERROR with Bin_Points_w_UnitCount() ***'
-                                    print str(e)
+                                valid_point = False
+                                success = False
+                                print '  ERROR!  This FC is a "{}", but it does not have the field: "{}"'.format(shape_type, unit_count_fld)
+                                print '  It cannot--therefore--be processed\n'
 
 
                             #---------------------------------------------------
-                            #    Create CPASG table for Points with a Unit Count Field
-                            #---------------------------------------------------
-                            if prod_cpasg_tbl.upper() == 'N/A':  # Don't try to bin if there is "N/A" in the CONTROL_TABLE
-                                print 'INFO. Not CPASGing this FC because the value in the CONTROL_TABLE is "N/A"'
+                            # Process valid Points
+                            if valid_point == True:
+                                #-----------------------------------------------
+                                #                Bin Points with a Unit Count Field
+                                #-----------------------------------------------
+                                if prod_binned_fc.upper() == 'N/A':  # Don't try to bin if there is "N/A" in the BINNING_CONTROL_TABLE
+                                    print 'INFO. Not Binning this FC because the value in the BINNING_CONTROL_TABLE is "N/A"'
 
-                            else:
-                                try:
-                                    CPASG_Points_w_UnitCount(wkg_fgdb, fc_to_process, prod_cpasg_tbl, CMTY_PLAN_CN, shorthand_name, unit_count_fld)
+                                else:
+                                    try:
+                                        Bin_Points_w_UnitCount(wkg_fgdb, fc_to_process, prod_binned_fc, GRID_HEX_060_ACRES, shorthand_name, unit_count_fld)
 
-                                except Exception as e:
-                                    success = False
-                                    print '\n*** ERROR with CPASG_Points_w_UnitCount() ***'
-                                    print str(e)
+                                    except Exception as e:
+                                        success = False
+                                        print '\n*** ERROR with Bin_Points_w_UnitCount() ***'
+                                        print str(e)
 
-                print '\n\n----------------------------------------------------'
-                print '----------------------------------------------------'
+
+                                #-----------------------------------------------
+                                #    Create CPASG table for Points with a Unit Count Field
+                                #-----------------------------------------------
+                                if prod_cpasg_tbl.upper() == 'N/A':  # Don't try to bin if there is "N/A" in the BINNING_CONTROL_TABLE
+                                    print 'INFO. Not CPASGing this FC because the value in the BINNING_CONTROL_TABLE is "N/A"'
+
+                                else:
+                                    try:
+                                        CPASG_Points_w_UnitCount(wkg_fgdb, fc_to_process, prod_cpasg_tbl, CMTY_PLAN_CN_2011, shorthand_name, unit_count_fld)
+
+                                    except Exception as e:
+                                        success = False
+                                        print '\n*** ERROR with CPASG_Points_w_UnitCount() ***'
+                                        print str(e)
+
+
+        except Exception as e:
+            success = False
+            print '\n*** ERROR in main() ***'
+            print str(e)
 
     #---------------------------------------------------------------------------
     #---------------------------------------------------------------------------
@@ -555,7 +608,7 @@ def Bin_Polys_w_Density(wkg_fgdb, fc_to_bin, prod_binned_fc, GRID_HEX_060_ACRES,
 
 #-------------------------------------------------------------------------------
 #-------------------------------------------------------------------------------
-def CPASG_Polys_w_Density(wkg_fgdb, fc_to_make_cpasg_tbl, prod_cpasg_tbl, CMTY_PLAN_CN, shorthand_name, density_fld):
+def CPASG_Polys_w_Density(wkg_fgdb, fc_to_make_cpasg_tbl, prod_cpasg_tbl, CMTY_PLAN_CN_2011, shorthand_name, density_fld):
     """
     To take unique single-part (not multipart) polygons with a density field
     and to create a CPASG table with a VALUE field
@@ -565,8 +618,8 @@ def CPASG_Polys_w_Density(wkg_fgdb, fc_to_make_cpasg_tbl, prod_cpasg_tbl, CMTY_P
     print 'Starting CPASG_Polys_w_Density()'
 
     # Set variables
-    cpasg_label_exist_fld = 'CPASG_LABE'  # The name of the existing field in CMTY_PLAN_CN
-    cpasg_label_new_fld   = 'CPASG_NAME'  # The new field name to give the CPASG_LABE
+    cpasg_label_exist_fld = 'CPASG_LABEL'  # The name of the existing field in CMTY_PLAN_CN_2011
+    cpasg_label_new_fld   = 'CPASG_NAME'  # The new field name to give the CPASG_LABEL
     cpasg_fld             = 'CPASG'
     row_acres_fld         = 'Row_Acres'
     value_final_fld       = 'VALUE_{}'.format(shorthand_name)
@@ -576,9 +629,9 @@ def CPASG_Polys_w_Density(wkg_fgdb, fc_to_make_cpasg_tbl, prod_cpasg_tbl, CMTY_P
     print '\n  Creating CPASG table from processed data found at:\n    {}\n'.format(fc_to_make_cpasg_tbl)
 
     #---------------------------------------------------------------------------
-    #                 Union 'FC to make CPASG table' with CMTY_PLAN_CN
+    #                 Union 'FC to make CPASG table' with CMTY_PLAN_CN_2011
 
-    in_features = [fc_to_make_cpasg_tbl, CMTY_PLAN_CN]
+    in_features = [fc_to_make_cpasg_tbl, CMTY_PLAN_CN_2011]
     union_fc = os.path.join(wkg_fgdb, '{}_CPASG_union'.format(shorthand_name))
     print '\n  Unioning:'
     for fc in in_features:
@@ -641,7 +694,7 @@ def CPASG_Polys_w_Density(wkg_fgdb, fc_to_make_cpasg_tbl, prod_cpasg_tbl, CMTY_P
 
 
     #---------------------------------------------------------------------------
-    #       Perform Frequency on CPASG_LABE & CPASG, while summing the VALUE field
+    #       Perform Frequency on CPASG_LABEL & CPASG, while summing the VALUE field
 
     freq_analysis_tbl = '{}_freq_CPASG_FINAL'.format(union_single_part_fc)
     freq_fields = [cpasg_label_exist_fld, cpasg_fld]
@@ -668,7 +721,7 @@ def CPASG_Polys_w_Density(wkg_fgdb, fc_to_make_cpasg_tbl, prod_cpasg_tbl, CMTY_P
     arcpy.DeleteField_management(freq_analysis_tbl, 'FREQUENCY')
 
 
-    # Change the field name [CPASG_LABE] to [CPASG_NAME] (for clarity)
+    # Change the field name [CPASG_LABEL] to [CPASG_NAME] (for clarity)
     existing_field_name = cpasg_label_exist_fld
     new_field_name      = cpasg_label_new_fld
     print '\n    Changing field name from: [{}] to: [{}] for FC:\n      {}'.format(existing_field_name, new_field_name, freq_analysis_tbl)
@@ -851,14 +904,14 @@ def Bin_Points_w_UnitCount(wkg_fgdb, fc_to_bin, prod_binned_fc, GRID_HEX_060_ACR
 
 #-------------------------------------------------------------------------------
 #-------------------------------------------------------------------------------
-def CPASG_Points_w_UnitCount(wkg_fgdb, fc_to_make_cpasg_tbl, prod_cpasg_tbl, CMTY_PLAN_CN, shorthand_name, unit_count_fld):
+def CPASG_Points_w_UnitCount(wkg_fgdb, fc_to_make_cpasg_tbl, prod_cpasg_tbl, CMTY_PLAN_CN_2011, shorthand_name, unit_count_fld):
     """
     """
     print '\nStarting CPASG_Points_w_UnitCount():'
 
     # Set variables
-    cpasg_label_exist_fld = 'CPASG_LABE'  # The name of the existing field in CMTY_PLAN_CN
-    cpasg_label_new_fld   = 'CPASG_NAME'  # The new field name to give the CPASG_LABE
+    cpasg_label_exist_fld = 'CPASG_LABEL'  # The name of the existing field in CMTY_PLAN_CN_2011
+    cpasg_label_new_fld   = 'CPASG_NAME'  # The new field name to give the CPASG_LABEL
     cpasg_fld             = 'CPASG'
     value_final_fld       = 'VALUE_{}'.format(shorthand_name)
     expression_type       = 'PYTHON_9.3'
@@ -868,17 +921,17 @@ def CPASG_Points_w_UnitCount(wkg_fgdb, fc_to_make_cpasg_tbl, prod_cpasg_tbl, CMT
 
 
     #---------------------------------------------------------------------------
-    #      Get the CMTY_PLAN_CN FC into a frequency table (with all CPASGs)
+    #      Get the CMTY_PLAN_CN_2011 FC into a frequency table (with all CPASGs)
     # This will be the table that will become the FINAL CPASG table
     final_CPASG_tbl = os.path.join(wkg_fgdb, '{}_CPASG_FINAL'.format(shorthand_name))
     freq_fields = [cpasg_label_exist_fld, cpasg_fld]
 
-    print '\n  Performing Frequency Analysis on FC:\n    {}'.format(CMTY_PLAN_CN)
+    print '\n  Performing Frequency Analysis on FC:\n    {}'.format(CMTY_PLAN_CN_2011)
     print '  Frequency Fields:'
     for f in freq_fields:
         print '    {}'.format(f)
     print '  To create table:\n    {}'.format(final_CPASG_tbl)
-    arcpy.Frequency_analysis(CMTY_PLAN_CN, final_CPASG_tbl, freq_fields)
+    arcpy.Frequency_analysis(CMTY_PLAN_CN_2011, final_CPASG_tbl, freq_fields)
 
 
     #---------------------------------------------------------------------------
@@ -891,7 +944,7 @@ def CPASG_Points_w_UnitCount(wkg_fgdb, fc_to_make_cpasg_tbl, prod_cpasg_tbl, CMT
     arcpy.DeleteField_management(final_CPASG_tbl, 'FREQUENCY')
 
 
-    # Change the field name [CPASG_LABE] to [CPASG_NAME] (for clarity)
+    # Change the field name [CPASG_LABEL] to [CPASG_NAME] (for clarity)
     existing_field_name = cpasg_label_exist_fld
     new_field_name      = cpasg_label_new_fld
     print '\n    Changing field name from: "{}" to: "{}"'.format(existing_field_name, new_field_name)
@@ -915,9 +968,9 @@ def CPASG_Points_w_UnitCount(wkg_fgdb, fc_to_make_cpasg_tbl, prod_cpasg_tbl, CMT
 
 
     #---------------------------------------------------------------------------
-    #           Intersect 'FC to make CPASG table' with CMTY_PLAN_CN
+    #           Intersect 'FC to make CPASG table' with CMTY_PLAN_CN_2011
 
-    in_features = [fc_to_make_cpasg_tbl, CMTY_PLAN_CN]
+    in_features = [fc_to_make_cpasg_tbl, CMTY_PLAN_CN_2011]
     int_fc = os.path.join(wkg_fgdb, '{}_CPASG_int'.format(shorthand_name))
     print '\n  Intersecting:'
     for fc in in_features:

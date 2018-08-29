@@ -32,7 +32,7 @@ There are basically 3 different methods that this date can be found:
 # Copyright:   (c) mgrue 2018
 # Licence:     <your licence>
 #-------------------------------------------------------------------------------
-import arcpy, os, datetime
+import arcpy, os, datetime, ConfigParser, time, sys
 
 def main():
     #---------------------------------------------------------------------------
@@ -48,14 +48,47 @@ def main():
     name_of_script = 'DEV_TRACKER_{}.py'.format(shorthand_name)
 
 
-    # Paths to SDE Feature Classes
-    LAST_DATA_UPDATE = r'P:\20180510_development_tracker\DEV\Scripts\Connection_Files\AD@ATLANTIC@SDW.sde\SDW.PDS.PDS_DEV_TRACKER_LAST_DATA_UPDATE'
+    #---------------------------------------------------------------------------
+    #---------------------------------------------------------------------------
+    #                   Use cfgFile to set the below variables
+
+    # Find a connection to the config file
+    # You can set multiple config files (to easily move this script to another network)
+    # Recommended (A = BLUE network) and (B = COUNTY network)
+    cfgFile_A     = r"P:\20180510_development_tracker\DEV\Scripts\Config_Files\DEV_TRACKER_Main_Config_File.ini"
+    cfgFile_B     = r"D:\DEV_TRACKER\PROD\Scripts\Config_Files\DEV_TRACKER_Main_Config_File.ini"
+
+    if os.path.exists(cfgFile_A):
+        cfgFile = cfgFile_A  # Use config file A
+
+    elif os.path.exists(cfgFile_B):
+        cfgFile = cfgFile_B  # Use config file B
+
+    else:
+        print("*** ERROR! cannot find valid INI file ***\nMake sure a valid INI file exists at:\n  {}\nOR:\n  {}".format(cfgFile_A, cfgFile_B))
+        print 'You may have to change the name/location of the INI file,\nOR change the variable in this script.'
+        success = False
+        time.sleep(10)
+        return  # Stop the script
+
+    if os.path.isfile(cfgFile):
+        print 'Using INI file found at:\n  {}\n'.format(cfgFile)
+        config = ConfigParser.ConfigParser()
+        config.read(cfgFile)
 
 
+    # Get variables from .ini file
+    root_folder               = config.get('Paths_Local',   'Root_Folder')
+    folder_with_original_csvs = config.get('Paths_Local',   'Folder_With_Original_CSVs')
+    edit_SDE_conn_File        = config.get('Edit_SDE_Info', 'Edit_SDE_Conn_File')
+    edit_SDE_prefix           = config.get('Edit_SDE_Info', 'Edit_SDE_Prefix')
+
+    #---------------------------------------------------------------------------
     # Paths to folders and local FGDBs
-    root_folder     = r'P:\20180510_development_tracker\DEV'
     log_file_folder = '{}\{}\{}'.format(root_folder, 'Scripts', 'Logs')
+
     data_folder     = '{}\{}'.format(root_folder, 'Data')
+
     wkg_fgdb        = '{}\{}'.format(data_folder, '{}.gdb'.format(shorthand_name))
 
 
@@ -64,28 +97,34 @@ def main():
     success_file = '{}\SUCCESS_running_{}.txt'.format(success_error_folder, name_of_script.split('.')[0])
     error_file   = '{}\ERROR_running_{}.txt'.format(success_error_folder, name_of_script.split('.')[0])
 
+    # Paths to SDE Feature Classes
+    LAST_DATA_UPDATE = os.path.join(edit_SDE_conn_File, edit_SDE_prefix + 'PDS_DEV_TRACKER_LAST_DATA_UPDATE')
 
-    # Paths to CSV Extracts
-    folder_with_csvs = r"P:\20180510_development_tracker\tables\CSV_Extract_20180726"
-##    folder_with_csvs = r'P:\20180510_development_tracker\tables\CSV_Extract_20180817'
-    extract_map_03   = os.path.join(folder_with_csvs, 'Existing Dwelling Units (2011 General Plan Forward) (Map 3 & Map 11).csv')
-    extract_map_04   = os.path.join(folder_with_csvs, 'Dwelling Units - Discretionary Approved (2011 GP Forward) (Map 4).csv')
-    extract_map_05   = os.path.join(folder_with_csvs, 'Dwelling Units - Land Development Grading In-Process (Map 5).csv')
-    extract_map_07   = os.path.join(folder_with_csvs, 'Dwelling Units - Discretionary In-Process (Map 7).csv')
-    extract_map_08_A = os.path.join(folder_with_csvs, 'In-Process Applicant General Plan Amendments (Map 8).csv')
-    extract_map_08_B = os.path.join(folder_with_csvs, 'In-Process County General Plan Amendments (Map 8).csv')
-    extract_map_11   = os.path.join(folder_with_csvs, 'Existing Dwelling Units (2011 General Plan Forward) (Map 3 & Map 11).csv')
+
+    # Paths to Original CSV Extracts (Not the formatted extracts since the modified date for the formatted extracts does not contain
+    # The date that the extract was deposited from Accela to the Original Extract Folder
+    extract_map_02   = os.path.join(folder_with_original_csvs, 'Approved General Plan Amendments (2011 General Plan Forward) (Map 2).csv')
+    extract_map_03   = os.path.join(folder_with_original_csvs, 'Existing Dwelling Units (2011 General Plan Forward) (Map 3 & Map 11).csv')
+    extract_map_04   = os.path.join(folder_with_original_csvs, 'Dwelling Units - Discretionary Approved (2011 GP Forward) (Map 4).csv')
+    extract_map_05   = os.path.join(folder_with_original_csvs, 'Dwelling Units - Land Development Grading In-Process (Map 5).csv')
+    extract_map_07   = os.path.join(folder_with_original_csvs, 'Dwelling Units - Discretionary In-Process (Map 7).csv')
+    extract_map_08_A = os.path.join(folder_with_original_csvs, 'In-Process Applicant General Plan Amendments (Map 8).csv')
+    extract_map_08_B = os.path.join(folder_with_original_csvs, 'In-Process County General Plan Amendments (Map 8).csv')
+    extract_map_11   = os.path.join(folder_with_original_csvs, 'Existing Dwelling Units (2011 General Plan Forward) (Map 3 & Map 11).csv')
 
 
     # Paths to SUCCESS/ERROR Files
-    success_run_map_02   = os.path.join(success_error_folder, 'SUCCESS_running_DEV_TRACKER_Process_Approved_GPAs_Map_02.txt')
+    success_run_map_02   = os.path.join(success_error_folder, 'SUCCESS_running_DEV_TRACKER_Process_Approved_GPA_Map_02.txt')
     success_run_map_03   = os.path.join(success_error_folder, 'SUCCESS_running_DEV_TRACKER_Process_Existing_DU_Map_03.txt')
     success_run_map_04   = os.path.join(success_error_folder, 'SUCCESS_running_DEV_TRACKER_Process_Approved_DU_Map_04.txt')
     success_run_map_05   = os.path.join(success_error_folder, 'SUCCESS_running_DEV_TRACKER_Process_Grading_In_Process_Map_05.txt')
+    success_run_map_06   = os.path.join(success_error_folder, 'SUCCESS_running_DEV_TRACKER_Process_Curnt_Dev_Potentl_Map_06.txt')
     success_run_map_07   = os.path.join(success_error_folder, 'SUCCESS_running_DEV_TRACKER_Process_In_Process_DU_Map_07.txt')
     success_run_map_08_A = os.path.join(success_error_folder, 'SUCCESS_running_DEV_TRACKER_Process_In_Process_GPA_Map_08_A.txt')
     success_run_map_08_B = os.path.join(success_error_folder, 'SUCCESS_running_DEV_TRACKER_Process_In_Process_GPA_Map_08_B.txt')
     success_run_map_08_C = os.path.join(success_error_folder, 'SUCCESS_running_DEV_TRACKER_Process_In_Process_GPA_Map_08_C.txt')
+    success_run_map_09   = os.path.join(success_error_folder, 'SUCCESS_running_DEV_TRACKER_Process_GP_Delta_Map_09.txt')
+    success_run_map_10   = os.path.join(success_error_folder, 'SUCCESS_running_DEV_TRACKER_Process_Future_Dev_Potentl_Map_10.txt')
     success_run_map_11   = os.path.join(success_error_folder, 'SUCCESS_running_DEV_TRACKER_Process_Cmpltd_Bld_Permits_Map_11.txt')
     success_run_map_12   = os.path.join(success_error_folder, 'SUCCESS_running_DEV_TRACKER_Process_Annex_Aquitns_Map_12.txt')
 
@@ -195,7 +234,7 @@ def main():
             print('\n\n-------------------------------------------------------')
             map_to_update = 'Map 02'
             print 'Update [{}] for: {}'.format(field_to_update, map_to_update)
-            print('SCRIPT Dependent method')
+            print('EXTRACT Dependent method')
 
             # Test to see if the SUCCESS file exists
             if not os.path.exists(success_run_map_02):
@@ -206,9 +245,9 @@ def main():
                 print('  Please investigate if the script that should have created the SUCCESS file failed')
 
             else:
-                # Get the date of the last SUCESSFULLY run of Map 02
-                print('\n  Get the date of the SUCCESS file:')
-                date_file_modified = Get_Date_From_File(success_run_map_02)
+                # Get the date of the extract
+                print('\n  Get the date of the extract:')
+                date_file_modified = Get_Date_From_File(extract_map_02)
 
                 # Update
                 print('\n  Set date into Table:')
@@ -363,94 +402,103 @@ def main():
             print('MAP Dependent method')
 
 
-            #                        Get info for Map 02
+            # Test to see if the SUCCESS file exists
+            if not os.path.exists(success_run_map_06):
+                all_dates_updated = False
+                print('*** WARNING! ***')
+                print('  The SUCCESS file does not exist at:\n    {}'.format(success_run_map_06))
+                print('  This means the date should not be updated for this map')
+                print('  Please investigate if the script that should have created the SUCCESS file failed')
 
-            # Get the date of the extract
-            print('\n  Get the date of Map 02:')
-            fields = [id_field, field_to_update]
-            where_clause = "{} = 'Map 02'".format(id_field)
-            with arcpy.da.SearchCursor(last_data_update_copy, fields, where_clause) as cursor:
-                row = next(cursor)
-                map_02_date = row[1]
-            del cursor
+            else:
+                #                        Get info for Map 02
 
-            print '    {}'.format(map_02_date)
+                # Get the date of the extract
+                print('\n  Get the date of Map 02:')
+                fields = [id_field, field_to_update]
+                where_clause = "{} = 'Map 02'".format(id_field)
+                with arcpy.da.SearchCursor(last_data_update_copy, fields, where_clause) as cursor:
+                    row = next(cursor)
+                    map_02_date = row[1]
+                del cursor
 
-            # Get a datetime object from the string
-            dt_obj_map_02 = datetime.datetime.strptime(map_02_date, '%m/%d/%Y')
+                print '    {}'.format(map_02_date)
 
-
-            #                        Get info for Map 03
-
-            # Get the date of the extract
-            print('\n  Get the date of Map 03:')
-            fields = [id_field, field_to_update]
-            where_clause = "{} = 'Map 03'".format(id_field)
-            with arcpy.da.SearchCursor(last_data_update_copy, fields, where_clause) as cursor:
-                row = next(cursor)
-                map_03_date = row[1]
-            del cursor
-
-            print '    {}'.format(map_03_date)
-
-            # Get a datetime object from the string
-            dt_obj_map_03 = datetime.datetime.strptime(map_03_date, '%m/%d/%Y')
+                # Get a datetime object from the string
+                dt_obj_map_02 = datetime.datetime.strptime(map_02_date, '%m/%d/%Y')
 
 
-            #                        Get info for Map 04
+                #                        Get info for Map 03
 
-            # Get the date of the extract
-            print('\n  Get the date of Map 04:')
-            fields = [id_field, field_to_update]
-            where_clause = "{} = 'Map 04'".format(id_field)
-            with arcpy.da.SearchCursor(last_data_update_copy, fields, where_clause) as cursor:
-                row = next(cursor)
-                map_04_date = row[1]
-            del cursor
+                # Get the date of the extract
+                print('\n  Get the date of Map 03:')
+                fields = [id_field, field_to_update]
+                where_clause = "{} = 'Map 03'".format(id_field)
+                with arcpy.da.SearchCursor(last_data_update_copy, fields, where_clause) as cursor:
+                    row = next(cursor)
+                    map_03_date = row[1]
+                del cursor
 
-            print '    {}'.format(map_04_date)
+                print '    {}'.format(map_03_date)
 
-            # Get a datetime object from the string
-            dt_obj_map_04 = datetime.datetime.strptime(map_04_date, '%m/%d/%Y')
-
-
-            #                        Get info for Map 12
-
-            # Get the date of the extract
-            print('\n  Get the date of Map 12:')
-            fields = [id_field, field_to_update]
-            where_clause = "{} = 'Map 12'".format(id_field)
-            with arcpy.da.SearchCursor(last_data_update_copy, fields, where_clause) as cursor:
-                row = next(cursor)
-                map_12_date = row[1]
-            del cursor
-
-            print '    {}'.format(map_12_date)
-
-            # Get a datetime object from the string
-            dt_obj_map_12 = datetime.datetime.strptime(map_12_date, '%m/%d/%Y')
+                # Get a datetime object from the string
+                dt_obj_map_03 = datetime.datetime.strptime(map_03_date, '%m/%d/%Y')
 
 
+                #                        Get info for Map 04
 
-            #              Decide which date to use (From Map 2, 3, 4, 12)
+                # Get the date of the extract
+                print('\n  Get the date of Map 04:')
+                fields = [id_field, field_to_update]
+                where_clause = "{} = 'Map 04'".format(id_field)
+                with arcpy.da.SearchCursor(last_data_update_copy, fields, where_clause) as cursor:
+                    row = next(cursor)
+                    map_04_date = row[1]
+                del cursor
 
-            # Get all the dt_obj into one list and sort the list (the first dt_obj is the one we want to use)
-            dt_objects = []
+                print '    {}'.format(map_04_date)
 
-            dt_objects.append(dt_obj_map_02)
-            dt_objects.append(dt_obj_map_03)
-            dt_objects.append(dt_obj_map_04)
-            dt_objects.append(dt_obj_map_12)
-
-            dt_objects.sort()
-
-            map_date_to_use = (dt_objects[0]).strftime('%m/%d/%Y')
+                # Get a datetime object from the string
+                dt_obj_map_04 = datetime.datetime.strptime(map_04_date, '%m/%d/%Y')
 
 
-            # Update
-            print('\n  Set date into Table:')
-            where_clause = "{} = '{}'".format(id_field, map_to_update)
-            Update_Cursor(last_data_update_copy, id_field, field_to_update, map_date_to_use, where_clause)
+                #                        Get info for Map 12
+
+                # Get the date of the extract
+                print('\n  Get the date of Map 12:')
+                fields = [id_field, field_to_update]
+                where_clause = "{} = 'Map 12'".format(id_field)
+                with arcpy.da.SearchCursor(last_data_update_copy, fields, where_clause) as cursor:
+                    row = next(cursor)
+                    map_12_date = row[1]
+                del cursor
+
+                print '    {}'.format(map_12_date)
+
+                # Get a datetime object from the string
+                dt_obj_map_12 = datetime.datetime.strptime(map_12_date, '%m/%d/%Y')
+
+
+
+                #              Decide which date to use (From Map 2, 3, 4, 12)
+
+                # Get all the dt_obj into one list and sort the list (the first dt_obj is the one we want to use)
+                dt_objects = []
+
+                dt_objects.append(dt_obj_map_02)
+                dt_objects.append(dt_obj_map_03)
+                dt_objects.append(dt_obj_map_04)
+                dt_objects.append(dt_obj_map_12)
+
+                dt_objects.sort()
+
+                map_date_to_use = (dt_objects[0]).strftime('%m/%d/%Y')
+
+
+                # Update
+                print('\n  Set date into Table:')
+                where_clause = "{} = '{}'".format(id_field, map_to_update)
+                Update_Cursor(last_data_update_copy, id_field, field_to_update, map_date_to_use, where_clause)
 
         except Exception as e:
             success = False
@@ -578,54 +626,62 @@ def main():
             print 'Update [{}] for: {}'.format(field_to_update, map_to_update)
             print('MAP Dependent method')
 
+            # Test to see if the SUCCESS file exists
+            if not os.path.exists(success_run_map_09):
+                all_dates_updated = False
+                print('*** WARNING! ***')
+                print('  The SUCCESS file does not exist at:\n    {}'.format(success_run_map_09))
+                print('  This means the date should not be updated for this map')
+                print('  Please investigate if the script that should have created the SUCCESS file failed')
 
-            #                        Get info for Map 04
+            else:
+                #                        Get info for Map 04
 
-            # Get the date of the extract
-            print('\n  Get the date of Map 04:')
-            fields = [id_field, field_to_update]
-            where_clause = "{} = 'Map 04'".format(id_field)
-            with arcpy.da.SearchCursor(last_data_update_copy, fields, where_clause) as cursor:
-                row = next(cursor)
-                map_04_date = row[1]
-            del cursor
+                # Get the date of the extract
+                print('\n  Get the date of Map 04:')
+                fields = [id_field, field_to_update]
+                where_clause = "{} = 'Map 04'".format(id_field)
+                with arcpy.da.SearchCursor(last_data_update_copy, fields, where_clause) as cursor:
+                    row = next(cursor)
+                    map_04_date = row[1]
+                del cursor
 
-            print '    {}'.format(map_04_date)
+                print '    {}'.format(map_04_date)
 
-            # Get a datetime object from the string
-            dt_obj_map_04 = datetime.datetime.strptime(map_04_date, '%m/%d/%Y')
-
-
-            #                        Get info for Map 07
-
-            # Get the date of the extract
-            print('\n  Get the date of Map 07:')
-            fields = [id_field, field_to_update]
-            where_clause = "{} = 'Map 07'".format(id_field)
-            with arcpy.da.SearchCursor(last_data_update_copy, fields, where_clause) as cursor:
-                row = next(cursor)
-                map_07_date = row[1]
-            del cursor
-
-            print '    {}'.format(map_07_date)
-
-            # Get a datetime object from the string
-            dt_obj_map_07 = datetime.datetime.strptime(map_07_date, '%m/%d/%Y')
+                # Get a datetime object from the string
+                dt_obj_map_04 = datetime.datetime.strptime(map_04_date, '%m/%d/%Y')
 
 
-            #              Decide which date to use (from 04 or 07)
+                #                        Get info for Map 07
 
-            if dt_obj_map_04 > dt_obj_map_07:  # Then 07 is the 'older' file and should be used
-                map_date_to_use = map_07_date
+                # Get the date of the extract
+                print('\n  Get the date of Map 07:')
+                fields = [id_field, field_to_update]
+                where_clause = "{} = 'Map 07'".format(id_field)
+                with arcpy.da.SearchCursor(last_data_update_copy, fields, where_clause) as cursor:
+                    row = next(cursor)
+                    map_07_date = row[1]
+                del cursor
 
-            else:  # Then A is either 'older' or the same date and should be used
-                map_date_to_use = map_04_date
+                print '    {}'.format(map_07_date)
+
+                # Get a datetime object from the string
+                dt_obj_map_07 = datetime.datetime.strptime(map_07_date, '%m/%d/%Y')
 
 
-            # Update
-            print('\n  Set date into Table:')
-            where_clause = "{} = '{}'".format(id_field, map_to_update)
-            Update_Cursor(last_data_update_copy, id_field, field_to_update, map_date_to_use, where_clause)
+                #              Decide which date to use (from 04 or 07)
+
+                if dt_obj_map_04 > dt_obj_map_07:  # Then 07 is the 'older' file and should be used
+                    map_date_to_use = map_07_date
+
+                else:  # Then A is either 'older' or the same date and should be used
+                    map_date_to_use = map_04_date
+
+
+                # Update
+                print('\n  Set date into Table:')
+                where_clause = "{} = '{}'".format(id_field, map_to_update)
+                Update_Cursor(last_data_update_copy, id_field, field_to_update, map_date_to_use, where_clause)
 
         except Exception as e:
             success = False
@@ -642,76 +698,84 @@ def main():
             print 'Update [{}] for: {}'.format(field_to_update, map_to_update)
             print('MAP Dependent method')
 
+            # Test to see if the SUCCESS file exists
+            if not os.path.exists(success_run_map_10):
+                all_dates_updated = False
+                print('*** WARNING! ***')
+                print('  The SUCCESS file does not exist at:\n    {}'.format(success_run_map_10))
+                print('  This means the date should not be updated for this map')
+                print('  Please investigate if the script that should have created the SUCCESS file failed')
 
-            #                        Get info for Map 06
+            else:
+                #                        Get info for Map 06
 
-            # Get the date of the extract
-            print('\n  Get the date of Map 06:')
-            fields = [id_field, field_to_update]
-            where_clause = "{} = 'Map 06'".format(id_field)
-            with arcpy.da.SearchCursor(last_data_update_copy, fields, where_clause) as cursor:
-                row = next(cursor)
-                map_06_date = row[1]
-            del cursor
+                # Get the date of the extract
+                print('\n  Get the date of Map 06:')
+                fields = [id_field, field_to_update]
+                where_clause = "{} = 'Map 06'".format(id_field)
+                with arcpy.da.SearchCursor(last_data_update_copy, fields, where_clause) as cursor:
+                    row = next(cursor)
+                    map_06_date = row[1]
+                del cursor
 
-            print '    {}'.format(map_06_date)
+                print '    {}'.format(map_06_date)
 
-            # Get a datetime object from the string
-            dt_obj_map_06 = datetime.datetime.strptime(map_06_date, '%m/%d/%Y')
-
-
-            #                        Get info for Map 07
-
-            # Get the date of the extract
-            print('\n  Get the date of Map 07:')
-            fields = [id_field, field_to_update]
-            where_clause = "{} = 'Map 07'".format(id_field)
-            with arcpy.da.SearchCursor(last_data_update_copy, fields, where_clause) as cursor:
-                row = next(cursor)
-                map_07_date = row[1]
-            del cursor
-
-            print '    {}'.format(map_07_date)
-
-            # Get a datetime object from the string
-            dt_obj_map_07 = datetime.datetime.strptime(map_07_date, '%m/%d/%Y')
+                # Get a datetime object from the string
+                dt_obj_map_06 = datetime.datetime.strptime(map_06_date, '%m/%d/%Y')
 
 
-            #                        Get info for Map 08
+                #                        Get info for Map 07
 
-            # Get the date of the extract
-            print('\n  Get the date of Map 08:')
-            fields = [id_field, field_to_update]
-            where_clause = "{} = 'Map 08'".format(id_field)
-            with arcpy.da.SearchCursor(last_data_update_copy, fields, where_clause) as cursor:
-                row = next(cursor)
-                map_08_date = row[1]
-            del cursor
+                # Get the date of the extract
+                print('\n  Get the date of Map 07:')
+                fields = [id_field, field_to_update]
+                where_clause = "{} = 'Map 07'".format(id_field)
+                with arcpy.da.SearchCursor(last_data_update_copy, fields, where_clause) as cursor:
+                    row = next(cursor)
+                    map_07_date = row[1]
+                del cursor
 
-            print '    {}'.format(map_08_date)
+                print '    {}'.format(map_07_date)
 
-            # Get a datetime object from the string
-            dt_obj_map_08 = datetime.datetime.strptime(map_08_date, '%m/%d/%Y')
-
-
-            #              Decide which date to use (From Map 6, 7, 8)
-
-            # Get all the dt_obj into one list and sort the list (the first dt_obj is the one we want to use)
-            dt_objects = []
-
-            dt_objects.append(dt_obj_map_06)
-            dt_objects.append(dt_obj_map_07)
-            dt_objects.append(dt_obj_map_08)
-
-            dt_objects.sort()
-
-            map_date_to_use = (dt_objects[0]).strftime('%m/%d/%Y')
+                # Get a datetime object from the string
+                dt_obj_map_07 = datetime.datetime.strptime(map_07_date, '%m/%d/%Y')
 
 
-            # Update
-            print('\n  Set date into Table:')
-            where_clause = "{} = '{}'".format(id_field, map_to_update)
-            Update_Cursor(last_data_update_copy, id_field, field_to_update, map_date_to_use, where_clause)
+                #                        Get info for Map 08
+
+                # Get the date of the extract
+                print('\n  Get the date of Map 08:')
+                fields = [id_field, field_to_update]
+                where_clause = "{} = 'Map 08'".format(id_field)
+                with arcpy.da.SearchCursor(last_data_update_copy, fields, where_clause) as cursor:
+                    row = next(cursor)
+                    map_08_date = row[1]
+                del cursor
+
+                print '    {}'.format(map_08_date)
+
+                # Get a datetime object from the string
+                dt_obj_map_08 = datetime.datetime.strptime(map_08_date, '%m/%d/%Y')
+
+
+                #              Decide which date to use (From Map 6, 7, 8)
+
+                # Get all the dt_obj into one list and sort the list (the first dt_obj is the one we want to use)
+                dt_objects = []
+
+                dt_objects.append(dt_obj_map_06)
+                dt_objects.append(dt_obj_map_07)
+                dt_objects.append(dt_obj_map_08)
+
+                dt_objects.sort()
+
+                map_date_to_use = (dt_objects[0]).strftime('%m/%d/%Y')
+
+
+                # Update
+                print('\n  Set date into Table:')
+                where_clause = "{} = '{}'".format(id_field, map_to_update)
+                Update_Cursor(last_data_update_copy, id_field, field_to_update, map_date_to_use, where_clause)
 
         except Exception as e:
             success = False

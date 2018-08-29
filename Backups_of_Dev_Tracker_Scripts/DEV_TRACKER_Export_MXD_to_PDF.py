@@ -7,7 +7,7 @@ Purpose:     Update the "update date" in the disclaimers and export the data-dri
 Author:      gr
 Created:     08/21/2018
 """
-import arcpy, os, time
+import arcpy, os, time, ConfigParser, sys
 
 def main():
     #---------------------------------------------------------------------------
@@ -23,9 +23,41 @@ def main():
     name_of_script = 'DEV_TRACKER_{}.py'.format(shorthand_name)
 
 
-    # Paths to folders and local FGDBs
-    root_folder       = r'P:\20180510_development_tracker\DEV'
+    #---------------------------------------------------------------------------
+    #---------------------------------------------------------------------------
+    #                   Use cfgFile to set the below variables
 
+    # Find a connection to the config file
+    # You can set multiple config files (to easily move this script to another network)
+    # Recommended (A = BLUE network) and (B = COUNTY network)
+    cfgFile_A     = r"P:\20180510_development_tracker\DEV\Scripts\Config_Files\DEV_TRACKER_Main_Config_File.ini"
+    cfgFile_B     = r"D:\DEV_TRACKER\PROD\Scripts\Config_Files\DEV_TRACKER_Main_Config_File.ini"
+
+    if os.path.exists(cfgFile_A):
+        cfgFile = cfgFile_A  # Use config file A
+
+    elif os.path.exists(cfgFile_B):
+        cfgFile = cfgFile_B  # Use config file B
+
+    else:
+        print("*** ERROR! cannot find valid INI file ***\nMake sure a valid INI file exists at:\n  {}\nOR:\n  {}".format(cfgFile_A, cfgFile_B))
+        print 'You may have to change the name/location of the INI file,\nOR change the variable in this script.'
+        success = False
+        time.sleep(10)
+        return  # Stop the script
+
+    if os.path.isfile(cfgFile):
+        print 'Using INI file found at:\n  {}\n'.format(cfgFile)
+        config = ConfigParser.ConfigParser()
+        config.read(cfgFile)
+
+
+    # Get variables from .ini file
+    root_folder        = config.get('Paths_Local',   'Root_Folder')
+
+
+    #---------------------------------------------------------------------------
+    # Paths to folders and local FGDBs
     log_file_folder   = '{}\{}\{}'.format(root_folder, 'Scripts', 'Logs')
 
     mxd_folder        = os.path.join(root_folder,"MXDs_to_Generate_PDFs")
@@ -38,10 +70,14 @@ def main():
     success_file = '{}\SUCCESS_running_{}.txt'.format(success_error_folder, name_of_script.split('.')[0])
     error_file   = '{}\ERROR_running_{}.txt'.format(success_error_folder, name_of_script.split('.')[0])
 
+    # Number of SUCCESS files this script needs to see in the success_error_folder
+    # in order to safely run
+    desired_num_success_files = 16
+
 
     # Misc variables
     success = True
-    map_01_name  = "MAP_01_DT_draft.mxd"
+    map_01_name  = "MAP_01_DT.mxd"
 
 
     #---------------------------------------------------------------------------
@@ -73,6 +109,54 @@ def main():
     if os.path.exists(error_file):
         print 'Deleting old file at:\n  {}\n'.format(error_file)
         os.remove(error_file)
+
+
+    #---------------------------------------------------------------------------
+    #          Only run the Export if all previously run scripts were
+    #                          SUCCESSFULLY run
+    #---------------------------------------------------------------------------
+    if success == True:
+        try:
+            # List all files in "success_error_folder"
+            print('\n-----------------------------------------------------------------')
+            print('Listing all files at:\n  {}\nTo confirm that all previous scripts ran sucessfully'.format(success_error_folder))
+            files = [f for f in os.listdir(success_error_folder) if os.path.isfile(os.path.join(success_error_folder, f))]
+
+            # Check to see if any files start with 'ERROR'
+            print('\n  Checking to see if any scripts produced an "ERROR" file')
+            for f in files:
+                if f.startswith('ERROR'):
+                    success = False
+                    print('*** WARNING! There is an "ERROR" file at:\n  {}\n'.format(os.path.join(success_error_folder, f)))
+
+
+            # If there were no ERROR files,
+            # Check to confirm there are the correct number of files that start with "SUCCESS"
+            if success == True:
+                print('\n  Checking to see if there are the correct number of "SUCCESS" files')
+                count_success = 0
+                for f in files:
+                    if f.startswith('SUCCESS'):
+                        count_success += 1
+
+                if count_success != desired_num_success_files:
+                    success = False
+                    print('*** WARNING!  There should be {} "SUCCESS" files, but there are only {}'.format(desired_num_success_files, count_success))
+                    print('This means that some previously run scripts were not successfully run.')
+                    print('But they did not produce an ERROR file for some reason')
+
+
+            if success == False:
+                print('\nThe above "WARNINGS" mean that this script will not be run')
+                print('Please fix the previously run scripts and rerun this script')
+
+            else:
+                print('  OK! All previously run scripts were "SUCCESSFULLY" run.  Continuing to run this script.')
+
+        except Exception as e:
+            success = False
+            print '\n*** ERROR with Checking if all previously run scripts were SUCCESSFULLY run ***'
+            print str(e)
 
 
     #---------------------------------------------------------------------------
@@ -134,6 +218,7 @@ def main():
             print str(e)
 
 
+    #---------------------------------------------------------------------------
     # Loop through each .mxd and 1) Update the Disclaimer  |  2) Export series to PDF
     if success == True:
         print('\n-------------------------------------------------------------')
@@ -162,14 +247,16 @@ def main():
                 print str(e)
 
 
-    # Rename the PDFs
-    print('\n{} | Renaming PDF files'.format(time.strftime("%H:%M:%S", time.localtime())))
-    try:
-        rename_pdf_files(pdf_folder)
-    except Exception as e:
-        success = False
-        print '\n*** ERROR with rename_pdf_files() ***'
-        print str(e)
+    #---------------------------------------------------------------------------
+    #                            Rename the PDFs
+    if success == True:
+        try:
+            print('\n{} | Renaming PDF files'.format(time.strftime("%H:%M:%S", time.localtime())))
+            rename_pdf_files(pdf_folder)
+        except Exception as e:
+            success = False
+            print '\n*** ERROR with rename_pdf_files() ***'
+            print str(e)
 
 
     #===========================================================================
