@@ -158,9 +158,7 @@ def main():
                     print('  {}'.format(file_to_delete))
                     os.remove(file_to_delete)
 
-                del file_to_delete
-
-            del files, f, old_csv_files_to_delete
+            del files
 
         except Exception as e:
             success = False
@@ -230,7 +228,8 @@ def main():
                                     break
 
                             print '\n    Field [{}] is at column index: {}'.format(name_of_field_to_delete, index_of_field_to_delete)
-                    del source, reader
+
+                        del source, reader
 
 
                     #-----------------------------------------------------------

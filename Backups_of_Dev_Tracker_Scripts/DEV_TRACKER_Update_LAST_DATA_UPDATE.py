@@ -820,12 +820,14 @@ def main():
     #         Delete the prod data and append the working data to prod
     if success == True:
         try:
-            print '\n  Get working data to prod:'
+            print('\n\n-------------------------------------------------------')
+            print('-------------------------------------------------------')
+            print 'Get working data to prod:'
 
-            print '\n    Deleting features at:\n      {}'.format(LAST_DATA_UPDATE)
+            print '\n  Deleting features at:\n    {}'.format(LAST_DATA_UPDATE)
             arcpy.DeleteRows_management(LAST_DATA_UPDATE)
 
-            print '\n    Append features from:\n      {}\n    To:\n      {}'.format(last_data_update_copy, LAST_DATA_UPDATE)
+            print '\n  Append features from:\n    {}\n  To:\n    {}'.format(last_data_update_copy, LAST_DATA_UPDATE)
             arcpy.Append_management(last_data_update_copy, LAST_DATA_UPDATE)
 
         except Exception as e:

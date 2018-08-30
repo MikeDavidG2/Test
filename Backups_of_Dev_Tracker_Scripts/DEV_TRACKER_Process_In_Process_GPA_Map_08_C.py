@@ -188,13 +188,14 @@ def main():
     #                     PROCESS WITH FCI CONSTRAINTS
     #---------------------------------------------------------------------------
     #---------------------------------------------------------------------------
-    print('\nProcessing with FCI constraints')
+
 
     #---------------------------------------------------------------------------
     #               Merge the Applicant and County GPA
     #---------------------------------------------------------------------------
     if success == True:
         try:
+            print('\nProcessing with FCI constraints')
             # Merge the Applicant GPA and County GPA
             in_features = [applicant_GPA_fc, county_GPA_w_FCI_fc]
             merged_fc = os.path.join(wkg_fgdb, 'In_Process_ALL_GPA_w_FCI')
@@ -230,13 +231,14 @@ def main():
     #                     PROCESS WITH NO FCI CONSTRAINTS
     #---------------------------------------------------------------------------
     #---------------------------------------------------------------------------
-    print('\nProcessing with NO FCI constraints')
+
 
     #---------------------------------------------------------------------------
     #               Merge the Applicant and County GPA
     #---------------------------------------------------------------------------
     if success == True:
         try:
+            print('\nProcessing with NO FCI constraints')
             # Merge the Applicant GPA and County GPA
             in_features = [applicant_GPA_fc, county_GPA_NO_FCI_fc]
             merged_fc = os.path.join(wkg_fgdb, 'In_Process_ALL_GPA_NO_FCI')

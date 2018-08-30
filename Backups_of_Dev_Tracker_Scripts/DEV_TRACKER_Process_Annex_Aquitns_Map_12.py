@@ -311,6 +311,7 @@ def main():
             arcpy.management.Delete("program_units1")
             arcpy.management.RepairGeometry("COMBO")
 
+            #-------------------------------------------------------------------
             # Create ready2bin
             arcpy.management.MakeFeatureLayer("COMBO","lyr")
             arcpy.management.Dissolve("lyr",shorthand_name + "1","DENSITY_FCI","","SINGLE_PART")
@@ -323,8 +324,16 @@ def main():
             arcpy.management.MakeFeatureLayer(shorthand_name + "_READY2BIN","lyr")
             arcpy.management.AlterField("lyr","DENSITY_FCI","DENSITY","DENSITY")
             arcpy.management.DeleteField("lyr","ORIG_FID")
+
+            # Calculate [DENSITY] field to be all negatives ([DENSITY]*-1)
+            expression = '!DENSITY!*-1'
+            print '\n  Calculating all values in field "{}" to be negative: {}\n'.format('DENSITY', expression)
+            arcpy.CalculateField_management("lyr", 'DENSITY', expression, 'PYTHON_9.3')
+
             arcpy.management.Delete("lyr")
 
+
+            #-------------------------------------------------------------------
             # Create no_fci ready2bin
             arcpy.management.MakeFeatureLayer("COMBO","lyr")
             arcpy.management.Dissolve("lyr",shorthand_name + "1","DENSITY_NOFCI","","SINGLE_PART")
@@ -337,7 +346,13 @@ def main():
             arcpy.management.MakeFeatureLayer(shorthand_name + "_NOFCI_READY2BIN","lyr")
             arcpy.management.AlterField("lyr","DENSITY_NOFCI","DENSITY","DENSITY")
             arcpy.management.DeleteField("lyr","ORIG_FID")
+
+            # Calculate [DENSITY] field to be all negatives ([DENSITY]*-1)
+            expression = '!DENSITY!*-1'
+            print '\n  Calculating all values in field "{}" to be negative: {}\n'.format('DENSITY', expression)
+            arcpy.CalculateField_management("lyr", 'DENSITY', expression, 'PYTHON_9.3')
             arcpy.management.Delete("lyr")
+
 
         except Exception as e:
             success = False

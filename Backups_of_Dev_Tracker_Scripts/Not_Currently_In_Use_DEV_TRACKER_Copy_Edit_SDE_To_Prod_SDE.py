@@ -83,13 +83,6 @@ def main():
 
 
     #---------------------------------------------------------------------------
-    #                         Set Prod SDE Paths
-
-    # Paths to SDE Feature Classes
-
-
-
-    #---------------------------------------------------------------------------
     #                         Set Edit SDE Paths
 
     # Paths to Feature Classes
@@ -157,13 +150,13 @@ def main():
         os.mkdir(log_file_folder)
 
     # Turn all 'print' statements into a log-writing object
-##    try:
-##        log_file = r'{}\{}'.format(log_file_folder, name_of_script.split('.')[0])
-##        orig_stdout, log_file_date, dt_to_append = Write_Print_To_Log(log_file, name_of_script)
-##    except Exception as e:
-##        success = False
-##        print '\n*** ERROR with Write_Print_To_Log() ***'
-##        print str(e)
+    try:
+        log_file = r'{}\{}'.format(log_file_folder, name_of_script.split('.')[0])
+        orig_stdout, log_file_date, dt_to_append = Write_Print_To_Log(log_file, name_of_script)
+    except Exception as e:
+        success = False
+        print '\n*** ERROR with Write_Print_To_Log() ***'
+        print str(e)
 
 
     #---------------------------------------------------------------------------
@@ -264,11 +257,13 @@ def main():
                         print('*** WARNING! This Prod Table does not exist:\n  {}'.format(prod_tbl))
 
                     else:
+
                         print '\n    Deleting rows at:\n      {}'.format(prod_tbl)
                         arcpy.DeleteRows_management(prod_tbl)
 
                         print '\n    Append rows from:\n      {}\n    To:\n      {}'.format(edit_tbl, prod_tbl)
                         arcpy.Append_management(edit_tbl, prod_tbl)
+
 
             except Exception as e:
                 success = False
@@ -309,11 +304,13 @@ def main():
                         print('*** WARNING! This Prod FC does not exist:\n  {}'.format(prod_fc))
 
                     else:
+
                         print '\n    Deleting features at:\n      {}'.format(prod_fc)
                         arcpy.DeleteFeatures_management(prod_fc)
 
                         print '\n    Append features from:\n      {}\n    To:\n      {}'.format(edit_fc, prod_fc)
                         arcpy.Append_management(edit_fc, prod_fc)
+
 
             except Exception as e:
                 success = False
@@ -357,7 +354,7 @@ def main():
     # End of script reporting
     print 'Successfully ran script = {}'.format(success)
     time.sleep(3)
-##    sys.stdout = orig_stdout
+    sys.stdout = orig_stdout
     sys.stdout.flush()
 
     if success == True:
@@ -365,7 +362,7 @@ def main():
     else:
         print '\n*** ERROR with {} ***'.format(name_of_script)
 
-##    print 'Please find log file at:\n  {}\n'.format(log_file_date)
+    print 'Please find log file at:\n  {}\n'.format(log_file_date)
     print '\nSuccess = {}'.format(success)
 
 

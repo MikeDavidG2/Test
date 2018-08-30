@@ -141,7 +141,7 @@ def main():
 
                 if count_success != desired_num_success_files:
                     success = False
-                    print('*** WARNING!  There should be {} "SUCCESS" files, but there are only {}'.format(desired_num_success_files, count_success))
+                    print('*** WARNING!  There should be {} "SUCCESS" files, but there are {}'.format(desired_num_success_files, count_success))
                     print('This means that some previously run scripts were not successfully run.')
                     print('But they did not produce an ERROR file for some reason')
 
@@ -472,15 +472,20 @@ def rename_pdf_files(out_folder):
     """
 
     for old_name in os.listdir(out_folder):
-        if old_name[:13] == "PDSDevTracker":
-            new_name = old_name[21:-4].replace(" ","_") + "_" + old_name[:20] + ".pdf"
+        try:
+            if old_name[:13] == "PDSDevTracker":
+                new_name = old_name[21:-4].replace(" ","_") + "_" + old_name[:20] + ".pdf"
 
-            try:
-                os.rename(out_folder + "\\" + old_name, out_folder + "\\" + new_name)
-            except: # if new file name already exists, delete it first
-                os.remove(out_folder + "\\" + new_name)
-                os.rename(out_folder + "\\" + old_name, out_folder + "\\" + new_name)
-            del new_name
+                try:
+                    os.rename(out_folder + "\\" + old_name, out_folder + "\\" + new_name)
+                except: # if new file name already exists, delete it first
+                    os.remove(out_folder + "\\" + new_name)
+                    os.rename(out_folder + "\\" + old_name, out_folder + "\\" + new_name)
+                del new_name
+
+        except Exception as e:
+            print '\n*** ERROR with Changing name for {} ***'.format(old_name)
+            print str(e)
 
     return
 
