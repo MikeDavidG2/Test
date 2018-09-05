@@ -53,16 +53,16 @@ def main():
 
 
     # Get variables from .ini file
-    root_folder        = config.get('Paths_Local',   'Root_Folder')
-
+    root_folder      = config.get('Paths_Local', 'Root_Folder')
+    pds_share_folder = config.get('Paths_Local', 'Folder_To_Share_w_PDS')
 
     #---------------------------------------------------------------------------
     # Paths to folders and local FGDBs
     log_file_folder   = '{}\{}\{}'.format(root_folder, 'Scripts', 'Logs')
 
-    mxd_folder        = os.path.join(root_folder,"MXDs_to_Generate_PDFs")
+    mxd_folder        = os.path.join(root_folder, "MXDs_to_Generate_PDFs")
 
-    pdf_folder        = os.path.join(root_folder,"PDF_Output")
+    pdf_folder        = os.path.join(pds_share_folder, "PDFs")
 
 
     # Success / Error file info
@@ -72,7 +72,7 @@ def main():
 
     # Number of SUCCESS files this script needs to see in the success_error_folder
     # in order to safely run
-    desired_num_success_files = 16
+    desired_num_success_files = 17
 
 
     # Misc variables
@@ -139,7 +139,7 @@ def main():
                     if f.startswith('SUCCESS'):
                         count_success += 1
 
-                if count_success != desired_num_success_files:
+                if count_success < desired_num_success_files:
                     success = False
                     print('*** WARNING!  There should be {} "SUCCESS" files, but there are {}'.format(desired_num_success_files, count_success))
                     print('This means that some previously run scripts were not successfully run.')

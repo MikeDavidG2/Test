@@ -36,6 +36,9 @@ set Update_LAST_DATA_UPDATE=%wkg_folder%\Source_Code\DEV_TRACKER_Update_LAST_DAT
 ::Set path to MXD to PDF script
 set Export_MXD_to_PDF=%wkg_folder%\Source_Code\DEV_TRACKER_Export_MXD_to_PDF.py
 
+::Set path to Create_QA_QC script
+set Create_QA_QC_File=%wkg_folder%\Source_Code\DEV_TRACKER_Create_QA_QC_File.py
+
 
 ::START RUNNING SCRIPTS
 echo -----------------------[START %date% %time%]------------------->>%log%
@@ -114,6 +117,11 @@ Start /wait  %Update_LAST_DATA_UPDATE%
 ::Export MXD to PDF
 echo Running %Export_MXD_to_PDF%>>%log%
 Start /wait  %Export_MXD_to_PDF%
+
+
+::Create a QA/QC file with the most recent log file from each script (Run regardless of SUCCESS/ERROR files)
+echo Running %Create_QA_QC_File%>>%log%
+Start /wait  %Create_QA_QC_File%
 
 
 echo -----------------------[END %date% %time%]--------------------->>%log%
